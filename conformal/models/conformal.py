@@ -4,7 +4,7 @@ import itertools
 
 
 class ConformalPredictor:
-    def __init__(self, model, device, logic, concept_dim=10, n_concepts=2):
+    def __init__(self, model, device, logic, concept_dim=10, n_concepts=2, multiconcepts=False, multilabel=False):
         """
         model: PyTorch model returning (label_pred, concept_pred)
         device: 'cuda' or 'cpu'
@@ -15,9 +15,14 @@ class ConformalPredictor:
         self.logic = logic
         self.concept_dim = concept_dim
         self.n_concepts = n_concepts
+        self.multiconcepts = multiconcepts
+        self.multilabel = multilabel
 
         self.per_concept_thresholds = None
         self.label_threshold = None
+
+        # TODO: bonferroni correction option
+        # TODO: fix label calibration score for BOIA
 
     @torch.no_grad()
     def compute_conformity_scores(self, dl):
@@ -36,13 +41,22 @@ class ConformalPredictor:
             _, conc_pred = self.model(data)
 
             # For each concept, compute 1 - probability of true label
-            batch_scores = torch.stack(
-                [
-                    1 - conc_pred[:, i, :][range(concepts.size(0)), concepts[:, i]]
-                    for i in range(concepts.size(1))
-                ],
-                dim=1,
-            )
+            if self.multiconcepts:
+                batch_scores = torch.stack(
+                    [
+                        1 - conc_pred[:, i, j, :][range(concepts.size(0)), concepts[:, j].long()]
+                        for i in range(self.n_concepts) for j in range(concepts.size(1))
+                    ],
+                    dim=1,
+                )
+            else:
+                batch_scores = torch.stack(
+                    [
+                        1 - conc_pred[:, i, :][range(concepts.size(0)), concepts[:, i].long()]
+                        for i in range(concepts.size(1))
+                    ],
+                    dim=1,
+                )
 
             all_scores.append(batch_scores.cpu().numpy())
 
@@ -88,21 +102,37 @@ class ConformalPredictor:
         into a list of included label sets using thresholds.
         """
         batch_sets = []
+
         # conc_pred shape: (Batch, N_Concepts, N_Classes)
         for i in range(conc_pred.size(0)):  # Per sample
             sample_set = []
             for j in range(conc_pred.size(1)):  # Per concept
+                
                 # Include class k if: 1 - prob[k] <= threshold
-                included = (
-                    torch.where(
-                        1 - conc_pred[i, j, :] <= self.per_concept_thresholds[j]
-                    )[0]
-                    .cpu()
-                    .numpy()
-                )
-                sample_set.append(included)
+                if self.multiconcepts:
+                    included_list = []
+                    for k in range(self.per_concept_thresholds.shape[0]):
+                        included = (
+                                torch.where(
+                                    1 - conc_pred[i, j, k, :][ :] <= self.per_concept_thresholds[k]
+                                )[0]
+                                .cpu()
+                                .numpy()
+                        )
+                        included_list.append(included)
+                    sample_set.append(included_list)
+                else:
+                    included = (
+                        torch.where(
+                            1 - conc_pred[i, j, :] <= self.per_concept_thresholds[j]
+                        )[0]
+                        .cpu()
+                        .numpy()
+                    )
+                    sample_set.append(included)
             batch_sets.append(sample_set)
         return batch_sets
+
 
     @torch.no_grad()
     def predict_concepts(self, dl):
@@ -125,6 +155,7 @@ class ConformalPredictor:
             prediction_sets.extend(batch_sets)
 
         return prediction_sets
+
 
     def _compute_derived_labels_vectorized(self, batch_concept_sets):
         """

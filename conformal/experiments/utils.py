@@ -43,7 +43,7 @@ def collect_predictions(model, data_loader, device, multiclass=False, multilabel
     elif all_conc_pred.ndim == 3:
         all_c = all_conc_pred.argmax(axis=2)
     else:
-        raise ValueError("all_conc_pred has unsupported shape")
+        all_c = all_conc_pred.argmax(axis=3).squeeze(1)
 
     return (
         all_labels,

@@ -71,7 +71,7 @@ def save_line_plot(
 
 
 def plot_confusion_matrix(
-    y_true, y_pred, class_names, title, output_path=None, max_cols=4
+    y_true, y_pred, class_names, title, output_path=None, max_cols=4, multilabel=False
 ):
     """
     Plot multiple confusion matrices (one per label) in a grid.
@@ -91,31 +91,43 @@ def plot_confusion_matrix(
     else:
         n_labels = y_true.shape[1]
 
-    n_cols = min(max_cols, n_labels)
-    n_rows = math.ceil(n_labels / n_cols)
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 5 * n_rows))
-    axes = np.array(axes).reshape(-1)  # Flatten for easy iteration
+    if multilabel:
+        n_labels = y_true.shape[1]
+        n_cols = min(max_cols, n_labels)
+        n_rows = math.ceil(n_labels / n_cols)
 
-    for i in range(n_labels):
-        cm = confusion_matrix(y_true[:, i], y_pred[:, i], normalize="true")
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 4 * n_rows))
+        axes = np.array([axes]).flatten() if n_labels == 1 else axes.flatten()
+
+        for i in range(n_labels):
+            # Binary comparison for each attribute
+            cm = confusion_matrix(y_true[:, i], y_pred[:, i], labels=[0, 1], normalize="true")
+            sns.heatmap(
+                cm, annot=True, fmt=".2f", cmap="Reds", ax=axes[i], cbar=False,
+                xticklabels=["Abs", "Pres"], yticklabels=["Abs", "Pres"]
+            )
+            axes[i].set_title(class_names[i] if i < len(class_names) else f"Attr {i}")
+            axes[i].set_xlabel("Predicted")
+            axes[i].set_ylabel("True")
+
+        # Clean up empty subplots
+        for j in range(n_labels, len(axes)):
+            axes[j].axis("off")
+    else:
+        fig, ax = plt.subplots(figsize=(12, 10))
+        cm = confusion_matrix(y_true, y_pred, normalize="true")
+        
+        # Limit labels for readability if there are too many (like 50)
+        tick_labels = class_names if len(class_names) < 20 else False
+        
         sns.heatmap(
-            cm,
-            annot=True,
-            fmt=".1f",
-            cmap="Reds",
-            ax=axes[i],
-            cbar=False,
-            xticklabels=[str(x) for x in range(cm.shape[0])],
-            yticklabels=[str(x) for x in range(cm.shape[1])],
+            cm, annot=(len(class_names) < 20), fmt=".1f", cmap="Reds",
+            ax=ax, xticklabels=tick_labels, yticklabels=tick_labels
         )
-        axes[i].set_xlabel("Predicted")
-        axes[i].set_ylabel("True")
-        axes[i].set_title(class_names[i] if i < len(class_names) else f"Label {i}")
-
-    # Hide any unused subplots
-    for j in range(n_labels, len(axes)):
-        axes[j].axis("off")
+        ax.set_title("Multi-class Confusion Matrix")
+        ax.set_xlabel("Predicted Label")
+        ax.set_ylabel("True Label")
 
     fig.suptitle(title, fontsize=16)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])

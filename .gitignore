@@ -18,3 +18,11 @@ exp
 
 # Python version
 .python-version
+
+animal-with-attributes.py
+
+# no longer in use
+conformal/experiments/active.py
+conformal/datasets/cub.py
+
+CONF

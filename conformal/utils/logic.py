@@ -3,13 +3,16 @@ import itertools
 
 
 class Logic:
-    def __init__(self, logic_lambda, n_concepts, concept_dim):
+    def __init__(self, logic_lambda, n_concepts, concept_dim, is_too_big=False):
         self.logic = logic_lambda
         self.n_concepts = n_concepts
         self.concept_dim = concept_dim
-        self.label_concept_map = self._initialize_label_concept_map(
-            n_concepts, concept_dim
-        )
+        if is_too_big:
+            self.label_concept_map = None
+        else:
+            self.label_concept_map = self._initialize_label_concept_map(
+                n_concepts, concept_dim
+            )
 
     def _initialize_label_concept_map(self, n_concepts, concept_dim):
         combinations = np.array(

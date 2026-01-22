@@ -24,7 +24,7 @@ def configure_global_arguments(parser):
     parser.add_argument(
         "dataset",
         metavar="DATASET",
-        choices={"mnistadd", "mnisthalf", "mnistsump", "cub", "boia"},
+        choices={"mnistadd", "mnisthalf", "mnistsump", "boia"},
         default="mnistadd",
         help="Dataset",
     )
@@ -160,7 +160,7 @@ def train_epoch(model, train_dl, optimizer, criterion, device, args):
         present_l = np.unique(all_labels)
         train_f1 = f1_score(all_labels, all_preds, labels=present_l, average="macro")
 
-    if args.dataset in ["boia", "cub"]:
+    if args.dataset in ["boia"]:
         train_c_f1 = 0.0
         for idx in range(all_g.shape[1]):
             present_c = np.unique(all_g[:, idx])
@@ -208,7 +208,7 @@ def train(
                 criterion,
                 device,
                 is_train=False,
-                multiclass=False if args.dataset not in ["cub", "boia"] else True,
+                multiclass=False if args.dataset not in ["boia"] else True,
                 multilabel=False if args.dataset not in ["boia"] else True,
             )
         )
@@ -255,7 +255,7 @@ def evaluate_and_log_model(
             criterion,
             device,
             is_train=False,
-            multiclass=False if args.dataset not in ["cub", "boia"] else True,
+            multiclass=False if args.dataset not in ["boia"] else True,
             multilabel=False if args.dataset not in ["boia"] else True,
         )
     )
@@ -270,7 +270,7 @@ def evaluate_and_log_model(
                 model,
                 test_dl,
                 device,
-                multiclass=False if args.dataset not in ["cub", "boia"] else True,
+                multiclass=False if args.dataset not in ["boia"] else True,
                 multilabel=False if args.dataset not in ["boia"] else True,
             )
         )
@@ -284,6 +284,7 @@ def evaluate_and_log_model(
             class_names,
             "Label confusion matrix",
             str(args.output_dir_path / f"{experiment_name}.label_confusion_matrix.pdf"),
+            multilabel=args.dataset == "boia",
         )
 
         log("> Concept confusion matrix...", "INFO")
@@ -295,6 +296,7 @@ def evaluate_and_log_model(
             str(
                 args.output_dir_path / f"{experiment_name}.concept_confusion_matrix.pdf"
             ),
+            multilabel=args.dataset == "boia",
         )
 
         res = Results(

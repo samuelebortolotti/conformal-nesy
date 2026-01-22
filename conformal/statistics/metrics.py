@@ -131,8 +131,8 @@ def compute_statistics(
         cm = all_c.astype(float).T @ all_g.astype(float)
 
     # Print as a 10x10 matrix
-    print("Confusion Matrix:")
-    print(cm)
+    # print("Confusion Matrix:")
+    # print(cm)
 
     if multilabel:
         y_ece = 0.0
@@ -144,8 +144,9 @@ def compute_statistics(
 
     if multiclass:
         c_ece = 0.0
+        print(all_conc_pred.shape, all_g.shape)
         for idx in range(all_conc_pred.shape[1]):
-            c_ece += compute_ece(all_conc_pred[:, idx], all_g[:, idx], n_bins=15)
+            c_ece += compute_ece(all_conc_pred[:, idx].argmax(axis=-1), all_g[:, idx], n_bins=15)
         c_ece /= all_conc_pred.shape[1]
     else:
         if all_conc_pred.ndim == 3:
@@ -186,7 +187,7 @@ def compute_statistics(
     )
 
 
-def conformal_metrics(prediction_sets, true_labels):
+def conformal_metrics(prediction_sets, true_labels, multiclass=False):
     """
     Compute conformal metrics: coverage and average set size.
     Automatically handles both:
@@ -220,11 +221,19 @@ def conformal_metrics(prediction_sets, true_labels):
 
     else:
         N, C = true_labels.shape
-        for i in range(N):
-            for j in range(C):
-                if true_labels[i, j] in prediction_sets[i][j]:
-                    coverage_total += 1
-                set_size_total += len(prediction_sets[i][j])
+
+        if multiclass:
+            for i in range(N):
+                for j in range(C):
+                    if true_labels[i, j] in prediction_sets[i][0][j]:
+                        coverage_total += 1
+                    set_size_total += len(prediction_sets[i][0][j])
+        else:
+            for i in range(N):
+                for j in range(C):
+                    if true_labels[i, j] in prediction_sets[i][j]:
+                        coverage_total += 1
+                    set_size_total += len(prediction_sets[i][j])
 
         coverage = coverage_total / (N * C)
         avg_set_size = set_size_total / (N * C)
