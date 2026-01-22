@@ -1,0 +1,21 @@
+import torch.nn as nn
+
+
+class Linear(nn.Module):
+    def __init__(self, input_shape=(2048), num_classes=4):
+        super().__init__()
+        self.input_shape = input_shape
+
+        self.model = nn.Linear(input_shape, num_classes)
+
+    def forward(self, x):
+        return self.model(x)
+
+
+def configure_subparsers(subparsers):
+    """Configure subparsers."""
+    # Subparser for ResNet18
+    linear_parser = subparsers.add_parser(
+        "linear",
+        help="Train a Linear layer",
+    )

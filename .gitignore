@@ -1,0 +1,20 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# Sphinx documentation
+docs/_build/
+
+# Environments
+venv/
+
+# Data
+data/
+
+# Optuna
+optuna_runs/
+
+# Experiments
+experiments
+
+# Python version
+.python-version
