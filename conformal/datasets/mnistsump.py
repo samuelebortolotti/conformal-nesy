@@ -23,8 +23,8 @@ class MNISTSumParityLoader(MNISTLoader):
 
         logic = Logic(
             lambda x: (x[:, 0] + x[:, 1]) % 2,
-            n_concepts=n_images, 
-            concept_dim=concept_dim
+            n_concepts=n_images,
+            concept_dim=concept_dim,
         )
 
         return (

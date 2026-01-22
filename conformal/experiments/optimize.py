@@ -1,0 +1,90 @@
+import optuna
+import tempfile
+import copy
+from pathlib import Path
+
+from conformal.experiments.train import main as train_main
+from conformal.experiments.train import configure_global_arguments, train_parser
+
+
+def configure_subparsers(subparsers):
+    """Configure the subparsers."""
+    parser = subparsers.add_parser(
+        "optuna",
+        help="Trains a nn model on a dataset",
+    )
+    train_parser(parser)
+    parser.add_argument(
+        "--optuna-path", type=str, default="optuna_runs", help="Optuna path"
+    )
+    parser.add_argument("--n-trials", type=int, default=20, help="Trials")
+    parser.set_defaults(func=main)
+
+
+def objective(trial, base_args, experiment_name, output_dir, device):
+    args = copy.deepcopy(base_args)
+
+    args.learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
+    args.batch_size = trial.suggest_categorical("batch_size", [32, 64, 128])
+    args.opt = trial.suggest_categorical("opt", ["adam", "sdg"])
+
+    args.model_path = f"trial_{trial.number}.pt"
+    args.output_dir_path = output_dir
+    args.dry_run = True
+
+    with tempfile.NamedTemporaryFile(
+        mode="w+", delete=False
+    ) as stats_file, tempfile.NamedTemporaryFile(
+        mode="w+", delete=False
+    ) as results_file:
+
+        return train_main(
+            experiment_name=f"trial_{trial.number}",
+            results_output_h=results_file,
+            stats_output_h=stats_file,
+            args=args,
+            device=device,
+        )
+
+
+def run_study(
+    device,
+    args,
+    experiment_name,
+    storage=None,
+    study_name="cbm_optuna",
+    direction="maximize",
+):
+    output_dir = Path("./" + args.optuna_path)
+    output_dir.mkdir(exist_ok=True)
+    device = device
+
+    if storage:
+        study = optuna.create_study(
+            direction=direction,
+            study_name=study_name,
+            storage=storage,
+            load_if_exists=True,
+        )
+    else:
+        study = optuna.create_study(direction=direction)
+
+    study.optimize(
+        lambda trial: objective(
+            trial=trial,
+            base_args=args,
+            experiment_name=experiment_name,
+            output_dir=output_dir,
+            device=device,
+        ),
+        n_trials=args.n_trials,
+    )
+
+    print("Best trial:")
+    print("  Value (F1):", study.best_trial.value)
+    print("  Params:", study.best_trial.params)
+    return study
+
+
+def main(experiment_name, results_output_h, stats_output_h, args, device):
+    run_study(device=device, args=args, experiment_name=experiment_name)

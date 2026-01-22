@@ -61,24 +61,14 @@ class DatasetFactory:
 
 class NeSyFactory:
     @staticmethod
-    def get_nesy_model(name: str, n_images, model, entangled, concept_dim, output_dim, dataset, device):
+    def get_nesy_model(
+        name: str, n_images, model, entangled, concept_dim, output_dim, dataset, device
+    ):
         if name.lower() == "dpl":
             return DPL(
-                n_images,
-                model,
-                entangled,
-                concept_dim,
-                output_dim,
-                dataset,
-                device
+                n_images, model, entangled, concept_dim, output_dim, dataset, device
             )
         elif name.lower() == "ltn":
             return LTN(
-                n_images,
-                model,
-                entangled,
-                concept_dim,
-                output_dim,
-                dataset,
-                device
+                n_images, model, entangled, concept_dim, output_dim, dataset, device
             )

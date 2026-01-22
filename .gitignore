@@ -14,7 +14,7 @@ data/
 optuna_runs/
 
 # Experiments
-experiments
+exp
 
 # Python version
 .python-version

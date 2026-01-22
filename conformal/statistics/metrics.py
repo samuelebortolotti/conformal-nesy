@@ -91,6 +91,8 @@ def compute_statistics(
         all_c = all_conc_pred.argmax(axis=1)
     elif all_conc_pred.ndim == 3:
         all_c = all_conc_pred.argmax(axis=2)
+    elif all_conc_pred.ndim == 4:
+        all_c = all_conc_pred.argmax(axis=3).squeeze(1)
 
     if multilabel:
         f1 = 0.0
@@ -192,23 +194,27 @@ def conformal_metrics(prediction_sets, true_labels):
     2. Multi-output classification: true_labels is (N, C)
     """
     true_labels = np.array(true_labels)
-    
+
     coverage_total = 0.0
     set_size_total = 0.0
-    
+
     if true_labels.ndim == 1 or (true_labels.ndim == 2 and true_labels.shape[1] == 1):
-        labels_1d = true_labels.ravel() 
+        labels_1d = true_labels.ravel()
         N = len(labels_1d)
-        
+
         for i in range(N):
             current_set = prediction_sets[i]
-            if isinstance(current_set, list) and len(current_set) == 1 and isinstance(current_set[0], (list, np.ndarray, set)):
+            if (
+                isinstance(current_set, list)
+                and len(current_set) == 1
+                and isinstance(current_set[0], (list, np.ndarray, set))
+            ):
                 current_set = current_set[0]
 
             if labels_1d[i] in current_set:
                 coverage_total += 1
             set_size_total += len(current_set)
-            
+
         coverage = coverage_total / N
         avg_set_size = set_size_total / N
 
@@ -219,7 +225,7 @@ def conformal_metrics(prediction_sets, true_labels):
                 if true_labels[i, j] in prediction_sets[i][j]:
                     coverage_total += 1
                 set_size_total += len(prediction_sets[i][j])
-        
+
         coverage = coverage_total / (N * C)
         avg_set_size = set_size_total / (N * C)
 

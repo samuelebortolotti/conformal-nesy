@@ -29,23 +29,17 @@ class MNISTHalfLoader(MNISTLoader):
         concept_names = [str(i) for i in range(concept_dim)]
 
         logic = Logic(
-            lambda x: x[:, 0] + x[:, 1],
-            n_concepts=n_images, 
-            concept_dim=concept_dim
+            lambda x: x[:, 0] + x[:, 1], n_concepts=n_images, concept_dim=concept_dim
         )
 
         return (
+            MNISTHalfDataset(base_train, filter_fn=_in_distribution_filter),
             MNISTHalfDataset(
-                base_train, 
-                filter_fn=_in_distribution_filter
-            ),
-            MNISTHalfDataset(
-                base_val, 
-                filter_fn=_in_distribution_filter
+                base_val, filter_fn=_in_distribution_filter
             ),  # if not self.active else MNISTHalfDataset(base_val, filter_fn=_out_of_distribution_filter),
             MNISTHalfDataset(
-                base_test, 
-                filter_fn=_in_distribution_filter #_out_of_distribution_filter),
+                base_test,
+                filter_fn=_in_distribution_filter,  # _out_of_distribution_filter),
             ),
             input_dim,
             concept_dim,

@@ -57,9 +57,7 @@ class MNISTAdditionLoader(MNISTLoader):
         concept_names = [str(i) for i in range(concept_dim)]
 
         logic = Logic(
-            lambda x: x[:, 0] + x[:, 1],
-            n_concepts=n_images, 
-            concept_dim=concept_dim
+            lambda x: x[:, 0] + x[:, 1], n_concepts=n_images, concept_dim=concept_dim
         )
 
         return (

@@ -193,21 +193,25 @@ def entropy_plot_over_time(
 def plot_conformal_comparison(results_storage, output_path, target_coverage=0.9):
     """
     Scatter plot comparing Label Coverage vs Average Set Size for different methods.
-    
+
     Args:
         results_storage (dict): Dictionary containing metrics for each method.
         output_path (Path): Path to save the image.
         target_coverage (float): The desired coverage level (1 - alpha).
     """
-    
-    markers = ['o', 's', '^', 'D', 'p']
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
-    
+
+    markers = ["o", "s", "^", "D", "p"]
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
+
     plotted_methods = []
-    
-    for (name, coverage, coverage_size) in zip(["concepts", "labels"], ["coverage_concepts", "coverage_labels"], ["concept_size", "label_size"]):
+
+    for name, coverage, coverage_size in zip(
+        ["concepts", "labels"],
+        ["coverage_concepts", "coverage_labels"],
+        ["concept_size", "label_size"],
+    ):
         plt.figure(figsize=(10, 7))
-        
+
         for i, (method_name, metrics) in enumerate(results_storage.items()):
             if name == "labels" and "coverage_labels" not in metrics:
                 continue
@@ -217,17 +221,34 @@ def plot_conformal_comparison(results_storage, output_path, target_coverage=0.9)
             x = metrics[coverage]
             y = metrics[coverage_size]
 
-            plt.scatter(x, y, label=method_name, s=150, alpha=0.9,
-                    edgecolors='black', linewidth=1.5, marker=markers[i % len(markers)], c=colors[i % len(colors)])
+            plt.scatter(
+                x,
+                y,
+                label=method_name,
+                s=150,
+                alpha=0.9,
+                edgecolors="black",
+                linewidth=1.5,
+                marker=markers[i % len(markers)],
+                c=colors[i % len(colors)],
+            )
             plotted_methods.append(method_name)
 
-        plt.axvline(x=target_coverage, color='gray', linestyle='--', alpha=0.7, label=f'Target ({target_coverage})')
-        plt.axhline(y=1.0, color='gray', linestyle=':', alpha=0.5)
-        plt.title(f"{name.title()} Conformal Prediction: Coverage vs. Size", fontsize=14)
+        plt.axvline(
+            x=target_coverage,
+            color="gray",
+            linestyle="--",
+            alpha=0.7,
+            label=f"Target ({target_coverage})",
+        )
+        plt.axhline(y=1.0, color="gray", linestyle=":", alpha=0.5)
+        plt.title(
+            f"{name.title()} Conformal Prediction: Coverage vs. Size", fontsize=14
+        )
         plt.xlabel("Marginal Coverage (Higher is better)", fontsize=12)
         plt.ylabel("Average Set Size (Lower is better, Ideal=1)", fontsize=12)
         plt.grid(True, linestyle="--", alpha=0.3)
-        plt.legend(loc='best', frameon=True, fancybox=True, shadow=True)
+        plt.legend(loc="best", frameon=True, fancybox=True, shadow=True)
         plt.tight_layout()
         plt.savefig(output_path / f"conformal_comparison_{name}.pdf", dpi=300)
         plt.close()
@@ -236,66 +257,73 @@ def plot_conformal_comparison(results_storage, output_path, target_coverage=0.9)
 def plot_model_metrics(baseline_results, output_path, concept_names=None):
     """
     Plots scalar performance metrics (F1, Loss, ECE) and per-concept entropy.
-    
+
     Args:
         baseline_results (dict): The dictionary stored under results_storage['No Conformal']
         output_path (Path): Directory to save plots.
         concept_names (list): Optional list of names for the concepts.
     """
-    
+
     f1_metrics = {
-        'Label F1': baseline_results.get('test_f1', 0),
-        'Concept F1': baseline_results.get('test_c_f1', 0)
+        "Label F1": baseline_results.get("test_f1", 0),
+        "Concept F1": baseline_results.get("test_c_f1", 0),
     }
-    
+
     plt.figure(figsize=(6, 5))
-    plt.bar(f1_metrics.keys(), f1_metrics.values(), color=['#2ca02c', '#1f77b4'], alpha=0.8, width=0.5)
+    plt.bar(
+        f1_metrics.keys(),
+        f1_metrics.values(),
+        color=["#2ca02c", "#1f77b4"],
+        alpha=0.8,
+        width=0.5,
+    )
     plt.ylim(0, 1.1)
-    plt.ylabel('Score')
-    plt.title('Classification Performance (F1)')
+    plt.ylabel("Score")
+    plt.title("Classification Performance (F1)")
     plt.tight_layout()
     plt.savefig(output_path / "metric_f1_scores.pdf", dpi=300)
     plt.close()
 
     unc_metrics = {
-        'Test Loss': baseline_results.get('test_loss', 0),
-        'Label ECE': baseline_results.get('yece', 0),
-        'Concept ECE': baseline_results.get('cece', 0),
-        'Mean Entropy (H_c)': baseline_results.get('H_c', 0)
+        "Test Loss": baseline_results.get("test_loss", 0),
+        "Label ECE": baseline_results.get("yece", 0),
+        "Concept ECE": baseline_results.get("cece", 0),
+        "Mean Entropy (H_c)": baseline_results.get("H_c", 0),
     }
-    
+
     plt.figure(figsize=(8, 5))
-    plt.bar(unc_metrics.keys(), unc_metrics.values(), color='#d62728', alpha=0.7, width=0.6)
-    plt.ylabel('Value')
-    plt.title('Calibration & Uncertainty Metrics')
-    plt.grid(axis='y', linestyle='--', alpha=0.5)
+    plt.bar(
+        unc_metrics.keys(), unc_metrics.values(), color="#d62728", alpha=0.7, width=0.6
+    )
+    plt.ylabel("Value")
+    plt.title("Calibration & Uncertainty Metrics")
+    plt.grid(axis="y", linestyle="--", alpha=0.5)
     plt.tight_layout()
     plt.savefig(output_path / "metric_uncertainty.pdf", dpi=300)
     plt.close()
 
+    h_per_val = baseline_results.get("H_c_per_value", [])
 
-    h_per_val = baseline_results.get('H_c_per_value', [])
-    
     if len(h_per_val) > 0:
         n_concepts = len(h_per_val)
         indices = np.arange(n_concepts)
-        
+
         plt.figure(figsize=(10, 5))
-        
+
         if concept_names and len(concept_names) == n_concepts:
             labels = concept_names
         else:
             labels = [f"C{i}" for i in indices]
-            
-        plt.bar(indices, h_per_val, color='purple', alpha=0.6, edgecolor='black')
-        
-        plt.xlabel('Concepts')
-        plt.ylabel('Entropy (Uncertainty)')
-        plt.title('Per-Concept Uncertainty (Entropy)')
-        plt.xticks(indices, labels, rotation=45, ha='right')
-        plt.grid(axis='y', linestyle='--', alpha=0.3)
+
+        plt.bar(indices, h_per_val, color="purple", alpha=0.6, edgecolor="black")
+
+        plt.xlabel("Concepts")
+        plt.ylabel("Entropy (Uncertainty)")
+        plt.title("Per-Concept Uncertainty (Entropy)")
+        plt.xticks(indices, labels, rotation=45, ha="right")
+        plt.grid(axis="y", linestyle="--", alpha=0.3)
         plt.ylim(0, 1)
-        
+
         plt.tight_layout()
         plt.savefig(output_path / "metric_entropy_per_concept.pdf", dpi=300)
         plt.close()
