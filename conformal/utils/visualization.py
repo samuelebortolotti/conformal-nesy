@@ -266,7 +266,7 @@ def plot_conformal_comparison(results_storage, output_path, target_coverage=0.9)
         plt.close()
 
 
-def plot_model_metrics(baseline_results, output_path, concept_names=None):
+def plot_model_metrics(baseline_results, output_path, concept_names=None, multiconcepts=False):
     """
     Plots scalar performance metrics (F1, Loss, ECE) and per-concept entropy.
 
@@ -314,27 +314,45 @@ def plot_model_metrics(baseline_results, output_path, concept_names=None):
     plt.savefig(output_path / "metric_uncertainty.pdf", dpi=300)
     plt.close()
 
-    h_per_val = baseline_results.get("H_c_per_value", [])
+    h_per_val = np.array(baseline_results.get("H_c_per_value", []))
 
-    if len(h_per_val) > 0:
-        n_concepts = len(h_per_val)
-        indices = np.arange(n_concepts)
+    if h_per_val.size > 0:
+        plt.figure(figsize=(12, 6))
+        
+        # If multiconcepts is True, we handle the [N_concepts, N_classes] structure
+        if multiconcepts:
+            # Squeeze if it's (1, 21, 2) -> (21, 2)
+            if h_per_val.ndim == 3:
+                h_per_val = h_per_val.squeeze(0)
+            
+            n_concepts, n_classes = h_per_val.shape
+            indices = np.arange(n_concepts)
+            width = 0.35  # Width of individual bars
 
-        plt.figure(figsize=(10, 5))
+            # Plot bars for each class (e.g., False and True)
+            # Assuming class 0 is False/Absent and class 1 is True/Present
+            plt.bar(indices - width/2, h_per_val[:, 0], width, label='Class 0 (False)', color="orchid", alpha=0.7)
+            plt.bar(indices + width/2, h_per_val[:, 1], width, label='Class 1 (True)', color="indigo", alpha=0.7)
 
+            plt.legend()
+        else:
+            # Standard 1D entropy per concept logic
+            n_concepts = len(h_per_val)
+            indices = np.arange(n_concepts)
+            plt.bar(indices, h_per_val, color="purple", alpha=0.6, edgecolor="black")
+
+        # Labels and Formatting
         if concept_names and len(concept_names) == n_concepts:
             labels = concept_names
         else:
-            labels = [f"C{i}" for i in indices]
-
-        plt.bar(indices, h_per_val, color="purple", alpha=0.6, edgecolor="black")
+            labels = [f"C{i}" for i in range(n_concepts)]
 
         plt.xlabel("Concepts")
         plt.ylabel("Entropy (Uncertainty)")
-        plt.title("Per-Concept Uncertainty (Entropy)")
+        plt.title("Per-Concept/State Uncertainty (Entropy)")
         plt.xticks(indices, labels, rotation=45, ha="right")
         plt.grid(axis="y", linestyle="--", alpha=0.3)
-        plt.ylim(0, 1)
+        plt.ylim(0, max(h_per_val.max() * 1.1, 1.0)) # Dynamic limit
 
         plt.tight_layout()
         plt.savefig(output_path / "metric_entropy_per_concept.pdf", dpi=300)

@@ -2,8 +2,7 @@ import torch.nn as nn
 import torch
 
 from conformal.utils.other import outer_product
-from conformal.models.operators import mnist_circuit, mnist_sump_circuit
-from conformal.models.operators import boia_circuit
+from conformal.models.operators import mnist_circuit, mnist_sump_circuit, boia_circuit, chx_circuit
 
 
 class DPL(nn.Module):
@@ -52,10 +51,12 @@ class DPL(nn.Module):
             )
         elif dataset == "boia":
             return boia_circuit()
+        elif dataset == "chx":
+            return chx_circuit()
         raise NotImplementedError(f"Circuit for dataset {dataset} not implemented.")
 
     def get_concepts(self, x):
-        if self.dataset in ["cub", "boia"]:
+        if self.dataset in ["boia", "chx"]:
             # Sigmoid for independent binary concepts
             c = torch.sigmoid(self.encoder(x))
             # Expand to [1-p, p] for DPL logic
@@ -128,7 +129,7 @@ class DPL(nn.Module):
             concepts = torch.stack(concepts, dim=1)
 
             # MNIST-like datasets
-            if self.dataset not in ["boia", "cub"]:
+            if self.dataset not in ["boia"]:
                 # compute the possible words
                 worlds = outer_product(concepts)
                 y = self._dpl_inference(worlds)
@@ -136,8 +137,5 @@ class DPL(nn.Module):
             if self.dataset in ["boia"]:
                 y_flat = self._boia_inference(concepts)
                 y = y_flat.view(y_flat.size(0), -1, 2)
-
-            if self.dataset in ["cub"]:
-                raise NotImplementedError("CUB DPL inference not implemented yet.")
 
             return y, concepts

@@ -23,7 +23,7 @@ def configure_global_arguments(parser):
     parser.add_argument(
         "dataset",
         metavar="DATASET",
-        choices={"mnistadd", "mnisthalf", "mnistsump", "boia"},
+        choices={"mnistadd", "mnisthalf", "mnistsump", "boia", "chx"},
         default="mnistadd",
         help="Dataset",
     )
@@ -229,6 +229,7 @@ def conformal_evaluation(
         n_concepts=model.n_images,
         multiconcepts=multiconcept,
         multilabel=multilabel,
+        bonferroni=True if args.dataset in ["boia"] else False
     )
 
     log("=== 2. Conformal (Calibrating Concepts) ===", "INFO")
@@ -267,7 +268,7 @@ def conformal_evaluation(
         test_dl, use_hard_logic=False, concept_refinement=False
     )
 
-    label_coverage, label_size = conformal_metrics(label_sets, all_labels, multiclass=multilabel)
+    label_coverage, label_size = conformal_metrics(label_sets, all_labels)
 
     log(
         f"[Conformal both Concepts and Labels] Label Coverage: {label_coverage:.4f}",
@@ -300,12 +301,13 @@ def conformal_evaluation(
         )
         return results_storage
 
-        print("=== 4. Conformal (Hard Logic) ===")
+    print("=== 4. Conformal (Hard Logic) ===")
+    
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=True
     )
 
-    label_coverage, label_size = conformal_metrics(label_sets, all_labels, multiclass=multilabel)
+    label_coverage, label_size = conformal_metrics(label_sets, all_labels)
 
     log(f"[Conformal Hard Logic] Label Coverage: {label_coverage:.4f}", "INFO")
     log(f"[Conformal Hard Logic] Label Set Size: {label_size:.4f}", "INFO")
@@ -332,7 +334,7 @@ def conformal_evaluation(
     )
 
     concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g, multiclass=multiconcept)
-    label_coverage, label_size = conformal_metrics(label_sets, all_labels, multiclass=multilabel)
+    label_coverage, label_size = conformal_metrics(label_sets, all_labels)
 
     log(
         f"[Conformal both Concepts and Labels with Concept Refinement] Concept Coverage: {concept_coverage:.4f}",
@@ -468,6 +470,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         result_storage["No Conformal"],
         args.output_dir_path,
         concept_names=args.concept_names if hasattr(args, "concept_names") else None,
+        multiconcepts=True if args.dataset in ["boia"] else False
     )
 
     log("Results Summary:", "INFO")

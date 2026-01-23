@@ -24,7 +24,7 @@ def configure_global_arguments(parser):
     parser.add_argument(
         "dataset",
         metavar="DATASET",
-        choices={"mnistadd", "mnisthalf", "mnistsump", "boia"},
+        choices={"mnistadd", "mnisthalf", "mnistsump", "boia", "chx"},
         default="mnistadd",
         help="Dataset",
     )
@@ -117,11 +117,18 @@ def train_epoch(model, train_dl, optimizer, criterion, device, args):
         # Add concept supervision loss if specified
         if args.concept_supervision > 0:
             concept_loss = 0.0
-            for i in range(conc_pred.size(1)):
-                concept_loss += torch.nn.functional.nll_loss(
-                    conc_pred[:, i, :].log(), concepts[:, i]
-                )
-            concept_loss /= conc_pred.size(1)
+
+            if args.dataset in ["chx", "boia"]:
+                for i in range(conc_pred.size(1)):
+                    concept_loss += torch.nn.functional.nll_loss(
+                        conc_pred[:, 0, i, :].log(), concepts[:, i].long()
+                    )
+            else:
+                for i in range(conc_pred.size(1)):
+                    concept_loss += torch.nn.functional.nll_loss(
+                        conc_pred[:, i, :].log(), concepts[:, i].long()
+                    )
+            concept_loss /= concepts.size(1)
             concept_loss = args.concept_supervision * concept_loss
             log(f"Concept supervision loss: {concept_loss.item():.4f}", "DEBUG")
             loss += concept_loss
@@ -208,7 +215,7 @@ def train(
                 criterion,
                 device,
                 is_train=False,
-                multiclass=False if args.dataset not in ["boia"] else True,
+                multiclass=False if args.dataset not in ["boia", "chx"] else True,
                 multilabel=False if args.dataset not in ["boia"] else True,
             )
         )
@@ -255,7 +262,7 @@ def evaluate_and_log_model(
             criterion,
             device,
             is_train=False,
-            multiclass=False if args.dataset not in ["boia"] else True,
+            multiclass=False if args.dataset not in ["boia", "chx"] else True,
             multilabel=False if args.dataset not in ["boia"] else True,
         )
     )
@@ -270,7 +277,7 @@ def evaluate_and_log_model(
                 model,
                 test_dl,
                 device,
-                multiclass=False if args.dataset not in ["boia"] else True,
+                multiclass=False if args.dataset not in ["boia", "chx"] else True,
                 multilabel=False if args.dataset not in ["boia"] else True,
             )
         )
@@ -296,7 +303,7 @@ def evaluate_and_log_model(
             str(
                 args.output_dir_path / f"{experiment_name}.concept_confusion_matrix.pdf"
             ),
-            multilabel=args.dataset == "boia",
+            multilabel=True if args.dataset in ["boia", "chx"] else False,
         )
 
         res = Results(

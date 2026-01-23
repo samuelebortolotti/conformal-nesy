@@ -4,7 +4,7 @@ import itertools
 
 
 class ConformalPredictor:
-    def __init__(self, model, device, logic, concept_dim=10, n_concepts=2, multiconcepts=False, multilabel=False):
+    def __init__(self, model, device, logic, concept_dim=10, n_concepts=2, multiconcepts=False, multilabel=False, bonferroni=False):
         """
         model: PyTorch model returning (label_pred, concept_pred)
         device: 'cuda' or 'cpu'
@@ -20,9 +20,7 @@ class ConformalPredictor:
 
         self.per_concept_thresholds = None
         self.label_threshold = None
-
-        # TODO: bonferroni correction option
-        # TODO: fix label calibration score for BOIA
+        self.bonferroni = bonferroni
 
     @torch.no_grad()
     def compute_conformity_scores(self, dl):
@@ -75,7 +73,16 @@ class ConformalPredictor:
             data, labels = data.to(self.device), labels.to(self.device)
             label_pred, _ = self.model(data)
 
-            batch_scores = 1 - label_pred[range(len(labels)), labels]
+            if self.multilabel:
+                batch_scores = torch.stack(
+                    [
+                        1 - label_pred[:, i, :][range(labels.size(0)), labels[:, i].long()]
+                        for i in range(labels.size(1))
+                    ],
+                    dim=1,
+                )
+            else:
+                batch_scores = 1 - label_pred[range(len(labels)), labels.long()]
             all_scores.append(batch_scores.cpu().numpy())
 
         return np.concatenate(all_scores)
@@ -85,15 +92,33 @@ class ConformalPredictor:
         Calibrate thresholds individually per concept using quantiles.
         """
         scores = self.compute_conformity_scores(dl)
-        self.per_concept_thresholds = np.quantile(scores, 1 - alpha, axis=0)
+
+        # Determine the effective alpha per concept
+        k = scores.shape[1] # Number of concepts
+        eff_alpha = alpha / k if self.bonferroni else alpha
+        
+        if self.bonferroni:
+            print(f"[Conformal] Applying Bonferroni: Joint alpha {alpha} -> Per-concept alpha {eff_alpha:.4f}")
+
+        # Compute the (1 - eff_alpha) quantile for each concept column
+        self.per_concept_thresholds = np.quantile(scores, 1 - eff_alpha, axis=0)
         print(f"[Conformal] Per-concept thresholds: {self.per_concept_thresholds}")
+
 
     def calibrate_labels(self, dl, alpha=0.1):
         """
         Calibrate threshold for the final label set.
         """
         scores = self.compute_label_scores(dl)
-        self.label_threshold = np.quantile(scores, 1 - alpha)
+
+        # Determine the effective alpha per label
+        k = scores.shape[1] # Number of labels
+        eff_alpha = alpha / k if self.bonferroni else alpha
+        
+        if self.bonferroni:
+            print(f"[Conformal] Applying Bonferroni (Multilabel): Joint alpha {alpha} -> Per-label alpha {eff_alpha:.4f}")
+        
+        self.label_threshold = np.quantile(scores, 1 - eff_alpha, axis=0)
         print(f"[Conformal] Label threshold: {self.label_threshold}")
 
     def _build_concept_sets_for_batch(self, conc_pred):
@@ -355,11 +380,24 @@ class ConformalPredictor:
             else:
                 # Standard Conformal if not hard logic
                 for i in range(label_pred.size(0)):
-                    included = (
-                        torch.where(1 - label_pred[i, :] <= self.label_threshold)[0]
-                        .cpu()
-                        .numpy()
-                    )
+                    if self.multilabel:
+                        included = []
+                        for j in range(label_pred.size(1)):
+                            incl = (
+                                torch.where(
+                                    1 - label_pred[i, j, :] <= self.label_threshold[j]
+                                )[0]
+                                .cpu()
+                                .numpy()
+                            )
+                            included.append(incl)
+                    else:
+                        included = (
+                            torch.where(1 - label_pred[i, :] <= self.label_threshold)[0]
+                            .cpu()
+                            .numpy()
+                        )
+                    
                     batch_label_sets.append(included)
 
             all_label_sets.extend(batch_label_sets)

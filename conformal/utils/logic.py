@@ -7,7 +7,8 @@ class Logic:
         self.logic = logic_lambda
         self.n_concepts = n_concepts
         self.concept_dim = concept_dim
-        if is_too_big:
+        self.is_too_big = is_too_big
+        if self.is_too_big:
             self.label_concept_map = None
         else:
             self.label_concept_map = self._initialize_label_concept_map(

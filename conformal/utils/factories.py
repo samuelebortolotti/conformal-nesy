@@ -8,6 +8,7 @@ from conformal.datasets.mnistsump import MNISTSumParityLoader
 from conformal.datasets.mnisthalf import MNISTHalfLoader
 from conformal.datasets.cub import CUBLoader
 from conformal.datasets.boia import BOIALoader
+from conformal.datasets.chx import CHXLoader
 from conformal.models.dpl import DPL
 from conformal.models.ltn import LTN
 
@@ -55,6 +56,8 @@ class DatasetFactory:
             return CUBLoader(**kwargs).load()
         elif name == "boia":
             return BOIALoader(**kwargs).load()
+        elif name == "chx":
+            return CHXLoader(**kwargs).load()
         else:
             raise ValueError(f"Unknown dataset: {name}")
 

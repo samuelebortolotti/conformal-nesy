@@ -222,12 +222,16 @@ def conformal_metrics(prediction_sets, true_labels, multiclass=False):
     else:
         N, C = true_labels.shape
 
+        print(len(prediction_sets), len(prediction_sets[0]), len(prediction_sets[0][0]), true_labels.shape)
+        print(prediction_sets[0][0])
+
         if multiclass:
             for i in range(N):
-                for j in range(C):
-                    if true_labels[i, j] in prediction_sets[i][0][j]:
-                        coverage_total += 1
-                    set_size_total += len(prediction_sets[i][0][j])
+                for k in range(len(prediction_sets[i])):
+                    for j in range(C):
+                            if true_labels[i, j] in prediction_sets[i][k][j]:
+                                coverage_total += 1
+                            set_size_total += len(prediction_sets[i][k][j])
         else:
             for i in range(N):
                 for j in range(C):

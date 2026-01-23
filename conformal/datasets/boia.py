@@ -248,6 +248,6 @@ class BOIALoader:
             n_images,
             class_names,
             concept_names,
-            self._label_aggregator,
+            logic,
             torch.nn.NLLLoss(),
         )
