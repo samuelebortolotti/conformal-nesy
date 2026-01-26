@@ -80,7 +80,7 @@ def configure_subparsers(subparsers):
 
 
 def save_visual_examples(
-    dataset, concept_sets, label_sets, method_name, output_dir, limit=3, is_image=True
+    dataset, concept_sets, label_sets, method_name, output_dir, limit=10, is_image=True
 ):
     """
     Finds and saves samples where at least one concept prediction set has size >= 2.
@@ -95,8 +95,8 @@ def save_visual_examples(
         if count >= limit:
             break
 
-        c_sets = concept_sets[i]
-        l_sets = label_sets[i] if label_sets is not None else None
+        c_sets = concept_sets[i].tolist()
+        l_sets = label_sets[i].tolist() if label_sets is not None else None
 
         # CONDITION: Check if any concept has a set size >= 2 (Uncertainty)
         # If your concepts are binary, >=2 means the set is {0, 1} (Don't Know)
@@ -113,7 +113,6 @@ def save_visual_examples(
             ax_img = fig.add_subplot(gs[0])
             ax_txt = fig.add_subplot(gs[1])
 
-
             if is_image:
                 if hasattr(image_data, "permute"):  # PyTorch Tensor
                     img_np = image_data.permute(1, 2, 0).cpu().numpy()
@@ -127,7 +126,7 @@ def save_visual_examples(
                     ax_img.imshow(img_np, cmap="gray")
                 else:
                     ax_img.imshow(img_np)
-    
+
             ax_img.axis("off")
             ax_img.set_title(
                 f"Sample {i} | Method: {method_name}", fontsize=12, fontweight="bold"
@@ -153,13 +152,13 @@ def save_visual_examples(
 
             # Save
             fname = save_path / f"sample_{i}.pdf"
-            print(fname)
+            log(fname, "DEBUG")
             plt.savefig(fname, format="pdf", bbox_inches="tight")
             plt.close()
 
             count += 1
 
-    print(f"[Info] Saved {count} examples for {method_name} to {save_path}")
+    log(f"[Info] Saved {count} examples for {method_name} to {save_path}", "INFO")
 
 
 def conformal_evaluation(
@@ -177,7 +176,7 @@ def conformal_evaluation(
 
     results_storage = {}
 
-    multiconcept = False if args.dataset not in ["boia"] else True
+    multiconcept = False if args.dataset not in ["boia", "chx"] else True
     multilabel = False if args.dataset not in ["boia"] else True
     is_image = False if args.dataset in ["boia"] else True
 
@@ -229,7 +228,7 @@ def conformal_evaluation(
         n_concepts=model.n_images,
         multiconcepts=multiconcept,
         multilabel=multilabel,
-        bonferroni=True if args.dataset in ["boia"] else False
+        bonferroni=True if args.dataset in ["chx"] else False, # in ["boia", "chx"] else False,
     )
 
     log("=== 2. Conformal (Calibrating Concepts) ===", "INFO")
@@ -240,7 +239,9 @@ def conformal_evaluation(
     log("Predicting conformal sets on the test set...", "INFO")
     concept_sets = cp.predict_concepts(test_dl)
 
-    concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g, multiclass=multiconcept)
+    concept_coverage, concept_set_size = conformal_metrics(
+        concept_sets, all_g
+    )
 
     log(f"[Conformal Concepts Only] Concept Coverage: {concept_coverage:.4f}", "INFO")
     log(f"[Conformal Concepts Only] Concept Set Size: {concept_set_size:.4f}", "INFO")
@@ -294,15 +295,8 @@ def conformal_evaluation(
         is_image=is_image,
     )
 
-    if cp.logic.is_too_big:
-        log(
-            "[Warning] Skipping concept refinement visual examples due to large logic size.",
-            "WARNING",
-        )
-        return results_storage
+    log("=== 4. Conformal (Hard Logic) ===", "INFO")
 
-    print("=== 4. Conformal (Hard Logic) ===")
-    
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=True
     )
@@ -327,13 +321,16 @@ def conformal_evaluation(
         args.output_dir_path,
         is_image=is_image,
     )
-
-    print("=== 5. Conformal with Concept Refinement ===")
+    
+    log("=== 5. Conformal with Concept Refinement ===", "INFO")
+    
     concept_sets, label_sets = cp.predict_concepts_and_labels(
-        test_dl, use_hard_logic=False, concept_refinement=True, label_refinement=False
+        test_dl, use_hard_logic=False, concept_refinement=True
     )
 
-    concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g, multiclass=multiconcept)
+    concept_coverage, concept_set_size = conformal_metrics(
+        concept_sets, all_g
+    )
     label_coverage, label_size = conformal_metrics(label_sets, all_labels)
 
     log(
@@ -369,50 +366,60 @@ def conformal_evaluation(
         "label_size": label_size,
     }
 
-    print("=== 5. Conformal with Concept and Label Refinement ===")
-    concept_sets, label_sets = cp.predict_concepts_and_labels(
-        test_dl, use_hard_logic=False, concept_refinement=True, label_refinement=True
-    )
-
-    concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g, multiclass=multiconcept)
-    label_coverage, label_size = conformal_metrics(label_sets, all_labels)
-
-    log(
-        f"[Conformal both Concepts and Labels with Concept and Label Refinement] Concept Coverage: {concept_coverage:.4f}",
-        "INFO",
-    )
-    log(
-        f"[Conformal both Concepts and Labels with Concept and Label  Refinement] Concept Set Size: {concept_set_size:.4f}",
-        "INFO",
-    )
-    log(
-        f"[Conformal both Concepts and Labels with Concept and Label  Refinement] Label Coverage: {label_coverage:.4f}",
-        "INFO",
-    )
-    log(
-        f"[Conformal both Concepts and Labels with Concept and Label  Refinement] Label Set Size: {label_size:.4f}",
-        "INFO",
-    )
-
-    save_visual_examples(
-        test_dl.dataset,
-        concept_sets,
-        label_sets,
-        "Conformal both Concepts and Labels with Concept and Label Refinement",
-        args.output_dir_path,
-        is_image=is_image,
-    )
-
-    results_storage[
-        "Conformal both Concepts and Labels with Concept and Label Refinement"
-    ] = {
-        "coverage_concepts": concept_coverage,
-        "concept_size": concept_set_size,
-        "coverage_labels": label_coverage,
-        "label_size": label_size,
-    }
-
     return results_storage
+
+    # if cp.logic.is_too_big:
+    #     log(
+    #         "[Warning] Skipping hard logic due to large logic size. Move to LTN?",
+    #         "WARNING",
+    #     )
+    #     return results_storage
+
+    # print("=== 6. Conformal with Concept and Label Refinement ===")
+
+    # concept_sets, label_sets = cp.predict_concepts_and_labels(
+    #     test_dl, use_hard_logic=False, concept_refinement=True
+    # )
+
+    # concept_coverage, concept_set_size = conformal_metrics(
+    #     concept_sets, all_g, multiclass=multiconcept
+    # )
+    # label_coverage, label_size = conformal_metrics(label_sets, all_labels)
+
+    # log(
+    #     f"[Conformal both Concepts and Labels with Concept and Label Refinement] Concept Coverage: {concept_coverage:.4f}",
+    #     "INFO",
+    # )
+    # log(
+    #     f"[Conformal both Concepts and Labels with Concept and Label  Refinement] Concept Set Size: {concept_set_size:.4f}",
+    #     "INFO",
+    # )
+    # log(
+    #     f"[Conformal both Concepts and Labels with Concept and Label  Refinement] Label Coverage: {label_coverage:.4f}",
+    #     "INFO",
+    # )
+    # log(
+    #     f"[Conformal both Concepts and Labels with Concept and Label  Refinement] Label Set Size: {label_size:.4f}",
+    #     "INFO",
+    # )
+
+    # save_visual_examples(
+    #     test_dl.dataset,
+    #     concept_sets,
+    #     label_sets,
+    #     "Conformal both Concepts and Labels with Concept and Label Refinement",
+    #     args.output_dir_path,
+    #     is_image=is_image,
+    # )
+
+    # results_storage[
+    #     "Conformal both Concepts and Labels with Concept and Label Refinement"
+    # ] = {
+    #     "coverage_concepts": concept_coverage,
+    #     "concept_size": concept_set_size,
+    #     "coverage_labels": label_coverage,
+    #     "label_size": label_size,
+    # }
 
 
 def main(experiment_name, results_output_h, stats_output_h, args, device):
@@ -430,7 +437,9 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         concept_names,
         label_aggregator,
         criterion,
-    ) = DatasetFactory.get_dataset(args.dataset)
+        concept_weights,
+        label_weights,
+    ) = DatasetFactory.get_dataset(name=args.dataset, device=args.device)
 
     _, val_dl, test_dl = create_dataloaders(
         train_ds, val_ds, test_ds, batch_size=args.batch_size, shuffle_val=False
@@ -470,7 +479,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         result_storage["No Conformal"],
         args.output_dir_path,
         concept_names=args.concept_names if hasattr(args, "concept_names") else None,
-        multiconcepts=True if args.dataset in ["boia"] else False
+        multiconcepts=True if args.dataset in ["boia", "chx"] else False,
     )
 
     log("Results Summary:", "INFO")

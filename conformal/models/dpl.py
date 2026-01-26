@@ -2,7 +2,12 @@ import torch.nn as nn
 import torch
 
 from conformal.utils.other import outer_product
-from conformal.models.operators import mnist_circuit, mnist_sump_circuit, boia_circuit, chx_circuit
+from conformal.models.operators import (
+    mnist_circuit,
+    mnist_sump_circuit,
+    boia_circuit,
+    chx_circuit,
+)
 
 
 class DPL(nn.Module):
@@ -131,7 +136,11 @@ class DPL(nn.Module):
             # MNIST-like datasets
             if self.dataset not in ["boia"]:
                 # compute the possible words
-                worlds = outer_product(concepts)
+                worlds = (
+                    outer_product(concepts.squeeze(1))
+                    if self.dataset in ["chx"]
+                    else outer_product(concepts)
+                )
                 y = self._dpl_inference(worlds)
 
             if self.dataset in ["boia"]:

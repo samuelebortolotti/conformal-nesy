@@ -44,16 +44,16 @@ class DatasetFactory:
     @staticmethod
     def get_dataset(name: str, **kwargs):
         name = name.lower()
-        if name == "mnist":
-            return MNISTLoader(**kwargs).load()
-        elif name == "mnistadd":
+        # if name == "mnist":
+        #     return MNISTLoader(**kwargs).load()
+        if name == "mnistadd":
             return MNISTAdditionLoader(**kwargs).load()
         elif name == "mnistsump":
             return MNISTSumParityLoader(**kwargs).load()
         elif name == "mnisthalf":
             return MNISTHalfLoader(**kwargs).load()
-        elif name == "cub":
-            return CUBLoader(**kwargs).load()
+        # elif name == "cub":
+        #     return CUBLoader(**kwargs).load()
         elif name == "boia":
             return BOIALoader(**kwargs).load()
         elif name == "chx":

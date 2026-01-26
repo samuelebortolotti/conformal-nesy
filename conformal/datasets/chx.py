@@ -12,8 +12,10 @@ from torchvision import transforms
 from conformal.utils.logic import Logic
 from conformal.general_utils import log
 
+
 class CHXDataset(Dataset):
     """Dataset class with lazy loading for Chest X-rays."""
+
     def __init__(self, image_paths, concepts, targets, transform=None):
         self.image_paths = image_paths
         self.concepts = concepts
@@ -28,17 +30,28 @@ class CHXDataset(Dataset):
         if self.transform:
             img = self.transform(img)
         return (
-            img, 
-            torch.tensor(self.concepts[idx], dtype=torch.long), 
-            torch.tensor(self.targets[idx], dtype=torch.long)
+            img,
+            torch.tensor(self.concepts[idx], dtype=torch.long),
+            torch.tensor(self.targets[idx], dtype=torch.long),
         )
 
+
 class CHXLoader:
-    def __init__(self, data_dir="data", batch_size=64, test_split=0.2, val_split=0.1):
+    def __init__(
+        self,
+        data_dir="data",
+        batch_size=64,
+        test_split=0.2,
+        val_split=0.1,
+        device="cuda",
+    ):
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.test_split = test_split
         self.val_split = val_split
+        self.device = device
+        self.label_weights = []
+        self.concepts_weights = []
 
     def _download_and_extract_needed(self, needed_filenames):
         """Downloads NIH tarballs only to extract specific annotated images."""
@@ -64,7 +77,9 @@ class CHXLoader:
             # Check if we already have all needed images before downloading next tar
             existing = set(os.listdir(img_dir))
             if needed_filenames.issubset(existing):
-                log("All annotated images already present. Skipping remaining downloads.")
+                log(
+                    "All annotated images already present. Skipping remaining downloads."
+                )
                 break
 
             tar_path = os.path.join(self.data_dir, f"batch_{idx+1}.tar.gz")
@@ -74,20 +89,28 @@ class CHXLoader:
             with tarfile.open(tar_path, "r:gz") as tar:
                 # Extract only the members that are in our 'needed' list
                 members = tar.getmembers()
-                to_extract = [m for m in members if os.path.basename(m.name) in needed_filenames]
-                
+                to_extract = [
+                    m for m in members if os.path.basename(m.name) in needed_filenames
+                ]
+
                 if to_extract:
                     log(f"Extracting {len(to_extract)} images from batch_{idx+1}...")
                     tar.extractall(path=img_dir, members=to_extract)
-            
+
             # Delete tarball immediately to save 2GB+ per batch
             os.remove(tar_path)
 
     def load(self):
         # 1. Access local CSVs
-        readers_csv = os.path.join(self.data_dir, "four_findings_expert_labels_individual_readers.csv")
-        test_labels_csv = os.path.join(self.data_dir, "four_findings_expert_labels_test_labels.csv")
-        val_labels_csv = os.path.join(self.data_dir, "four_findings_expert_labels_validation_labels.csv")
+        readers_csv = os.path.join(
+            self.data_dir, "four_findings_expert_labels_individual_readers.csv"
+        )
+        test_labels_csv = os.path.join(
+            self.data_dir, "four_findings_expert_labels_test_labels.csv"
+        )
+        val_labels_csv = os.path.join(
+            self.data_dir, "four_findings_expert_labels_validation_labels.csv"
+        )
 
         # Load all into one pool
         df_readers = pd.read_csv(readers_csv)
@@ -96,13 +119,14 @@ class CHXLoader:
         expert_df = pd.concat([df_readers, df_test, df_val], ignore_index=True)
 
         # 2. Trigger selective download/extraction
-        needed_images = set(expert_df["Image ID"].unique())
-        self._download_and_extract_needed(needed_images)
+        # needed_images = set(expert_df["Image ID"].unique())
+        # self._download_and_extract_needed(needed_images)
 
         # 3. Process Labels
         concept_cols = ["Fracture", "Pneumothorax", "Airspace opacity", "Nodule/mass"]
-        if "Nodule or mass" in expert_df.columns:
-            expert_df.rename(columns={"Nodule or mass": "Nodule/mass"}, inplace=True)
+
+        # if "Nodule or mass" in expert_df.columns:
+        #     expert_df.rename(columns={"Nodule or mass": "Nodule/mass"}, inplace=True)
 
         for col in concept_cols:
             expert_df[col] = np.where(expert_df[col] == "YES", 1, 0)
@@ -114,7 +138,8 @@ class CHXLoader:
 
         # Target mapping
         df_agg["target"] = (df_agg[concept_cols].sum(axis=1) == 0).astype(int)
-        img_dir = os.path.join(self.data_dir, "images_nih")
+
+        img_dir = os.path.join(self.data_dir, "images_nih", "images")
         df_agg["path"] = df_agg["Image ID"].apply(lambda x: os.path.join(img_dir, x))
 
         # Final check: only include what we successfully extracted
@@ -122,23 +147,62 @@ class CHXLoader:
 
         # 4. Split and Transform
         x_train, x_test, c_train, c_test, y_train, y_test = train_test_split(
-            df_agg["path"].values, df_agg[concept_cols].values, df_agg["target"].values, 
-            test_size=self.test_split, random_state=42
+            df_agg["path"].values,
+            df_agg[concept_cols].values,
+            df_agg["target"].values,
+            test_size=self.test_split,
+            random_state=42,
         )
         x_train, x_val, c_train, c_val, y_train, y_val = train_test_split(
             x_train, c_train, y_train, test_size=self.val_split, random_state=42
         )
 
-        transform = transforms.Compose([
-            transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
+        # Label weights
+        y_counts = np.bincount(y_train)
+        self.label_weights = torch.tensor(
+            len(y_train) / (2.0 * y_counts), dtype=torch.float
+        )
 
-        logic = Logic(lambda x: (torch.sum(x, dim=1) == 0).long(), n_concepts=1, concept_dim=4)
+        # Concept weights
+        for i in range(c_train.shape[1]):
+            c_counts = np.bincount(c_train[:, i])
+            if len(c_counts) < 2:
+                weights = [1.0, 1.0]
+            else:
+                weights = len(c_train) / (2.0 * c_counts)
+            self.concepts_weights.append(
+                torch.tensor(weights, dtype=torch.float).to(self.device)
+            )
+
+        self.label_weights = self.label_weights.to(self.device)
+
+        transform = transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
+
+        logic = Logic(
+            lambda x: (np.sum(x, axis=1) == 0).astype(np.int64), n_concepts=1, concept_dim=4
+        )
 
         return (
             CHXDataset(x_train, c_train, y_train, transform),
             CHXDataset(x_val, c_val, y_val, transform),
             CHXDataset(x_test, c_test, y_test, transform),
-            (3, 224, 224), 4, 2, 1, ["Abnormal", "Healthy"], concept_cols, logic, torch.nn.CrossEntropyLoss()
+            (3, 224, 224),
+            4,
+            2,
+            1,
+            ["Abnormal", "Healthy"],
+            concept_cols,
+            logic,
+            torch.nn.CrossEntropyLoss(weight=self.label_weights),
+            self.concepts_weights,
+            self.label_weights,
         )

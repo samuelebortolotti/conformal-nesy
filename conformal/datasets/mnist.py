@@ -4,7 +4,9 @@ import torch
 
 
 class MNISTLoader:
-    def __init__(self, root="./data", val_split=0.1, download=True, active=False):
+    def __init__(
+        self, root="./data", val_split=0.1, download=True, active=False, device="cuda"
+    ):
         self.transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
         )
@@ -12,6 +14,7 @@ class MNISTLoader:
         self.val_split = val_split
         self.download = download
         self.active = active
+        self.device = device
 
     def _label_aggregator(label1):
         return label1

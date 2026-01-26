@@ -144,9 +144,10 @@ def compute_statistics(
 
     if multiclass:
         c_ece = 0.0
-        print(all_conc_pred.shape, all_g.shape)
         for idx in range(all_conc_pred.shape[1]):
-            c_ece += compute_ece(all_conc_pred[:, idx].argmax(axis=-1), all_g[:, idx], n_bins=15)
+            c_ece += compute_ece(
+                all_conc_pred[:, idx].argmax(axis=-1), all_g[:, idx], n_bins=15
+            )
         c_ece /= all_conc_pred.shape[1]
     else:
         if all_conc_pred.ndim == 3:
@@ -187,59 +188,38 @@ def compute_statistics(
     )
 
 
-def conformal_metrics(prediction_sets, true_labels, multiclass=False):
+def conformal_metrics(prediction_tuples, true_labels):
     """
-    Compute conformal metrics: coverage and average set size.
-    Automatically handles both:
-    1. Standard classification: true_labels is (N,) or (N, 1)
-    2. Multi-output classification: true_labels is (N, C)
+    Compute conformal metrics for concept combinations (tuples).
+    
+    Args:
+        prediction_tuples: List of np.ndarrays [Samples][Combinations, Concepts]
+        true_labels: np.ndarray [Samples, Concepts]
     """
     true_labels = np.array(true_labels)
+    N = len(true_labels)
 
     coverage_total = 0.0
     set_size_total = 0.0
 
-    if true_labels.ndim == 1 or (true_labels.ndim == 2 and true_labels.shape[1] == 1):
-        labels_1d = true_labels.ravel()
-        N = len(labels_1d)
+    # Loop through the examples (samples)
+    for i in range(N):
+        # This is your matrix of all valid conformal combinations for this sample
+        sample_tuples = prediction_tuples[i] 
+        
+        # The ground truth combination we are looking for
+        ground_truth = true_labels[i]
 
-        for i in range(N):
-            current_set = prediction_sets[i]
-            if (
-                isinstance(current_set, list)
-                and len(current_set) == 1
-                and isinstance(current_set[0], (list, np.ndarray, set))
-            ):
-                current_set = current_set[0]
-
-            if labels_1d[i] in current_set:
+        # Check the presence of the true combination in the predicted tuples
+        if sample_tuples.size > 0:
+            if np.any(np.all(sample_tuples == ground_truth, axis=-1)):
                 coverage_total += 1
-            set_size_total += len(current_set)
+        
+        # Increment total set size by the number of unique tuples predicted
+        set_size_total += len(sample_tuples)
 
-        coverage = coverage_total / N
-        avg_set_size = set_size_total / N
-
-    else:
-        N, C = true_labels.shape
-
-        print(len(prediction_sets), len(prediction_sets[0]), len(prediction_sets[0][0]), true_labels.shape)
-        print(prediction_sets[0][0])
-
-        if multiclass:
-            for i in range(N):
-                for k in range(len(prediction_sets[i])):
-                    for j in range(C):
-                            if true_labels[i, j] in prediction_sets[i][k][j]:
-                                coverage_total += 1
-                            set_size_total += len(prediction_sets[i][k][j])
-        else:
-            for i in range(N):
-                for j in range(C):
-                    if true_labels[i, j] in prediction_sets[i][j]:
-                        coverage_total += 1
-                    set_size_total += len(prediction_sets[i][j])
-
-        coverage = coverage_total / (N * C)
-        avg_set_size = set_size_total / (N * C)
+    # Calculate final averages
+    coverage = coverage_total / N
+    avg_set_size = set_size_total / N
 
     return coverage, avg_set_size

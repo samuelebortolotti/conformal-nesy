@@ -91,7 +91,6 @@ def plot_confusion_matrix(
     else:
         n_labels = y_true.shape[1]
 
-
     if multilabel:
         n_labels = y_true.shape[1]
         n_cols = min(max_cols, n_labels)
@@ -102,10 +101,18 @@ def plot_confusion_matrix(
 
         for i in range(n_labels):
             # Binary comparison for each attribute
-            cm = confusion_matrix(y_true[:, i], y_pred[:, i], labels=[0, 1], normalize="true")
+            cm = confusion_matrix(
+                y_true[:, i], y_pred[:, i], labels=[0, 1], normalize="true"
+            )
             sns.heatmap(
-                cm, annot=True, fmt=".2f", cmap="Reds", ax=axes[i], cbar=False,
-                xticklabels=["Abs", "Pres"], yticklabels=["Abs", "Pres"]
+                cm,
+                annot=True,
+                fmt=".2f",
+                cmap="Reds",
+                ax=axes[i],
+                cbar=False,
+                xticklabels=["Abs", "Pres"],
+                yticklabels=["Abs", "Pres"],
             )
             axes[i].set_title(class_names[i] if i < len(class_names) else f"Attr {i}")
             axes[i].set_xlabel("Predicted")
@@ -117,13 +124,18 @@ def plot_confusion_matrix(
     else:
         fig, ax = plt.subplots(figsize=(12, 10))
         cm = confusion_matrix(y_true, y_pred, normalize="true")
-        
+
         # Limit labels for readability if there are too many (like 50)
         tick_labels = class_names if len(class_names) < 20 else False
-        
+
         sns.heatmap(
-            cm, annot=(len(class_names) < 20), fmt=".1f", cmap="Reds",
-            ax=ax, xticklabels=tick_labels, yticklabels=tick_labels
+            cm,
+            annot=(len(class_names) < 20),
+            fmt=".1f",
+            cmap="Reds",
+            ax=ax,
+            xticklabels=tick_labels,
+            yticklabels=tick_labels,
         )
         ax.set_title("Multi-class Confusion Matrix")
         ax.set_xlabel("Predicted Label")
@@ -266,7 +278,9 @@ def plot_conformal_comparison(results_storage, output_path, target_coverage=0.9)
         plt.close()
 
 
-def plot_model_metrics(baseline_results, output_path, concept_names=None, multiconcepts=False):
+def plot_model_metrics(
+    baseline_results, output_path, concept_names=None, multiconcepts=False
+):
     """
     Plots scalar performance metrics (F1, Loss, ECE) and per-concept entropy.
 
@@ -318,21 +332,35 @@ def plot_model_metrics(baseline_results, output_path, concept_names=None, multic
 
     if h_per_val.size > 0:
         plt.figure(figsize=(12, 6))
-        
+
         # If multiconcepts is True, we handle the [N_concepts, N_classes] structure
         if multiconcepts:
             # Squeeze if it's (1, 21, 2) -> (21, 2)
             if h_per_val.ndim == 3:
                 h_per_val = h_per_val.squeeze(0)
-            
+
             n_concepts, n_classes = h_per_val.shape
             indices = np.arange(n_concepts)
             width = 0.35  # Width of individual bars
 
             # Plot bars for each class (e.g., False and True)
             # Assuming class 0 is False/Absent and class 1 is True/Present
-            plt.bar(indices - width/2, h_per_val[:, 0], width, label='Class 0 (False)', color="orchid", alpha=0.7)
-            plt.bar(indices + width/2, h_per_val[:, 1], width, label='Class 1 (True)', color="indigo", alpha=0.7)
+            plt.bar(
+                indices - width / 2,
+                h_per_val[:, 0],
+                width,
+                label="Class 0 (False)",
+                color="orchid",
+                alpha=0.7,
+            )
+            plt.bar(
+                indices + width / 2,
+                h_per_val[:, 1],
+                width,
+                label="Class 1 (True)",
+                color="indigo",
+                alpha=0.7,
+            )
 
             plt.legend()
         else:
@@ -352,7 +380,7 @@ def plot_model_metrics(baseline_results, output_path, concept_names=None, multic
         plt.title("Per-Concept/State Uncertainty (Entropy)")
         plt.xticks(indices, labels, rotation=45, ha="right")
         plt.grid(axis="y", linestyle="--", alpha=0.3)
-        plt.ylim(0, max(h_per_val.max() * 1.1, 1.0)) # Dynamic limit
+        plt.ylim(0, max(h_per_val.max() * 1.1, 1.0))  # Dynamic limit
 
         plt.tight_layout()
         plt.savefig(output_path / "metric_entropy_per_concept.pdf", dpi=300)

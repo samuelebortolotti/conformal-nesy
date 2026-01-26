@@ -1,7 +1,9 @@
 import os
 import torch
+import numpy as np
 from torch.utils.data import Dataset, random_split
 from conformal.utils.logic import Logic
+from conformal.general_utils import log
 import pickle
 
 CONCEPTS_ORDER = {
@@ -130,10 +132,13 @@ class BOIALoader:
     train, val, test, input_dim, concept_dim, output_dim, n_images, class_names, concept_names, label_aggregator
     """
 
-    def __init__(self, root="./data/bdd2048", val_split=0.1):
+    def __init__(self, root="./data/bdd2048", val_split=0.1, device="cuda"):
         self.root = root
         self.val_split = val_split
         self.transform = None
+        self.label_weights = []
+        self.concept_weights = []
+        self.device = device
 
     def _label_aggregator(self, label):
         # Identity function (can be customized)
@@ -194,49 +199,116 @@ class BOIALoader:
         # NOT (¬A): Represented as 1 - A.
 
         logic = Logic(
-            lambda x: torch.stack([
-                # 1. STOP
-                # stop = Or(red_light, stop_sign, obstacle)
-                # where obstacle = Or(car, person, rider, other_obstacle)
-                torch.clamp(
-                    x[:, 3] + x[:, 4] + # red_light + stop_sign
-                    torch.clamp(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1), # obstacles
-                    0, 1
-                ),
-
-                # 2. MOVE_FORWARD
-                # move_forward = And(Implies(stop, Not(mf_cond)), mf_cond)
-                # Simplified for fuzzy logic: mf_cond AND (NOT stop)
-                # where mf_cond = Or(green_light, follow, road_clear)
-                torch.clamp(
-                    # move_forward_cond
-                    torch.clamp(x[:, 0] + x[:, 1] + (1 - torch.clamp(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1)), 0, 1) * # Not(stop)
-                    (1 - torch.clamp(x[:, 3] + x[:, 4] + torch.clamp(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1), 0, 1)),
-                    0, 1
-                ),
-
-                # 3. TURN_LEFT
-                # turn_left = And(can_turn_left, Not(cannot_turn_left))
-                torch.clamp(
-                    # can_turn_left: Or(left_lane, left_green_light, left_follow)
-                    torch.clamp(x[:, 18] + x[:, 19] + x[:, 20], 0, 1) * # Not(cannot_turn_left): Or(no_left_lane, left_obstacle, left_solid_line)
-                    (1 - torch.clamp(x[:, 9] + x[:, 10] + x[:, 11], 0, 1)),
-                    0, 1
-                ),
-
-                # 4. TURN_RIGHT
-                # turn_right = And(can_turn_right, Not(cannot_turn_right))
-                torch.clamp(
-                    # can_turn_right: Or(right_lane, right_green_light, right_follow)
-                    torch.clamp(x[:, 12] + x[:, 13] + x[:, 14], 0, 1) * # Not(cannot_turn_right): Or(no_right_lane, right_obstacle, right_solid_line)
-                    (1 - torch.clamp(x[:, 15] + x[:, 16] + x[:, 17], 0, 1)),
-                    0, 1
-                )
-            ], dim=1),
-            n_concepts=n_images, 
+            lambda x: torch.stack(
+                [
+                    # 1. STOP
+                    # stop = Or(red_light, stop_sign, obstacle)
+                    # where obstacle = Or(car, person, rider, other_obstacle)
+                    torch.clamp(
+                        x[:, 3]
+                        + x[:, 4]  # red_light + stop_sign
+                        + torch.clamp(
+                            x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1
+                        ),  # obstacles
+                        0,
+                        1,
+                    ),
+                    # 2. MOVE_FORWARD
+                    # move_forward = And(Implies(stop, Not(mf_cond)), mf_cond)
+                    # Simplified for fuzzy logic: mf_cond AND (NOT stop)
+                    # where mf_cond = Or(green_light, follow, road_clear)
+                    torch.clamp(
+                        # move_forward_cond
+                        torch.clamp(
+                            x[:, 0]
+                            + x[:, 1]
+                            + (
+                                1
+                                - torch.clamp(
+                                    x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1
+                                )
+                            ),
+                            0,
+                            1,
+                        )  # Not(stop)
+                        * (
+                            1
+                            - torch.clamp(
+                                x[:, 3]
+                                + x[:, 4]
+                                + torch.clamp(
+                                    x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1
+                                ),
+                                0,
+                                1,
+                            )
+                        ),
+                        0,
+                        1,
+                    ),
+                    # 3. TURN_LEFT
+                    # turn_left = And(can_turn_left, Not(cannot_turn_left))
+                    torch.clamp(
+                        # can_turn_left: Or(left_lane, left_green_light, left_follow)
+                        torch.clamp(
+                            x[:, 18] + x[:, 19] + x[:, 20], 0, 1
+                        )  # Not(cannot_turn_left): Or(no_left_lane, left_obstacle, left_solid_line)
+                        * (1 - torch.clamp(x[:, 9] + x[:, 10] + x[:, 11], 0, 1)),
+                        0,
+                        1,
+                    ),
+                    # 4. TURN_RIGHT
+                    # turn_right = And(can_turn_right, Not(cannot_turn_right))
+                    torch.clamp(
+                        # can_turn_right: Or(right_lane, right_green_light, right_follow)
+                        torch.clamp(
+                            x[:, 12] + x[:, 13] + x[:, 14], 0, 1
+                        )  # Not(cannot_turn_right): Or(no_right_lane, right_obstacle, right_solid_line)
+                        * (1 - torch.clamp(x[:, 15] + x[:, 16] + x[:, 17], 0, 1)),
+                        0,
+                        1,
+                    ),
+                ],
+                dim=1,
+            ),
+            n_concepts=n_images,
             concept_dim=concept_dim,
-            is_too_big=True
+            is_too_big=True,
         )
+
+        log("Calculating class and concept weights for BOIA...", "INFO")
+        all_concepts = []
+        all_labels = []
+
+        for i in range(len(full_train)):
+            img_data = full_train.data[i]
+            t_path = img_data["img_path"][:-4] + ".pt"
+
+            lab_path = os.path.join(image_dir, "train", "labels", t_path)
+            con_path = os.path.join(image_dir, "train", "concepts", t_path)
+
+            all_labels.append(torch.load(lab_path).squeeze(0)[:4].numpy())
+            all_concepts.append(torch.load(con_path).squeeze(0).numpy())
+
+        all_labels = np.array(all_labels)
+        all_concepts = np.array(all_concepts)
+
+        for i in range(all_labels.shape[1]):
+            counts = np.bincount(all_labels[:, i].astype(int), minlength=2)
+            w = len(all_labels) / (2.0 * counts)
+            self.label_weights.append(
+                torch.tensor(w, dtype=torch.float32).to(self.device)
+            )
+
+        for i in range(all_concepts.shape[1]):
+            counts = np.bincount(all_concepts[:, i].astype(int), minlength=2)
+            if counts[1] == 0 or counts[0] == 0:  # Handle rare concepts
+                w = [1.0, 1.0]
+            else:
+                w = len(all_concepts) / (2.0 * counts)
+            self.concept_weights.append(
+                torch.tensor(w, dtype=torch.float32).to(self.device)
+            )
 
         return (
             train_dataset,
@@ -250,4 +322,6 @@ class BOIALoader:
             concept_names,
             logic,
             torch.nn.NLLLoss(),
+            self.concept_weights,
+            self.label_weights,
         )

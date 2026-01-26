@@ -1,6 +1,7 @@
 from conformal.datasets.mnist import MNISTLoader
 from conformal.datasets.mnistadd import MNISTAdditionDataset
 from conformal.utils.logic import Logic
+from conformal.datasets.mnistadd import mnist_addition_weights
 import torch
 
 
@@ -27,6 +28,10 @@ class MNISTSumParityLoader(MNISTLoader):
             concept_dim=concept_dim,
         )
 
+        self.label_weights, self.concept_weights = mnist_addition_weights(
+            MNISTSumParityDataset(base_train), output_dim, concept_dim, self.device
+        )
+
         return (
             MNISTSumParityDataset(base_train),
             MNISTSumParityDataset(base_val),
@@ -38,5 +43,7 @@ class MNISTSumParityLoader(MNISTLoader):
             class_names,
             concept_names,
             logic,
-            torch.nn.NLLLoss(),
+            torch.nn.NLLLoss(weight=self.label_weights),
+            self.concept_weights,
+            self.label_weights,
         )

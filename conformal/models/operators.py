@@ -145,6 +145,7 @@ def _or_four_bits_circuit():
 # CHX
 ##
 
+
 def chx_circuit():
     possible_worlds = list(product(range(2), repeat=4))
     n_worlds = len(possible_worlds)
@@ -162,46 +163,54 @@ def chx_circuit():
             w_q[w, 0] = 1
     return w_q
 
+
 ##
 # CLEVR
 ##
 
+
 def same_objects_circuit(n_images, n_colors=3, n_shapes=3, n_materials=2, n_sizes=2):
     dims = [n_colors, n_shapes, n_materials, n_sizes] * n_images
-    
+
     # Generate all possible worlds (36 * 36 = 1296)
     possible_worlds = list(product(*[range(d) for d in dims]))
-    
+
     n_worlds = len(possible_worlds)
-    n_queries = 2 # 0: Different, 1: Same
-    
+    n_queries = 2  # 0: Different, 1: Same
+
     w_q = torch.zeros(n_worlds, n_queries)
-    
+
     look_up = {i: c for i, c in zip(range(n_worlds), possible_worlds)}
-    
+
     for w in range(n_worlds):
         (
-            color_1, shape_1, material_1, size_1,
-            color_2, shape_2, material_2, size_2,
+            color_1,
+            shape_1,
+            material_1,
+            size_1,
+            color_2,
+            shape_2,
+            material_2,
+            size_2,
         ) = look_up[w]
-        
+
         same = True
 
         if color_1 != color_2:
             same = False
-        
+
         if shape_1 != shape_2:
             same = False
-        
+
         if material_1 != material_2:
             same = False
 
         if size_1 != size_2:
             same = False
-            
+
         if same:
-            w_q[w, 1] = 1 # Match
+            w_q[w, 1] = 1  # Match
         else:
-            w_q[w, 0] = 1 # No Match
-            
+            w_q[w, 0] = 1  # No Match
+
     return w_q

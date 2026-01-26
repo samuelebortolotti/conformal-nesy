@@ -81,7 +81,9 @@ def configure_subparsers(subparsers):
     parser.set_defaults(func=main)
 
 
-def train_epoch(model, train_dl, optimizer, criterion, device, args):
+def train_epoch(
+    model, train_dl, optimizer, criterion, device, args, concept_weights, label_weights
+):
     """
     Train model for one epoch.
     """
@@ -102,17 +104,18 @@ def train_epoch(model, train_dl, optimizer, criterion, device, args):
         output, conc_pred = model(data)
 
         if isinstance(criterion, nn.NLLLoss):
-            loss = (
-                criterion(output.log(), target)
-                if args.dataset not in ["boia"]
-                else criterion(output.log().permute(0, 2, 1), target)
-            )
+            output = output.log()
+
+        if args.dataset != "boia":
+            loss = criterion(output, target)
         else:
-            loss = (
-                criterion(output, target)
-                if args.dataset not in ["boia"]
-                else criterion(output.permute(0, 2, 1), target)
-            )
+            # boia
+            loss = 0.0
+            for i in range(output.size(1)):
+                loss = torch.nn.functional.nll_loss(
+                    output.permute(0, 2, 1), target, weight=label_weights[i]
+                )
+            loss /= output.size(1)
 
         # Add concept supervision loss if specified
         if args.concept_supervision > 0:
@@ -121,12 +124,17 @@ def train_epoch(model, train_dl, optimizer, criterion, device, args):
             if args.dataset in ["chx", "boia"]:
                 for i in range(conc_pred.size(1)):
                     concept_loss += torch.nn.functional.nll_loss(
-                        conc_pred[:, 0, i, :].log(), concepts[:, i].long()
+                        conc_pred[:, 0, i, :].log(),
+                        concepts[:, i].long(),
+                        weight=concept_weights[i] if concept_weights else None,
                     )
+
             else:
                 for i in range(conc_pred.size(1)):
                     concept_loss += torch.nn.functional.nll_loss(
-                        conc_pred[:, i, :].log(), concepts[:, i].long()
+                        conc_pred[:, i, :].log(),
+                        concepts[:, i].long(),
+                        weight=concept_weights[i] if concept_weights else None,
                     )
             concept_loss /= concepts.size(1)
             concept_loss = args.concept_supervision * concept_loss
@@ -134,7 +142,7 @@ def train_epoch(model, train_dl, optimizer, criterion, device, args):
             loss += concept_loss
 
         if loss <= 0:
-            log(f"Loss should be greater than zero", "CRITICAL")
+            log(f"Loss should be greater than zero: {loss}", "CRITICAL")
             exit(1)
 
         loss.backward()
@@ -159,7 +167,10 @@ def train_epoch(model, train_dl, optimizer, criterion, device, args):
         for idx in range(all_labels.shape[1]):
             present_l = np.unique(all_labels[:, idx])
             train_f1 += f1_score(
-                all_labels[:, idx], all_preds[:, idx], labels=present_l, average="macro"
+                all_labels[:, idx],
+                all_preds[:, idx],
+                labels=present_l,
+                average="macro",
             )
         train_f1 /= all_labels.shape[1]
 
@@ -167,7 +178,7 @@ def train_epoch(model, train_dl, optimizer, criterion, device, args):
         present_l = np.unique(all_labels)
         train_f1 = f1_score(all_labels, all_preds, labels=present_l, average="macro")
 
-    if args.dataset in ["boia"]:
+    if args.dataset in ["boia", "chx"]:
         train_c_f1 = 0.0
         for idx in range(all_g.shape[1]):
             present_c = np.unique(all_g[:, idx])
@@ -199,13 +210,22 @@ def train(
     criterion,
     args,
     experiment_name,
+    concept_weights,
+    label_weights,
 ):
     statistics = Statistics()
     model = model.to(device)
 
     for epoch in range(epochs):
         train_loss, train_f1, train_c_f1 = train_epoch(
-            model, train_dl, optimizer, criterion, device, args
+            model,
+            train_dl,
+            optimizer,
+            criterion,
+            device,
+            args,
+            concept_weights,
+            label_weights,
         )
 
         val_loss, val_f1, val_c_f1, H_c, H_c_per_value, yece, cece, _ = (
@@ -346,7 +366,9 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         concept_names,
         label_aggregator,
         criterion,
-    ) = DatasetFactory.get_dataset(args.dataset)
+        concept_weights,
+        label_weights,
+    ) = DatasetFactory.get_dataset(name=args.dataset, device=args.device)
 
     train_dl, val_dl, test_dl = create_dataloaders(
         train_ds, val_ds, test_ds, batch_size=args.batch_size
@@ -377,6 +399,8 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         criterion,
         args,
         experiment_name,
+        concept_weights,
+        label_weights,
     )
 
     log("> Training completed.", "INFO")
