@@ -7,10 +7,13 @@ from conformal.datasets.mnistadd import MNISTAdditionLoader
 from conformal.datasets.mnistsump import MNISTSumParityLoader
 from conformal.datasets.mnisthalf import MNISTHalfLoader
 from conformal.datasets.cub import CUBLoader
+from conformal.datasets.derma import DERMALoader
 from conformal.datasets.boia import BOIALoader
 from conformal.datasets.chx import CHXLoader
 from conformal.models.dpl import DPL
 from conformal.models.ltn import LTN
+from conformal.models.linear_predictor import LinearPredictor
+from conformal.models.dsl import DSL
 
 
 class OptimizerFactory:
@@ -58,6 +61,8 @@ class DatasetFactory:
             return BOIALoader(**kwargs).load()
         elif name == "chx":
             return CHXLoader(**kwargs).load()
+        elif name == "derma":
+            return DERMALoader(**kwargs).load()
         else:
             raise ValueError(f"Unknown dataset: {name}")
 
@@ -65,13 +70,54 @@ class DatasetFactory:
 class NeSyFactory:
     @staticmethod
     def get_nesy_model(
-        name: str, n_images, model, entangled, concept_dim, output_dim, dataset, device
+        name: str, n_images, model, concept_dim, output_dim, device, logic, args
     ):
         if name.lower() == "dpl":
             return DPL(
-                n_images, model, entangled, concept_dim, output_dim, dataset, device
+                n_images=n_images,
+                encoder=model,
+                entangled=args.entangled,
+                concept_dim=concept_dim,
+                output_dim=output_dim,
+                dataset=args.dataset,
+                device=device,
             )
         elif name.lower() == "ltn":
             return LTN(
-                n_images, model, entangled, concept_dim, output_dim, dataset, device
+                n_images=n_images,
+                encoder=model,
+                entangled=args.entangled,
+                concept_dim=concept_dim,
+                output_dim=output_dim,
+                dataset=args.dataset,
+                device=device,
+                logic=logic,
+                and_op=args.and_op,
+                or_op=args.or_op,
+                imp_op=args.imp_op,
+                p=args.p,
             )
+        elif name.lower() == "linpred":
+            return LinearPredictor(
+                n_images=n_images,
+                encoder=model,
+                entangled=args.entangled,
+                concept_dim=concept_dim,
+                output_dim=output_dim,
+                dataset=args.dataset,
+                device=device,
+            )
+        elif name.lower() == "dsl":
+            return DSL(
+                n_images=n_images,
+                encoder=model,
+                entangled=args.entangled,
+                concept_dim=concept_dim,
+                output_dim=output_dim,
+                dataset=args.dataset,
+                device=device,
+                epsilon_rules=args.epsilon_rules,
+                epsilon_symbols=args.epsilon_symbols,
+            )
+        else:
+            raise ValueError(f"Unknown nesy method: {name}")

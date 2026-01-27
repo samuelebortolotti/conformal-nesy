@@ -30,6 +30,7 @@ def compute_ece(probs, labels, n_bins=15):
 
 def compute_statistics(
     model,
+    dataset,
     data_loader,
     criterion,
     device,
@@ -54,17 +55,13 @@ def compute_statistics(
 
         output, conc_pred = model(data)
 
+        loss = model.compute_loss(
+            dataset, criterion, conc_pred, concepts, output, target, None
+        )
+
         if isinstance(criterion, nn.NLLLoss):
-            if multilabel:
-                loss = criterion(output.log().permute(0, 2, 1), target)
-            else:
-                loss = criterion(output.log(), target)
             probs = output.detach().cpu().numpy()
         else:
-            if multilabel:
-                loss = criterion(output.permute(0, 2, 1), target)
-            else:
-                loss = criterion(output, target)
             probs = torch.softmax(output, dim=-1).detach().cpu().numpy()
 
         running_loss += loss.item()
@@ -191,7 +188,7 @@ def compute_statistics(
 def conformal_metrics(prediction_tuples, true_labels):
     """
     Compute conformal metrics for concept combinations (tuples).
-    
+
     Args:
         prediction_tuples: List of np.ndarrays [Samples][Combinations, Concepts]
         true_labels: np.ndarray [Samples, Concepts]
@@ -205,8 +202,8 @@ def conformal_metrics(prediction_tuples, true_labels):
     # Loop through the examples (samples)
     for i in range(N):
         # This is your matrix of all valid conformal combinations for this sample
-        sample_tuples = prediction_tuples[i] 
-        
+        sample_tuples = prediction_tuples[i]
+
         # The ground truth combination we are looking for
         ground_truth = true_labels[i]
 
@@ -214,7 +211,7 @@ def conformal_metrics(prediction_tuples, true_labels):
         if sample_tuples.size > 0:
             if np.any(np.all(sample_tuples == ground_truth, axis=-1)):
                 coverage_total += 1
-        
+
         # Increment total set size by the number of unique tuples predicted
         set_size_total += len(sample_tuples)
 

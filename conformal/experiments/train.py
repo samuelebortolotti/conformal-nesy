@@ -3,16 +3,19 @@
 import torch
 import csv
 
-import torch.nn as nn
 import numpy as np
 
 from sklearn.metrics import f1_score
 from conformal.general_utils import log
-from conformal.utils.factories import DatasetFactory, OptimizerFactory, NetworkFactory
+from conformal.utils.factories import (
+    DatasetFactory,
+    OptimizerFactory,
+    NetworkFactory,
+    NeSyFactory,
+)
 from conformal.datasets.loaders import create_dataloaders
 from conformal.models import resnet18, lenet, linear
 from conformal.statistics.statistics import Statistics, Results
-from conformal.models.dpl import DPL
 from conformal.utils.visualization import plot_confusion_matrix
 from conformal.experiments.utils import collect_predictions
 from conformal.statistics.metrics import compute_statistics
@@ -24,7 +27,7 @@ def configure_global_arguments(parser):
     parser.add_argument(
         "dataset",
         metavar="DATASET",
-        choices={"mnistadd", "mnisthalf", "mnistsump", "boia", "chx"},
+        choices={"mnistadd", "mnisthalf", "mnistsump", "boia", "chx", "derma"},
         default="mnistadd",
         help="Dataset",
     )
@@ -103,25 +106,16 @@ def train_epoch(
         optimizer.zero_grad()
         output, conc_pred = model(data)
 
-        if isinstance(criterion, nn.NLLLoss):
-            output = output.log()
-
-        if args.dataset != "boia":
-            loss = criterion(output, target)
-        else:
-            # boia
-            loss = 0.0
-            for i in range(output.size(1)):
-                loss = torch.nn.functional.nll_loss(
-                    output.permute(0, 2, 1), target, weight=label_weights[i]
-                )
-            loss /= output.size(1)
+        # NeSy loss specific
+        loss = model.compute_loss(
+            args.dataset, criterion, conc_pred, concepts, output, target, label_weights
+        )
 
         # Add concept supervision loss if specified
         if args.concept_supervision > 0:
             concept_loss = 0.0
 
-            if args.dataset in ["chx", "boia"]:
+            if args.dataset in ["chx", "boia", "derma"]:
                 for i in range(conc_pred.size(1)):
                     concept_loss += torch.nn.functional.nll_loss(
                         conc_pred[:, 0, i, :].log(),
@@ -178,7 +172,7 @@ def train_epoch(
         present_l = np.unique(all_labels)
         train_f1 = f1_score(all_labels, all_preds, labels=present_l, average="macro")
 
-    if args.dataset in ["boia", "chx"]:
+    if args.dataset in ["boia", "chx", "derma"]:
         train_c_f1 = 0.0
         for idx in range(all_g.shape[1]):
             present_c = np.unique(all_g[:, idx])
@@ -231,11 +225,14 @@ def train(
         val_loss, val_f1, val_c_f1, H_c, H_c_per_value, yece, cece, _ = (
             compute_statistics(
                 model,
+                args.dataset,
                 val_dl,
                 criterion,
                 device,
                 is_train=False,
-                multiclass=False if args.dataset not in ["boia", "chx"] else True,
+                multiclass=(
+                    False if args.dataset not in ["boia", "chx", "derma"] else True
+                ),
                 multilabel=False if args.dataset not in ["boia"] else True,
             )
         )
@@ -261,7 +258,7 @@ def evaluate_and_log_model(
     concept_names,
     concept_dim,
     n_images,
-    label_aggregator,
+    logic,
     args,
     results_output_h,
     stats_output_h,
@@ -278,11 +275,12 @@ def evaluate_and_log_model(
     test_loss, test_f1, test_c_f1, H_c, H_c_per_value, yece, cece, _ = (
         compute_statistics(
             model,
+            args.dataset,
             test_dl,
             criterion,
             device,
             is_train=False,
-            multiclass=False if args.dataset not in ["boia", "chx"] else True,
+            multiclass=False if args.dataset not in ["boia", "chx", "derma"] else True,
             multilabel=False if args.dataset not in ["boia"] else True,
         )
     )
@@ -297,7 +295,9 @@ def evaluate_and_log_model(
                 model,
                 test_dl,
                 device,
-                multiclass=False if args.dataset not in ["boia", "chx"] else True,
+                multiclass=(
+                    False if args.dataset not in ["boia", "chx", "derma"] else True
+                ),
                 multilabel=False if args.dataset not in ["boia"] else True,
             )
         )
@@ -323,7 +323,7 @@ def evaluate_and_log_model(
             str(
                 args.output_dir_path / f"{experiment_name}.concept_confusion_matrix.pdf"
             ),
-            multilabel=True if args.dataset in ["boia", "chx"] else False,
+            multilabel=True if args.dataset in ["boia", "chx", "derma"] else False,
         )
 
         res = Results(
@@ -364,7 +364,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         n_images,
         class_names,
         concept_names,
-        label_aggregator,
+        logic,
         criterion,
         concept_weights,
         label_weights,
@@ -377,10 +377,8 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     log("Training model", "INFO")
 
     model = NetworkFactory.get_network(args.model, input_dim, concept_dim, args)
-
-    # TODO: LTN integration
-    model = DPL(
-        n_images, model, args.entangled, concept_dim, output_dim, args.dataset, device
+    model = NeSyFactory.get_nesy_model(
+        args.nesy, n_images, model, concept_dim, output_dim, device, logic, args
     )
 
     optimizer = OptimizerFactory.create_optimizer(
@@ -407,7 +405,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
 
     log("> Evaluating and logging model...", "INFO")
 
-    _ = evaluate_and_log_model(
+    test_f1 = evaluate_and_log_model(
         model,
         experiment_name,
         test_dl,
@@ -417,7 +415,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         concept_names,
         concept_dim,
         n_images,
-        label_aggregator,
+        logic,
         args,
         results_output_h,
         stats_output_h,
@@ -425,3 +423,5 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     )
 
     log("> Evaluation and logging completed.", "INFO")
+
+    return test_f1

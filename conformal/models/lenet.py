@@ -1,4 +1,10 @@
 import torch.nn as nn
+from conformal.models import dpl, ltn, linear_predictor, dsl
+
+
+def configure_global_arguments(parser):
+    """Configure global arguments that are shared across models and datasets."""
+    pass
 
 
 class LeNet(nn.Module):
@@ -27,8 +33,16 @@ class LeNet(nn.Module):
 
 def configure_subparsers(subparsers):
     """Configure subparsers."""
-    # Subparser for ResNet18
+    # Subparser for LeNet5
     lenet_parser = subparsers.add_parser(
         "lenet",
         help="Train a LeNet model",
     )
+
+    configure_global_arguments(lenet_parser)
+
+    subparsers = lenet_parser.add_subparsers(dest="nesy")
+    ltn.configure_subparsers(subparsers)
+    dpl.configure_subparsers(subparsers)
+    linear_predictor.configure_subparsers(subparsers)
+    dsl.configure_subparsers(subparsers)

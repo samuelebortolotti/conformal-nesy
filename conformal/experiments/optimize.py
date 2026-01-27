@@ -4,7 +4,7 @@ import copy
 from pathlib import Path
 
 from conformal.experiments.train import main as train_main
-from conformal.experiments.train import configure_global_arguments, train_parser
+from conformal.experiments.train import train_parser
 
 
 def configure_subparsers(subparsers):
@@ -25,8 +25,18 @@ def objective(trial, base_args, experiment_name, output_dir, device):
     args = copy.deepcopy(base_args)
 
     args.learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
-    args.batch_size = trial.suggest_categorical("batch_size", [32, 64, 128])
-    args.opt = trial.suggest_categorical("opt", ["adam", "sdg"])
+    args.momentum = trial.suggest_float("momentum", 1e-5, 1, log=True)
+    args.batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256])
+    args.opt = trial.suggest_categorical("opt", ["adam", "sgd"])
+
+    if args.nesy == "ltn":
+        args.and_op = trial.suggest_categorical("and_op", ["godel", "prod", "luk"])
+        args.or_op = trial.suggest_categorical("or_op", ["godel", "prod", "luk"])
+        args.imp_op = trial.suggest_categorical("imp_op", ["godel", "prod", "luk", "goguen", "klenee"])
+        args.p = trial.suggest_categorical("p", list(range(1, 10)))
+    elif args.nesy == "dsl":
+        args.epsilon_symbols = trial.suggest_float("epsilon_symbols", 1e-5, 0.5, log=True)
+        args.epsilon_rules = trial.suggest_float("epsilon_rules", 1e-5, 0.5, log=True)
 
     args.model_path = f"trial_{trial.number}.pt"
     args.output_dir_path = output_dir

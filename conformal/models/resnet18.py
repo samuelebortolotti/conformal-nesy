@@ -1,6 +1,17 @@
 import torch.nn as nn
 import torchvision.models as models
 
+from conformal.models import dpl, ltn, linear_predictor, dsl
+
+
+def configure_global_arguments(parser):
+    """Configure global arguments that are shared across models and datasets."""
+    parser.add_argument(
+        "--pretrained",
+        action="store_true",
+        help="Use pretrained weights for ResNet-18.",
+    )
+
 
 class ResNet18(nn.Module):
     def __init__(self, input_shape=(1, 28, 28), num_classes=10, pretrained=True):
@@ -32,8 +43,11 @@ def configure_subparsers(subparsers):
         "resnet18",
         help="Train a ResNet-18 model",
     )
-    resnet_parser.add_argument(
-        "--pretrained",
-        action="store_true",
-        help="Use pretrained weights for ResNet-18.",
-    )
+
+    configure_global_arguments(resnet_parser)
+
+    subparsers = resnet_parser.add_subparsers(dest="nesy")
+    ltn.configure_subparsers(subparsers)
+    dpl.configure_subparsers(subparsers)
+    linear_predictor.configure_subparsers(subparsers)
+    dsl.configure_subparsers(subparsers)

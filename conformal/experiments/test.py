@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from conformal.models import resnet18, lenet, linear
 from conformal.general_utils import log
-from conformal.utils.factories import DatasetFactory, NetworkFactory
+from conformal.utils.factories import DatasetFactory, NetworkFactory, NeSyFactory
 from conformal.models.dpl import DPL
 from conformal.datasets.loaders import create_dataloaders
 from conformal.experiments.utils import load_model
@@ -23,7 +23,7 @@ def configure_global_arguments(parser):
     parser.add_argument(
         "dataset",
         metavar="DATASET",
-        choices={"mnistadd", "mnisthalf", "mnistsump", "boia", "chx"},
+        choices={"mnistadd", "mnisthalf", "mnistsump", "boia", "chx", "derma"},
         default="mnistadd",
         help="Dataset",
     )
@@ -167,7 +167,7 @@ def conformal_evaluation(
     test_dl,
     device,
     args,
-    label_aggregator,
+    logic,
     criterion,
     alpha_concepts=0.1,
     alpha_label=0.1,
@@ -176,7 +176,7 @@ def conformal_evaluation(
 
     results_storage = {}
 
-    multiconcept = False if args.dataset not in ["boia", "chx"] else True
+    multiconcept = False if args.dataset not in ["boia", "chx", "derma"] else True
     multilabel = False if args.dataset not in ["boia"] else True
     is_image = False if args.dataset in ["boia"] else True
 
@@ -193,6 +193,7 @@ def conformal_evaluation(
         _,
     ) = compute_statistics(
         model,
+        args.dataset,
         test_dl,
         criterion,
         device,
@@ -223,12 +224,14 @@ def conformal_evaluation(
     cp = ConformalPredictor(
         model,
         device=device,
-        logic=label_aggregator,
+        logic=logic,
         concept_dim=model.concept_dim,
         n_concepts=model.n_images,
         multiconcepts=multiconcept,
         multilabel=multilabel,
-        bonferroni=True if args.dataset in ["chx"] else False, # in ["boia", "chx"] else False,
+        bonferroni=(
+            True if args.dataset in ["chx", "derma"] else False
+        ),  # in ["boia", "chx"] else False,
     )
 
     log("=== 2. Conformal (Calibrating Concepts) ===", "INFO")
@@ -239,9 +242,7 @@ def conformal_evaluation(
     log("Predicting conformal sets on the test set...", "INFO")
     concept_sets = cp.predict_concepts(test_dl)
 
-    concept_coverage, concept_set_size = conformal_metrics(
-        concept_sets, all_g
-    )
+    concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
 
     log(f"[Conformal Concepts Only] Concept Coverage: {concept_coverage:.4f}", "INFO")
     log(f"[Conformal Concepts Only] Concept Set Size: {concept_set_size:.4f}", "INFO")
@@ -321,16 +322,14 @@ def conformal_evaluation(
         args.output_dir_path,
         is_image=is_image,
     )
-    
+
     log("=== 5. Conformal with Concept Refinement ===", "INFO")
-    
+
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=False, concept_refinement=True
     )
 
-    concept_coverage, concept_set_size = conformal_metrics(
-        concept_sets, all_g
-    )
+    concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
     label_coverage, label_size = conformal_metrics(label_sets, all_labels)
 
     log(
@@ -435,7 +434,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         n_images,
         class_names,
         concept_names,
-        label_aggregator,
+        logic,
         criterion,
         concept_weights,
         label_weights,
@@ -448,10 +447,8 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     log("Loading the model", "INFO")
 
     model = NetworkFactory.get_network(args.model, input_dim, concept_dim, args)
-
-    # TODO: LTN integration
-    model = DPL(
-        n_images, model, args.entangled, concept_dim, output_dim, args.dataset, device
+    model = NeSyFactory.get_nesy_model(
+        args.nesy, n_images, model, concept_dim, output_dim, device, logic, args
     )
 
     model_path = args.output_dir_path / f"{experiment_name}.{args.model_path}.pth"
@@ -465,7 +462,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         test_dl,
         device,
         args,
-        label_aggregator,
+        logic,
         criterion,
         alpha_concepts=alpha,
         alpha_label=alpha,
@@ -479,7 +476,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         result_storage["No Conformal"],
         args.output_dir_path,
         concept_names=args.concept_names if hasattr(args, "concept_names") else None,
-        multiconcepts=True if args.dataset in ["boia", "chx"] else False,
+        multiconcepts=True if args.dataset in ["boia", "chx", "derma"] else False,
     )
 
     log("Results Summary:", "INFO")

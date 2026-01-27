@@ -188,7 +188,9 @@ class CHXLoader:
         )
 
         logic = Logic(
-            lambda x: (np.sum(x, axis=1) == 0).astype(np.int64), n_concepts=1, concept_dim=4
+            lambda x: (np.sum(x, axis=1) == 0).astype(np.int64),
+            n_concepts=1,
+            concept_dim=4,
         )
 
         return (

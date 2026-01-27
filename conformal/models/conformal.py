@@ -121,12 +121,14 @@ class ConformalPredictor:
         if self.bonferroni:
             log(
                 f"[Conformal] Applying Bonferroni: Joint alpha {alpha} -> Per-concept alpha {eff_alpha:.4f}",
-                "INFO"
+                "INFO",
             )
 
         # Compute the (1 - eff_alpha) quantile for each concept column
         self.per_concept_thresholds = np.quantile(scores, 1 - eff_alpha, axis=0)
-        log(f"[Conformal] Per-concept thresholds: {self.per_concept_thresholds}", "INFO")
+        log(
+            f"[Conformal] Per-concept thresholds: {self.per_concept_thresholds}", "INFO"
+        )
 
     def calibrate_labels(self, dl, alpha=0.1):
         """
@@ -137,19 +139,18 @@ class ConformalPredictor:
         # Determine the effective alpha per label
         # Number of labels
         k = 1
-        if len(scores.shape) > 1: 
-            k = scores.shape[1] 
+        if len(scores.shape) > 1:
+            k = scores.shape[1]
         eff_alpha = alpha / k if self.bonferroni else alpha
 
         if self.bonferroni:
             log(
                 f"[Conformal] Applying Bonferroni (Multilabel): Joint alpha {alpha} -> Per-label alpha {eff_alpha:.4f}",
-                "INFO"
+                "INFO",
             )
 
         self.label_threshold = np.quantile(scores, 1 - eff_alpha, axis=0)
         log(f"[Conformal] Label threshold: {self.label_threshold}", "INFO")
-
 
     def _build_concept_sets_for_batch(self, conc_pred):
         """
@@ -190,15 +191,12 @@ class ConformalPredictor:
                     batch_sets.append(sample_set)
         return batch_sets
 
-
     def _generate_combinations(self, marginal_list):
         """Helper to process empty sets and generate Cartesian products."""
         processed = [
-            s if s.size > 0 else np.arange(self.concept_dim) 
-            for s in marginal_list
+            s if s.size > 0 else np.arange(self.concept_dim) for s in marginal_list
         ]
         return np.array(list(itertools.product(*processed)))
-
 
     @torch.no_grad()
     def predict_concepts(self, dl):
@@ -220,14 +218,13 @@ class ConformalPredictor:
             # TODO: unless the concept outcome is entangled
             # Get marginals first
             batch_marginal_sets = self._build_concept_sets_for_batch(conc_pred)
-            
+
             # Convert to tuples immediately
             for sample_marginal in batch_marginal_sets:
                 tuples = self._generate_combinations(sample_marginal)
                 all_tuple_sets.append(tuples)
 
         return all_tuple_sets
-
 
     def _refine_concept_prediction_set(
         self, label_prediction_set, concept_prediction_tuples
@@ -246,7 +243,7 @@ class ConformalPredictor:
             derived_labels = self.logic.forward(tuples)
             if hasattr(derived_labels, "cpu"):
                 derived_labels = derived_labels.cpu().numpy()
-            
+
             # Keep tuples that result in an allowed label
             mask = np.isin(derived_labels, labels)
             valid_tuples = tuples[mask]
@@ -254,11 +251,10 @@ class ConformalPredictor:
 
         return refined_batch_tuples
 
-
     def _compute_derived_labels_from_tuples(self, batch_concept_tuples):
         """
         Derives labels from concept tuples using Hard Logic.
-        
+
         Args:
             batch_concept_tuples: List of np.ndarrays, each of shape (N_combinations, N_concepts)
         Returns:
@@ -277,7 +273,7 @@ class ConformalPredictor:
 
         if hasattr(raw_labels, "cpu"):
             raw_labels = raw_labels.cpu().numpy()
-        
+
         # Ensure labels are flat (for single-label classification tasks)
         raw_labels = np.array(raw_labels).ravel()
 
@@ -327,26 +323,38 @@ class ConformalPredictor:
             for sample_m in batch_marginal:
                 # Handle empty sets by treating them as full range (wildcards)
                 # TODO: for now it works in MNIST, what for BOIA and others?
-                processed = [s if s.size > 0 else np.arange(self.concept_dim) for s in sample_m]
+                processed = [
+                    s if s.size > 0 else np.arange(self.concept_dim) for s in sample_m
+                ]
                 sample_tuples = np.array(list(itertools.product(*processed)))
                 batch_tuples.append(sample_tuples)
-            
+
             all_concept_tuples.extend(batch_tuples)
 
             # Build Label Sets
             if use_hard_logic:
-                batch_label_sets = self._compute_derived_labels_from_tuples(batch_tuples)
+                batch_label_sets = self._compute_derived_labels_from_tuples(
+                    batch_tuples
+                )
             else:
                 # Standard Conformal Label prediction (1 - prob <= threshold)
                 batch_label_sets = []
                 for i in range(label_pred.size(0)):
                     if self.multilabel:
                         included = [
-                            torch.where(1 - label_pred[i, j, :] <= self.label_threshold[j])[0].cpu().numpy()
+                            torch.where(
+                                1 - label_pred[i, j, :] <= self.label_threshold[j]
+                            )[0]
+                            .cpu()
+                            .numpy()
                             for j in range(label_pred.size(1))
                         ]
                     else:
-                        included = torch.where(1 - label_pred[i, :] <= self.label_threshold)[0].cpu().numpy()
+                        included = (
+                            torch.where(1 - label_pred[i, :] <= self.label_threshold)[0]
+                            .cpu()
+                            .numpy()
+                        )
                     batch_label_sets.append(included.reshape(-1, 1))
             all_label_sets.extend(batch_label_sets)
 

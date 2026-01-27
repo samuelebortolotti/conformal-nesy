@@ -4,3 +4,5 @@ torchvision~=0.21.0
 optuna~=4.4.0
 scikit-learn~=1.6.1
 seaborn~=0.13.2
+medmnist~=3.0.2
+LTNtorch~=1.0.2

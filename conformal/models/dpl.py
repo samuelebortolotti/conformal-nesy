@@ -1,4 +1,3 @@
-import torch.nn as nn
 import torch
 
 from conformal.utils.other import outer_product
@@ -7,43 +6,34 @@ from conformal.models.operators import (
     mnist_sump_circuit,
     boia_circuit,
     chx_circuit,
+    derma_circuit,
 )
+from conformal.models.nesy import NeSyModel
 
 
-class DPL(nn.Module):
+def configure_global_arguments(parser):
+    """Global arguments for DeepProbLog"""
+    pass
+
+
+class DPL(NeSyModel):
     def __init__(
         self, n_images, encoder, entangled, concept_dim, output_dim, dataset, device
     ):
-        super().__init__()
-        self.entangled = entangled
-        self.encoder = encoder
-        self.n_images = n_images
-        self.concept_dim = concept_dim
-        self.dataset = dataset
-        self.device = device
-
-        # build the circuit
+        super().__init__(
+            n_images, encoder, entangled, concept_dim, output_dim, dataset, device
+        )
         self.circuit_data = self._build_circuit(
             concept_dim, output_dim, n_images, dataset
         )
 
         # If BOIA, circuit is factorized
         if dataset == "boia":
-            self.FS_w_q, self.L_w_q, self.R_w_q, self.or_four_bits = self.circuit_data
-            self.FS_w_q = self.FS_w_q.to(self.device)
-            self.L_w_q = self.L_w_q.to(self.device)
-            self.R_w_q = self.R_w_q.to(self.device)
-            self.or_four_bits = self.or_four_bits.to(self.device)
+            self.FS_w_q, self.L_w_q, self.R_w_q, self.or_four_bits = [
+                t.to(self.device) for t in self.circuit_data
+            ]
         else:
             self.circuit = self.circuit_data.to(self.device)
-
-    def _normalize(self, x):
-        eps = 1e-5
-        x = x + eps
-        with torch.no_grad():
-            Z = torch.sum(x, dim=-1, keepdim=True)
-        x = x / Z
-        return x
 
     def _build_circuit(self, concept_dim, output_dim, n_images, dataset):
         if dataset == "mnistadd" or dataset == "mnisthalf":
@@ -58,22 +48,22 @@ class DPL(nn.Module):
             return boia_circuit()
         elif dataset == "chx":
             return chx_circuit()
+        elif dataset == "derma":
+            return derma_circuit()
         raise NotImplementedError(f"Circuit for dataset {dataset} not implemented.")
 
-    def get_concepts(self, x):
-        if self.dataset in ["boia", "chx"]:
-            # Sigmoid for independent binary concepts
-            c = torch.sigmoid(self.encoder(x))
-            # Expand to [1-p, p] for DPL logic
-            c = torch.stack([1 - c, c], dim=-1)
-            return self._normalize(c)
+    def inference(self, concepts):
+        """DPL-specific probabilistic circuit inference."""
+        if self.dataset == "boia":
+            return self._boia_inference(concepts)
 
-        # Softmax for categorical concepts (like MNIST digits)
-        c = torch.softmax(self.encoder(x), dim=-1)
-        return self._normalize(c)
-
-    def _dpl_inference(self, worlds):
-        query_prob = torch.matmul(worlds, self.circuit)  # (B, nr_classes)
+        # Standard DPL logic
+        worlds = (
+            outer_product(concepts.squeeze(1))
+            if self.dataset in ["chx", "derma"]
+            else outer_product(concepts)
+        )
+        query_prob = torch.matmul(worlds, self.circuit)
         return self._normalize(query_prob)
 
     def _boia_inference(self, pCs):
@@ -121,30 +111,12 @@ class DPL(nn.Module):
             res = torch.einsum("bi,bj->bij", res, next_c).reshape(res.shape[0], -1)
         return res
 
-    def forward(self, x):
-        if self.entangled:
-            concepts = self.get_concepts(x)
-            y = self._dpl_inference(concepts)
 
-            return y, concepts
-        else:
-
-            xs = torch.chunk(x, self.n_images, dim=-1)
-            concepts = [self.get_concepts(xi) for xi in xs]
-            concepts = torch.stack(concepts, dim=1)
-
-            # MNIST-like datasets
-            if self.dataset not in ["boia"]:
-                # compute the possible words
-                worlds = (
-                    outer_product(concepts.squeeze(1))
-                    if self.dataset in ["chx"]
-                    else outer_product(concepts)
-                )
-                y = self._dpl_inference(worlds)
-
-            if self.dataset in ["boia"]:
-                y_flat = self._boia_inference(concepts)
-                y = y_flat.view(y_flat.size(0), -1, 2)
-
-            return y, concepts
+def configure_subparsers(subparsers):
+    """Configure subparsers."""
+    # Subparser for DPL
+    dpl_parser = subparsers.add_parser(
+        "dpl",
+        help="Use DPL as NeSy predictor",
+    )
+    configure_global_arguments(dpl_parser)
