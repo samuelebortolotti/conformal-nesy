@@ -424,4 +424,6 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
 
     log("> Evaluation and logging completed.", "INFO")
 
-    return test_f1
+    log("> Returning best F1 score on labels in the validation set...", "INFO")
+
+    return statistics.best_f1

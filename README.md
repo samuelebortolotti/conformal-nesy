@@ -20,4 +20,4 @@
 - cub tassonomia per famiglia diversa, definire un set di concetti categorici 28.
 - cosa si misura in conformal, a che punto sono arrivati.
 - che relazione c'e' tra p(y|c) e p(c|x)? Le varie calibrazioni, calibrazione multilabel, naive bayes, modelli markoviani
-- implementare LTN
+- Test Optuna with dry-run

@@ -38,8 +38,8 @@ def output_writer(path: str, compression: Optional[str]):
 def get_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        prog="bayes",
-        description="Bayesian methods experiments.",
+        prog="conformal",
+        description="Conformal NeSy methods experiments.",
     )
     parser.add_argument(
         "--device",
@@ -65,11 +65,13 @@ def get_args():
         "--dry-run",
         "-n",
         action="store_true",
+        default=False,
         help="Don't write any file",
     )
     parser.add_argument(
         "--entangled",
         "-ent",
+        default=False,
         action="store_true",
         help="Entangled model",
     )
