@@ -38,9 +38,9 @@ class NeSyModel(nn.Module):
     def forward(self, x):
         if self.entangled:
             concepts = self.get_concepts(x)
-            y = self.inference(concepts)
+            y, extra = self.inference(concepts)
 
-            return y, concepts
+            return y, concepts, extra
         else:
 
             xs = torch.chunk(x, self.n_images, dim=-1)
@@ -48,19 +48,19 @@ class NeSyModel(nn.Module):
             concepts = torch.stack(concepts, dim=1)
 
             # inference
-            y = self.inference(concepts)
+            y, extra = self.inference(concepts)
 
             # Special case for BDD-OIA
             if self.dataset in ["boia"]:
                 y = y.view(y.size(0), -1, 2)
 
-            return y, concepts
+            return y, concepts, extra
 
     def inference(self, concepts):
         """Abstract method to be overridden by LTN, DPL and Linear Predictor."""
         raise NotImplementedError("Subclasses must implement the inference method.")
 
-    def compute_loss(self, dataset, criterion, conc_pred, concepts, output, target, label_weights):
+    def compute_loss(self, dataset, criterion, conc_pred, concepts, output, target, label_weights, extra):
         """DPL and Linear Predictor standard loss on labels. LTN overrides it"""
         if isinstance(criterion, torch.nn.NLLLoss):
             output = output.log()
@@ -70,8 +70,11 @@ class NeSyModel(nn.Module):
         else:
             loss = 0.0
             for i in range(output.size(1)):
+                sample_weights = (
+                    label_weights[i] if label_weights is not None else None
+                )
                 loss = torch.nn.functional.nll_loss(
-                    output.permute(0, 2, 1), target, weight=label_weights[i]
+                    output.permute(0, 2, 1), target, weight=sample_weights
                 )
             loss /= output.size(1)
 

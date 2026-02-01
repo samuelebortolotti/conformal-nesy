@@ -157,22 +157,37 @@ class LTN(NeSyModel):
             )
         elif dataset == "derma":
             return derma_ltn_loss(
-                equiv_op=self.equiv_op, or_op=self.or_op, forall_op=self.forall_op, not_op=self.not_op, sat_agg_op=self.sat_agg_op
+                equiv_op=self.equiv_op, forall_op=self.forall_op, not_op=self.not_op, exists_op=self.exists_op, sat_agg_op=self.sat_agg_op
             )
         
         raise NotImplementedError(
             f"LTN SAT-Agg loss for dataset {dataset} not implemented."
         )
 
+
+    def _inference_boia(self, concepts):
+        logic_output = self.logic.forward(concepts)
+        block_outputs = []
+
+        for i in range(logic_output.shape[1]):
+            one_hot_block = F.one_hot(
+                torch.tensor(logic_output[:, i]), num_classes=2
+            ).float()
+            block_outputs.append(one_hot_block)
+
+        return torch.cat(block_outputs, dim=1).to(self.device)
+
     def inference(self, concepts):
         """Apply the hard logic on the argmax of the concepts"""
         concept_copy = concepts.clone().squeeze().argmax(dim=-1).cpu().numpy()
+        if self.dataset == "boia":
+            return self._inference_boia(concept_copy), None
         return F.one_hot(
             torch.tensor(self.logic.forward(concept_copy)), 
             num_classes=self.output_dim
-        ).to(self.device).float()
+        ).to(self.device).float(), None
 
-    def compute_loss(self, dataset, criterion, conc_pred, concepts, output, target, label_weights):
+    def compute_loss(self, dataset, criterion, conc_pred, concepts, output, target, label_weights, extra):
         """Return the LTN loss"""
         return self.ltn_loss(conc_pred, target)
 

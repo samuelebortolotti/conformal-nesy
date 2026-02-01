@@ -11,6 +11,7 @@ class Statistics:
         self.train_c_f1_scores = []
         self.val_c_f1_scores = []
         self.best_f1 = 0
+        self.best_model = None
 
     def log(
         self, epoch, train_loss, train_f1, val_f1, train_c_f1, val_c_f1, val_loss, model
@@ -25,7 +26,7 @@ class Statistics:
         self.val_c_f1_scores.append(val_c_f1)
         self.train_c_f1_scores.append(train_c_f1)
 
-        if val_f1 > self.best_f1:
+        if val_f1 > self.best_f1 or self.best_model is None:
             self.best_f1 = val_f1
             self.best_model = model.state_dict()
 

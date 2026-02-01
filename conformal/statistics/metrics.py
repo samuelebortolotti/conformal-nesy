@@ -53,10 +53,17 @@ def compute_statistics(
         data = data.to(device)
         target = target.to(device)
 
-        output, conc_pred = model(data)
+        output, conc_pred, extra = model(data)
 
         loss = model.compute_loss(
-            dataset, criterion, conc_pred, concepts, output, target, None
+            dataset=dataset, 
+            criterion=criterion, 
+            conc_pred=conc_pred, 
+            concepts=concepts, 
+            output=output, 
+            target=target, 
+            label_weights=None, 
+            extra=extra
         )
 
         if isinstance(criterion, nn.NLLLoss):

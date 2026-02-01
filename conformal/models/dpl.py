@@ -55,7 +55,7 @@ class DPL(NeSyModel):
     def inference(self, concepts):
         """DPL-specific probabilistic circuit inference."""
         if self.dataset == "boia":
-            return self._boia_inference(concepts)
+            return self._boia_inference(concepts), None
 
         # Standard DPL logic
         worlds = (
@@ -64,7 +64,7 @@ class DPL(NeSyModel):
             else outer_product(concepts)
         )
         query_prob = torch.matmul(worlds, self.circuit)
-        return self._normalize(query_prob)
+        return self._normalize(query_prob), None
 
     def _boia_inference(self, pCs):
         """Factored ProbLog inference for BOIA task"""

@@ -34,7 +34,7 @@ class MNISTHalfLoader(MNISTLoader):
         )
 
         self.label_weights, self.concept_weights = mnist_addition_weights(
-            MNISTHalfDataset(base_train), output_dim, concept_dim, self.device
+            MNISTHalfDataset(base_train, filter_fn=_in_distribution_filter), output_dim, concept_dim, self.device
         )
 
         return (

@@ -104,11 +104,11 @@ def train_epoch(
         concepts = concepts.to(device)
 
         optimizer.zero_grad()
-        output, conc_pred = model(data)
+        output, conc_pred, extra = model(data)
 
         # NeSy loss specific
         loss = model.compute_loss(
-            args.dataset, criterion, conc_pred, concepts, output, target, label_weights
+            args.dataset, criterion, conc_pred, concepts, output, target, label_weights, extra
         )
 
         # Add concept supervision loss if specified

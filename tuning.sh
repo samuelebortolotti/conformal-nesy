@@ -18,7 +18,7 @@ MODELS_IMG=("resnet18")
 PRETRAINED_FLAG="--pretrained"
 DATASETS_BOIA=("boia")
 MODELS_BOIA=("linear")
-NESY_VARIANTS=("dpl" "ltn" "linpred") # NOTE: dsl to be implemented
+NESY_VARIANTS=("dpl" "ltn" "dsl", "linpred")
 CONCEPT_SUPS=("0.0" "1.0")
 EPOCHS=20
 

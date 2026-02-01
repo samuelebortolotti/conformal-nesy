@@ -47,7 +47,7 @@ class ConformalPredictor:
 
         for data, concepts, _ in dl:
             data, concepts = data.to(self.device), concepts.to(self.device)
-            _, conc_pred = self.model(data)
+            _, conc_pred, _ = self.model(data)
 
             # For each concept, compute 1 - probability of true label
             if self.multiconcepts:
@@ -213,7 +213,7 @@ class ConformalPredictor:
 
         for data, _, _ in dl:
             data = data.to(self.device)
-            _, conc_pred = self.model(data)
+            _, conc_pred, _ = self.model(data)
 
             # TODO: unless the concept outcome is entangled
             # Get marginals first
@@ -315,7 +315,7 @@ class ConformalPredictor:
             data = data.to(self.device)
 
             # Forward Pass
-            label_pred, conc_pred = self.model(data)
+            label_pred, conc_pred, _ = self.model(data)
 
             # Build the initial "Conformal Tuples" (Cartesian Product)
             batch_marginal = self._build_concept_sets_for_batch(conc_pred)

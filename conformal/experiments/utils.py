@@ -23,7 +23,7 @@ def collect_predictions(model, data_loader, device, multiclass=False, multilabel
         data = data.to(device)
         target = target.to(device)
 
-        output, conc_pred = model(data)
+        output, conc_pred, _ = model(data)
 
         all_preds.append(output.argmax(dim=-1).cpu().numpy())
         all_labels.append(target.cpu().numpy())

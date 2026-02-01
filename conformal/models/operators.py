@@ -97,14 +97,19 @@ class mnist_sump_ltn_loss(BaseMNISTLTNLoss):
     def condition(self):
         return lambda d1, d2, n: torch.eq((d1.value + d2.value) % 2, n.value)
 
-
-def mnist_add_dsl_weights(n_images, concept_dim, output_dim, device):
+def _generic_dsl_weights(n_images, concept_dim, output_dim, device):
     shape = [concept_dim] * n_images + [output_dim]
     return torch.nn.Parameter(torch.randn(shape).to(device))
 
+def _generic_dsl_words_weights(n_images, concept_dim, output_dim, device):
+    shape = [2**concept_dim] + [output_dim]
+    return torch.nn.Parameter(torch.randn(shape).to(device))
+
+def mnist_add_dsl_weights(n_images, concept_dim, output_dim, device):
+    return _generic_dsl_weights(n_images, concept_dim, output_dim, device)
 
 def mnist_sump_dsl_weights(n_images, concept_dim, output_dim, device):
-    return mnist_add_dsl_weights(n_images, concept_dim, output_dim, device)
+    return _generic_dsl_weights(n_images, concept_dim, output_dim, device)
 
 
 #
@@ -368,14 +373,42 @@ class boia_ltn_loss(torch.nn.Module):
         log("phi8: " + str(phi8), "DEBUG")
         log("phi9: " + str(phi9), "DEBUG")
 
-        log(f"LTN loss: {1.0 - self.sat_agg_op(phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9)}", "INFO")
+        log(f"LTN loss: {1.0 - self.sat_agg_op(phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9)}", "DEBUG")
 
         return 1.0 - self.sat_agg_op(phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9)
 
 
-def boia_dsl_weights():
-    raise NotImplemented("Not implemented DSL for BOIA")
-
+def boia_dsl_weights(n_images, concept_dim, output_dim, device):
+        return [
+            # forward
+            _generic_dsl_words_weights(
+                n_images=n_images, 
+                concept_dim=9,
+                output_dim=2, 
+                device=device
+            ),
+            # stop
+            _generic_dsl_words_weights(
+                n_images=n_images, 
+                concept_dim=9,
+                output_dim=2, 
+                device=device
+            ),
+            # left-stop
+            _generic_dsl_words_weights(
+                n_images=n_images, 
+                concept_dim=6,
+                output_dim=2, 
+                device=device
+            ),
+            # right-stop
+            _generic_dsl_words_weights(
+                n_images=n_images, 
+                concept_dim=6,
+                output_dim=2, 
+                device=device
+            )
+        ]
 
 
 ##
@@ -447,11 +480,11 @@ class chx_ltn_loss(torch.nn.Module):
         )
 
         sat_agg = self.sat_agg_op(healty, malignant)
-        log(f"LTN loss: {1 - sat_agg}", "INFO")
+        log(f"LTN loss: {1 - sat_agg}", "DEBUG")
         return 1 - sat_agg
 
-def chx_dsl_weights():
-    pass
+def chx_dsl_weights(n_images, concept_dim, output_dim, device):
+    return _generic_dsl_words_weights(n_images, concept_dim, output_dim, device)
     
 ##
 # DERMA
@@ -526,12 +559,12 @@ class derma_ltn_loss(torch.nn.Module):
         )
 
         sat_agg = self.sat_agg_op(healty, malignant)
-        log(f"LTN loss: {1 - sat_agg}", "INFO")
+        log(f"LTN loss: {1 - sat_agg}", "DEBUG")
         return 1 - sat_agg
 
 
-def derma_dsl_weights():
-    raise NotImplemented("Not implemented DSL for DERMA")
+def derma_dsl_weights(n_images, concept_dim, output_dim, device):
+    return _generic_dsl_words_weights(n_images, concept_dim, output_dim, device)
 
 
 ##
