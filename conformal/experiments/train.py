@@ -108,7 +108,14 @@ def train_epoch(
 
         # NeSy loss specific
         loss = model.compute_loss(
-            args.dataset, criterion, conc_pred, concepts, output, target, label_weights, extra
+            args.dataset,
+            criterion,
+            conc_pred,
+            concepts,
+            output,
+            target,
+            label_weights,
+            extra,
         )
 
         # Add concept supervision loss if specified

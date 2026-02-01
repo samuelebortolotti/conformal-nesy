@@ -31,7 +31,6 @@ class LinearPredictor(NeSyModel):
             torch.nn.Linear(in_dim, output_dim), activation
         ).to(self.device)
 
-
     def _inference_boia(self, concepts):
         out = self.linear(concepts.view(concepts.shape[0], -1))
         out = torch.stack([out, 1.0 - out], dim=-1).reshape(out.shape[0], -1)

@@ -60,7 +60,17 @@ class NeSyModel(nn.Module):
         """Abstract method to be overridden by LTN, DPL and Linear Predictor."""
         raise NotImplementedError("Subclasses must implement the inference method.")
 
-    def compute_loss(self, dataset, criterion, conc_pred, concepts, output, target, label_weights, extra):
+    def compute_loss(
+        self,
+        dataset,
+        criterion,
+        conc_pred,
+        concepts,
+        output,
+        target,
+        label_weights,
+        extra,
+    ):
         """DPL and Linear Predictor standard loss on labels. LTN overrides it"""
         if isinstance(criterion, torch.nn.NLLLoss):
             output = output.log()
@@ -70,9 +80,7 @@ class NeSyModel(nn.Module):
         else:
             loss = 0.0
             for i in range(output.size(1)):
-                sample_weights = (
-                    label_weights[i] if label_weights is not None else None
-                )
+                sample_weights = label_weights[i] if label_weights is not None else None
                 loss = torch.nn.functional.nll_loss(
                     output.permute(0, 2, 1), target, weight=sample_weights
                 )

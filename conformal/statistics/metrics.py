@@ -56,14 +56,14 @@ def compute_statistics(
         output, conc_pred, extra = model(data)
 
         loss = model.compute_loss(
-            dataset=dataset, 
-            criterion=criterion, 
-            conc_pred=conc_pred, 
-            concepts=concepts, 
-            output=output, 
-            target=target, 
-            label_weights=None, 
-            extra=extra
+            dataset=dataset,
+            criterion=criterion,
+            conc_pred=conc_pred,
+            concepts=concepts,
+            output=output,
+            target=target,
+            label_weights=None,
+            extra=extra,
         )
 
         if isinstance(criterion, nn.NLLLoss):

@@ -97,16 +97,20 @@ class mnist_sump_ltn_loss(BaseMNISTLTNLoss):
     def condition(self):
         return lambda d1, d2, n: torch.eq((d1.value + d2.value) % 2, n.value)
 
+
 def _generic_dsl_weights(n_images, concept_dim, output_dim, device):
     shape = [concept_dim] * n_images + [output_dim]
     return torch.nn.Parameter(torch.randn(shape).to(device))
+
 
 def _generic_dsl_words_weights(n_images, concept_dim, output_dim, device):
     shape = [2**concept_dim] + [output_dim]
     return torch.nn.Parameter(torch.randn(shape).to(device))
 
+
 def mnist_add_dsl_weights(n_images, concept_dim, output_dim, device):
     return _generic_dsl_weights(n_images, concept_dim, output_dim, device)
+
 
 def mnist_sump_dsl_weights(n_images, concept_dim, output_dim, device):
     return _generic_dsl_weights(n_images, concept_dim, output_dim, device)
@@ -215,7 +219,9 @@ class boia_ltn_loss(torch.nn.Module):
     Encapsulates the common logic for variable creation and satisfaction aggregation.
     """
 
-    def __init__(self, and_op, or_op, not_op, imp_op, exists_op, forall_op, equiv_op, sat_agg_op) -> None:
+    def __init__(
+        self, and_op, or_op, not_op, imp_op, exists_op, forall_op, equiv_op, sat_agg_op
+    ) -> None:
         super().__init__()
         self.and_op = and_op
         self.or_op = or_op
@@ -246,8 +252,12 @@ class boia_ltn_loss(torch.nn.Module):
         left_green_light = ltn.Variable(
             "left_green_light", conc_preds[:, 10], add_batch_dim=False
         )
-        left_follow = ltn.Variable("left_follow", conc_preds[:, 11], add_batch_dim=False)
-        no_left_lane = ltn.Variable("no_left_lane", conc_preds[:, 12], add_batch_dim=False)
+        left_follow = ltn.Variable(
+            "left_follow", conc_preds[:, 11], add_batch_dim=False
+        )
+        no_left_lane = ltn.Variable(
+            "no_left_lane", conc_preds[:, 12], add_batch_dim=False
+        )
         left_obstacle = ltn.Variable(
             "left_obstacle", conc_preds[:, 13], add_batch_dim=False
         )
@@ -258,7 +268,9 @@ class boia_ltn_loss(torch.nn.Module):
         right_green_light = ltn.Variable(
             "right_green_light", conc_preds[:, 16], add_batch_dim=False
         )
-        right_follow = ltn.Variable("right_follow", conc_preds[:, 17], add_batch_dim=False)
+        right_follow = ltn.Variable(
+            "right_follow", conc_preds[:, 17], add_batch_dim=False
+        )
         no_right_lane = ltn.Variable(
             "no_right_lane", conc_preds[:, 18], add_batch_dim=False
         )
@@ -274,26 +286,31 @@ class boia_ltn_loss(torch.nn.Module):
         turn_right = ltn.Variable("turn_right", actions[:, 3], add_batch_dim=False)
 
         # REDLIGHT: red_light ⇒ ¬green_light
-        
+
         # phi1 = self.Forall(ltn.diag(red_light, green_light), self.Implies(red_light, self.Not(green_light)))
         phi1 = self.forall_op(
-            ltn.diag(red_light, green_light), self.not_op(self.and_op(red_light, green_light))
+            ltn.diag(red_light, green_light),
+            self.not_op(self.and_op(red_light, green_light)),
         )
-        
+
         # OBSTACLE: obstacle = car ∨ person ∨ rider ∨ other_obstacle
         def obstacle(c, p, r, o):
             return self.or_op(c, self.or_op(p, self.or_op(r, o)))
-        
+
         # ROAD_CLEAR: road_clear ⇐⇒ ¬obstacle
         phi2 = self.forall_op(
             ltn.diag(road_clear, car, person, rider, other_obstacle),
-            self.equiv_op(road_clear, self.not_op(obstacle(car, person, rider, other_obstacle))),
+            self.equiv_op(
+                road_clear, self.not_op(obstacle(car, person, rider, other_obstacle))
+            ),
         )
-        
+
         # MOVE_FORWARD: green_light ∨ follow ∨ clear ⇒ move_forward
         phi3 = self.forall_op(
             ltn.diag(green_light, follow, road_clear, move_forward),
-            self.imp_op(self.or_op(green_light, self.or_op(follow, road_clear)), move_forward),
+            self.imp_op(
+                self.or_op(green_light, self.or_op(follow, road_clear)), move_forward
+            ),
         )
 
         # STOP: red_light ∨ stop_sign ∨ obstacle ⇒ stop
@@ -307,7 +324,7 @@ class boia_ltn_loss(torch.nn.Module):
                 stop,
             ),
         )
-    
+
         phi5 = self.forall_op(
             ltn.diag(
                 red_light,
@@ -324,7 +341,9 @@ class boia_ltn_loss(torch.nn.Module):
                 self.and_op(
                     self.or_op(
                         red_light,
-                        self.or_op(stop_sign, obstacle(car, person, rider, other_obstacle)),
+                        self.or_op(
+                            stop_sign, obstacle(car, person, rider, other_obstacle)
+                        ),
                     ),
                     self.or_op(green_light, self.or_op(follow, road_clear)),
                 )
@@ -342,7 +361,9 @@ class boia_ltn_loss(torch.nn.Module):
         # TURN LEFT: can_turn ∧ ¬cannot_turn ⇒ turn_left
         phi6 = self.forall_op(
             ltn.diag(left_lane, left_green_light, left_follow, turn_left),
-            self.equiv_op(can_turn(left_lane, left_green_light, left_follow), turn_left),
+            self.equiv_op(
+                can_turn(left_lane, left_green_light, left_follow), turn_left
+            ),
         )
         phi7 = self.forall_op(
             ltn.diag(no_left_lane, left_obstacle, left_solid_line, turn_left),
@@ -353,12 +374,16 @@ class boia_ltn_loss(torch.nn.Module):
         )
         phi8 = self.forall_op(
             ltn.diag(right_lane, right_green_light, right_follow, turn_right),
-            self.equiv_op(can_turn(right_lane, right_green_light, right_follow), turn_right),
+            self.equiv_op(
+                can_turn(right_lane, right_green_light, right_follow), turn_right
+            ),
         )
         phi9 = self.forall_op(
             ltn.diag(no_right_lane, right_obstacle, right_solid_line, turn_right),
             self.equiv_op(
-                self.not_op(cannot_turn(no_right_lane, right_obstacle, right_solid_line)),
+                self.not_op(
+                    cannot_turn(no_right_lane, right_obstacle, right_solid_line)
+                ),
                 turn_right,
             ),
         )
@@ -373,47 +398,41 @@ class boia_ltn_loss(torch.nn.Module):
         log("phi8: " + str(phi8), "DEBUG")
         log("phi9: " + str(phi9), "DEBUG")
 
-        log(f"LTN loss: {1.0 - self.sat_agg_op(phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9)}", "DEBUG")
+        log(
+            f"LTN loss: {1.0 - self.sat_agg_op(phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9)}",
+            "DEBUG",
+        )
 
-        return 1.0 - self.sat_agg_op(phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9)
+        return 1.0 - self.sat_agg_op(
+            phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9
+        )
 
 
 def boia_dsl_weights(n_images, concept_dim, output_dim, device):
-        return [
-            # forward
-            _generic_dsl_words_weights(
-                n_images=n_images, 
-                concept_dim=9,
-                output_dim=2, 
-                device=device
-            ),
-            # stop
-            _generic_dsl_words_weights(
-                n_images=n_images, 
-                concept_dim=9,
-                output_dim=2, 
-                device=device
-            ),
-            # left-stop
-            _generic_dsl_words_weights(
-                n_images=n_images, 
-                concept_dim=6,
-                output_dim=2, 
-                device=device
-            ),
-            # right-stop
-            _generic_dsl_words_weights(
-                n_images=n_images, 
-                concept_dim=6,
-                output_dim=2, 
-                device=device
-            )
-        ]
+    return [
+        # forward
+        _generic_dsl_words_weights(
+            n_images=n_images, concept_dim=9, output_dim=2, device=device
+        ),
+        # stop
+        _generic_dsl_words_weights(
+            n_images=n_images, concept_dim=9, output_dim=2, device=device
+        ),
+        # left-stop
+        _generic_dsl_words_weights(
+            n_images=n_images, concept_dim=6, output_dim=2, device=device
+        ),
+        # right-stop
+        _generic_dsl_words_weights(
+            n_images=n_images, concept_dim=6, output_dim=2, device=device
+        ),
+    ]
 
 
 ##
 # CHX
 ##
+
 
 def chx_circuit():
     possible_worlds = list(product(range(2), repeat=4))
@@ -447,7 +466,7 @@ class chx_ltn_loss(torch.nn.Module):
         self.exists_op = exists_op
 
     def forward(self, pred_concepts, labels):
-        x = ltn.Variable("x", pred_concepts[:, 0, :, 1] )
+        x = ltn.Variable("x", pred_concepts[:, 0, :, 1])
         l = ltn.Variable("l", labels)
         indices = ltn.Variable("indices", torch.arange(4))
 
@@ -460,32 +479,28 @@ class chx_ltn_loss(torch.nn.Module):
             ltn.diag(x, l),
             self.equiv_op(
                 is_healthy(l),
-                self.forall_op(
-                    [indices], 
-                    self.not_op(is_present(x, indices))
-                )
-            )
+                self.forall_op([indices], self.not_op(is_present(x, indices))),
+            ),
         )
 
-        # If malignant <-> exists at least one 
+        # If malignant <-> exists at least one
         malignant = self.forall_op(
             ltn.diag(x, l),
             self.equiv_op(
                 self.not_op(is_healthy(l)),
-                self.exists_op(
-                    [indices], 
-                    is_present(x, indices)
-                )
-            )
+                self.exists_op([indices], is_present(x, indices)),
+            ),
         )
 
         sat_agg = self.sat_agg_op(healty, malignant)
         log(f"LTN loss: {1 - sat_agg}", "DEBUG")
         return 1 - sat_agg
 
+
 def chx_dsl_weights(n_images, concept_dim, output_dim, device):
     return _generic_dsl_words_weights(n_images, concept_dim, output_dim, device)
-    
+
+
 ##
 # DERMA
 ##
@@ -509,16 +524,15 @@ def derma_circuit():
     return w_q
 
 
-
 class derma_ltn_loss(torch.nn.Module):
     def __init__(self, equiv_op, forall_op, not_op, exists_op, sat_agg_op) -> None:
         """
-        Logic: 
+        Logic:
         Malignant (1) <=> Concept 0 OR Concept 1 OR Concept 5 is True.
         Benign (0)    <=> NOT (Concept 0 OR Concept 1 OR Concept 5).
         """
         super().__init__()
-        
+
         self.equiv_op = equiv_op
         self.forall_op = forall_op
         self.not_op = not_op
@@ -526,36 +540,32 @@ class derma_ltn_loss(torch.nn.Module):
         self.exists_op = exists_op
 
     def forward(self, pred_concepts, labels):
-        x = ltn.Variable("x", pred_concepts[:, 0, :, 1] )
+        x = ltn.Variable("x", pred_concepts[:, 0, :, 1])
         l = ltn.Variable("l", labels)
         indices = ltn.Variable("indices", torch.tensor([0, 1, 5]))
 
         # Predicates
         is_present = ltn.Predicate(func=lambda c, idx: torch.gather(c, 1, idx.long()))
-        is_healthy = ltn.Predicate(func=lambda l: (l == 1).float()) # NOTE: different from CHX
+        is_healthy = ltn.Predicate(
+            func=lambda l: (l == 1).float()
+        )  # NOTE: different from CHX
 
         # If healty <-> for all indices not present
         healty = self.forall_op(
             ltn.diag(x, l),
             self.equiv_op(
                 is_healthy(l),
-                self.forall_op(
-                    [indices], 
-                    self.not_op(is_present(x, indices))
-                )
-            )
+                self.forall_op([indices], self.not_op(is_present(x, indices))),
+            ),
         )
 
-        # If malignant <-> exists at least one 
+        # If malignant <-> exists at least one
         malignant = self.forall_op(
             ltn.diag(x, l),
             self.equiv_op(
                 self.not_op(is_healthy(l)),
-                self.exists_op(
-                    [indices], 
-                    is_present(x, indices)
-                )
-            )
+                self.exists_op([indices], is_present(x, indices)),
+            ),
         )
 
         sat_agg = self.sat_agg_op(healty, malignant)

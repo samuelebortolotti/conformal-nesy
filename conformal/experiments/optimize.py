@@ -32,10 +32,14 @@ def objective(trial, base_args, experiment_name, output_dir, device):
     if args.nesy == "ltn":
         args.and_op = trial.suggest_categorical("and_op", ["godel", "prod", "luk"])
         args.or_op = trial.suggest_categorical("or_op", ["godel", "prod", "luk"])
-        args.imp_op = trial.suggest_categorical("imp_op", ["godel", "prod", "luk", "goguen", "klenee"])
+        args.imp_op = trial.suggest_categorical(
+            "imp_op", ["godel", "prod", "luk", "goguen", "klenee"]
+        )
         args.p = trial.suggest_categorical("p", list(range(1, 10)))
     elif args.nesy == "dsl":
-        args.epsilon_symbols = trial.suggest_float("epsilon_symbols", 1e-5, 0.5, log=True)
+        args.epsilon_symbols = trial.suggest_float(
+            "epsilon_symbols", 1e-5, 0.5, log=True
+        )
         args.epsilon_rules = trial.suggest_float("epsilon_rules", 1e-5, 0.5, log=True)
 
     args.model_path = f"trial_{trial.number}.pt"

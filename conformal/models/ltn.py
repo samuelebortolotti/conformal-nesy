@@ -10,6 +10,7 @@ from conformal.models.nesy import NeSyModel
 import torch
 import torch.nn.functional as F
 
+
 def configure_global_arguments(parser):
     """Configure global arguments for LTN."""
     parser.add_argument(
@@ -76,10 +77,13 @@ class LTN(NeSyModel):
 
     def _build_not(self):
         return ltn.Connective(ltn.fuzzy_ops.NotStandard())
-    
+
     def _build_equiv(self, and_op, imp_op):
         return ltn.Connective(
-            ltn.fuzzy_ops.Equiv(and_op=self._select_and_operator(and_op), implies_op=self._select_imp_operator(imp_op))
+            ltn.fuzzy_ops.Equiv(
+                and_op=self._select_and_operator(and_op),
+                implies_op=self._select_imp_operator(imp_op),
+            )
         )
 
     def _build_exists(self, p):
@@ -149,21 +153,28 @@ class LTN(NeSyModel):
                 exists_op=self.exists_op,
                 forall_op=self.forall_op,
                 equiv_op=self.equiv_op,
-                sat_agg_op=self.sat_agg_op
+                sat_agg_op=self.sat_agg_op,
             )
         elif dataset == "chx":
             return chx_ltn_loss(
-                equiv_op=self.equiv_op, forall_op=self.forall_op, not_op=self.not_op, exists_op=self.exists_op, sat_agg_op=self.sat_agg_op,
+                equiv_op=self.equiv_op,
+                forall_op=self.forall_op,
+                not_op=self.not_op,
+                exists_op=self.exists_op,
+                sat_agg_op=self.sat_agg_op,
             )
         elif dataset == "derma":
             return derma_ltn_loss(
-                equiv_op=self.equiv_op, forall_op=self.forall_op, not_op=self.not_op, exists_op=self.exists_op, sat_agg_op=self.sat_agg_op
+                equiv_op=self.equiv_op,
+                forall_op=self.forall_op,
+                not_op=self.not_op,
+                exists_op=self.exists_op,
+                sat_agg_op=self.sat_agg_op,
             )
-        
+
         raise NotImplementedError(
             f"LTN SAT-Agg loss for dataset {dataset} not implemented."
         )
-
 
     def _inference_boia(self, concepts):
         logic_output = self.logic.forward(concepts)
@@ -182,12 +193,27 @@ class LTN(NeSyModel):
         concept_copy = concepts.clone().squeeze().argmax(dim=-1).cpu().numpy()
         if self.dataset == "boia":
             return self._inference_boia(concept_copy), None
-        return F.one_hot(
-            torch.tensor(self.logic.forward(concept_copy)), 
-            num_classes=self.output_dim
-        ).to(self.device).float(), None
+        return (
+            F.one_hot(
+                torch.tensor(self.logic.forward(concept_copy)),
+                num_classes=self.output_dim,
+            )
+            .to(self.device)
+            .float(),
+            None,
+        )
 
-    def compute_loss(self, dataset, criterion, conc_pred, concepts, output, target, label_weights, extra):
+    def compute_loss(
+        self,
+        dataset,
+        criterion,
+        conc_pred,
+        concepts,
+        output,
+        target,
+        label_weights,
+        extra,
+    ):
         """Return the LTN loss"""
         return self.ltn_loss(conc_pred, target)
 
