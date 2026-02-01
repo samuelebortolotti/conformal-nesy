@@ -4,7 +4,7 @@ import torchvision
 from torch.utils.data import Dataset
 from medmnist import DermaMNIST
 from torchvision import transforms
-from conformal.utils.logic import Logic
+from conformal.utils.logic import HardLogic
 
 
 class DERMALoader:
@@ -80,7 +80,7 @@ class DERMALoader:
         self.label_weights = self._get_weights(train_ds)
         self.concepts_weights = self._get_concept_weights(train_ds)
 
-        logic = Logic(
+        logic = HardLogic(
             lambda x: (np.any(x[:, [0, 1, 5]] == 1, axis=1)).astype(np.int64),
             n_concepts=1,
             concept_dim=7,

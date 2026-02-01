@@ -1,6 +1,6 @@
 from conformal.datasets.mnist import MNISTLoader
 from conformal.datasets.mnistadd import MNISTAdditionDataset
-from conformal.utils.logic import Logic
+from conformal.utils.logic import HardLogic
 from conformal.datasets.mnistadd import mnist_addition_weights
 import torch
 
@@ -22,7 +22,7 @@ class MNISTSumParityLoader(MNISTLoader):
         class_names = [str(i) for i in range(output_dim)]
         concept_names = [str(i) for i in range(concept_dim)]
 
-        logic = Logic(
+        logic = HardLogic(
             lambda x: (x[:, 0] + x[:, 1]) % 2,
             n_concepts=n_images,
             concept_dim=concept_dim,

@@ -10,6 +10,7 @@ class ConformalPredictor:
         model,
         device,
         logic,
+        dataset,
         concept_dim=10,
         n_concepts=2,
         multiconcepts=False,
@@ -28,6 +29,7 @@ class ConformalPredictor:
         self.n_concepts = n_concepts
         self.multiconcepts = multiconcepts
         self.multilabel = multilabel
+        self.dataset = dataset
 
         self.per_concept_thresholds = None
         self.label_threshold = None
@@ -47,7 +49,7 @@ class ConformalPredictor:
 
         for data, concepts, _ in dl:
             data, concepts = data.to(self.device), concepts.to(self.device)
-            _, conc_pred, _ = self.model(data)
+            _, conc_pred, _ = self.model(data, eval=True)
 
             # For each concept, compute 1 - probability of true label
             if self.multiconcepts:
@@ -89,7 +91,7 @@ class ConformalPredictor:
 
         for data, _, labels in dl:
             data, labels = data.to(self.device), labels.to(self.device)
-            label_pred, _ = self.model(data)
+            label_pred, _, _ = self.model(data, eval=True)
 
             if self.multilabel:
                 batch_scores = torch.stack(
@@ -213,7 +215,7 @@ class ConformalPredictor:
 
         for data, _, _ in dl:
             data = data.to(self.device)
-            _, conc_pred, _ = self.model(data)
+            _, conc_pred, _ = self.model(data, eval=True)
 
             # TODO: unless the concept outcome is entangled
             # Get marginals first
@@ -315,17 +317,15 @@ class ConformalPredictor:
             data = data.to(self.device)
 
             # Forward Pass
-            label_pred, conc_pred, _ = self.model(data)
+            label_pred, conc_pred, _ = self.model(data, eval=True)
 
             # Build the initial "Conformal Tuples" (Cartesian Product)
             batch_marginal = self._build_concept_sets_for_batch(conc_pred)
             batch_tuples = []
             for sample_m in batch_marginal:
                 # Handle empty sets by treating them as full range (wildcards)
-                # TODO: for now it works in MNIST, what for BOIA and others?
-                processed = [
-                    s if s.size > 0 else np.arange(self.concept_dim) for s in sample_m
-                ]
+                fill_dim = self.concept_dim if self.dataset.startswith("mnist") else 2
+                processed = [s if s.size > 0 else np.arange(fill_dim) for s in sample_m]
                 sample_tuples = np.array(list(itertools.product(*processed)))
                 batch_tuples.append(sample_tuples)
 

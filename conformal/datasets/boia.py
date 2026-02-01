@@ -2,7 +2,7 @@ import os
 import torch
 import numpy as np
 from torch.utils.data import Dataset, random_split
-from conformal.utils.logic import Logic
+from conformal.utils.logic import HardLogic
 from conformal.general_utils import log
 import pickle
 
@@ -198,7 +198,7 @@ class BOIALoader:
         # AND (A∧B): Represented as A * B.
         # NOT (¬A): Represented as 1 - A.
 
-        logic = Logic(
+        logic = HardLogic(
             lambda x: np.stack(
                 [
                     # 1. STOP

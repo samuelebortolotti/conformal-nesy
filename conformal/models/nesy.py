@@ -35,10 +35,10 @@ class NeSyModel(nn.Module):
 
         return self._normalize(c)
 
-    def forward(self, x):
+    def forward(self, x, eval=False):
         if self.entangled:
             concepts = self.get_concepts(x)
-            y, extra = self.inference(concepts)
+            y, extra = self.inference(concepts, eval=eval)
 
             return y, concepts, extra
         else:
@@ -48,7 +48,7 @@ class NeSyModel(nn.Module):
             concepts = torch.stack(concepts, dim=1)
 
             # inference
-            y, extra = self.inference(concepts)
+            y, extra = self.inference(concepts, eval=eval)
 
             # Special case for BDD-OIA
             if self.dataset in ["boia"]:
@@ -56,7 +56,7 @@ class NeSyModel(nn.Module):
 
             return y, concepts, extra
 
-    def inference(self, concepts):
+    def inference(self, concepts, eval=False):
         """Abstract method to be overridden by LTN, DPL and Linear Predictor."""
         raise NotImplementedError("Subclasses must implement the inference method.")
 
@@ -87,3 +87,10 @@ class NeSyModel(nn.Module):
             loss /= output.size(1)
 
         return loss
+
+    def _from_predictions_to_probabilities(self, x):
+        # one hot, categorical only for mnist, otherwise binary
+        return torch.nn.functional.one_hot(
+            torch.tensor(x),
+            num_classes=self.concept_dim if "mnist" in self.dataset else 2,
+        ).to(self.device)

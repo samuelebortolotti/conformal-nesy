@@ -36,7 +36,7 @@ class LinearPredictor(NeSyModel):
         out = torch.stack([out, 1.0 - out], dim=-1).reshape(out.shape[0], -1)
         return out
 
-    def inference(self, concepts):
+    def inference(self, concepts, eval=False):
         """Linear predictor inference."""
         log_odds = torch.log(concepts)
 

@@ -52,7 +52,7 @@ class DPL(NeSyModel):
             return derma_circuit()
         raise NotImplementedError(f"Circuit for dataset {dataset} not implemented.")
 
-    def inference(self, concepts):
+    def inference(self, concepts, eval=False):
         """DPL-specific probabilistic circuit inference."""
         if self.dataset == "boia":
             return self._boia_inference(concepts), None

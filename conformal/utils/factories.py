@@ -2,11 +2,9 @@ import torch.optim as optim
 from conformal.models.resnet18 import ResNet18
 from conformal.models.lenet import LeNet
 from conformal.models.linear import Linear
-from conformal.datasets.mnist import MNISTLoader
 from conformal.datasets.mnistadd import MNISTAdditionLoader
 from conformal.datasets.mnistsump import MNISTSumParityLoader
 from conformal.datasets.mnisthalf import MNISTHalfLoader
-from conformal.datasets.cub import CUBLoader
 from conformal.datasets.derma import DERMALoader
 from conformal.datasets.boia import BOIALoader
 from conformal.datasets.chx import CHXLoader
@@ -14,6 +12,7 @@ from conformal.models.dpl import DPL
 from conformal.models.ltn import LTN
 from conformal.models.linear_predictor import LinearPredictor
 from conformal.models.dsl import DSL
+from conformal.utils.logic import DSLLogic, HardLogic, LinearLayerLogic
 
 
 class OptimizerFactory:
@@ -47,16 +46,12 @@ class DatasetFactory:
     @staticmethod
     def get_dataset(name: str, **kwargs):
         name = name.lower()
-        # if name == "mnist":
-        #     return MNISTLoader(**kwargs).load()
         if name == "mnistadd":
             return MNISTAdditionLoader(**kwargs).load()
         elif name == "mnistsump":
             return MNISTSumParityLoader(**kwargs).load()
         elif name == "mnisthalf":
             return MNISTHalfLoader(**kwargs).load()
-        # elif name == "cub":
-        #     return CUBLoader(**kwargs).load()
         elif name == "boia":
             return BOIALoader(**kwargs).load()
         elif name == "chx":
@@ -121,3 +116,26 @@ class NeSyFactory:
             )
         else:
             raise ValueError(f"Unknown nesy method: {name}")
+
+
+class LogicFactory:
+    @staticmethod
+    def get_logic(name: str, logic, model):
+        if name.lower() in ["dpl", "ltn"]:
+            return logic
+        elif name.lower() == "linpred":
+            return LinearLayerLogic(
+                model=model,
+                n_concepts=logic.n_concepts,
+                concept_dim=logic.concept_dim,
+                is_too_big=logic.is_too_big,
+            )
+        elif name.lower() == "dsl":
+            return DSLLogic(
+                model=model,
+                n_concepts=logic.n_concepts,
+                concept_dim=logic.concept_dim,
+                is_too_big=logic.is_too_big,
+            )
+        else:
+            raise ValueError(f"Unknown logic type: {name}")

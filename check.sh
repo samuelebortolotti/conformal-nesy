@@ -1,15 +1,10 @@
 #!/bin/bash
 
-# SCRIPT: tuning.sh
+# SCRIPT: check.sh
 # AUTHOR: Samuele Bortolotti <samuele@unitn.it>
-# DATE:   2026-01-28
+# DATE:   2026-02-01
 #
-# PURPOSE: Hyperparameter tuning 
-
-BASE_OUTPUT_DIR="optuna_runs"
-mkdir -p "$BASE_OUTPUT_DIR"
-
-STOP_ON_FAILURE=true 
+# PURPOSE: Check no crashes happens
 
 DATASETS_MNIST=("mnistadd" "mnisthalf" "mnistsump")
 MODELS_MNIST=("lenet")
@@ -20,7 +15,7 @@ DATASETS_BOIA=("boia")
 MODELS_BOIA=("linear")
 NESY_VARIANTS=("dpl" "ltn" "dsl" "linpred")
 CONCEPT_SUPS=("0.0" "1.0")
-EPOCHS=20
+EPOCHS=2
 
 run_job() {
     local dataset=$1
@@ -29,20 +24,12 @@ run_job() {
     local cs=$4
     local extra_args=$5
 
-    RUN_NAME="${dataset}_${model}_${nesy}_cs${cs//./}"
-    OUTPUT_DIR="${BASE_OUTPUT_DIR}/${RUN_NAME}"
-    mkdir -p "$OUTPUT_DIR"
-
-    echo "Starting run: $RUN_NAME"
-
     CMD="python -m conformal \
-        CONF --dry-run optuna \
-        --optuna-path $OUTPUT_DIR \
+        CONF --dry-run train \
         $dataset \
         --concept-sup $cs \
         --epochs $EPOCHS \
-        $model $nesy $extra_args \
-        > \"${OUTPUT_DIR}/log.txt\" 2>&1"
+        $model $nesy $extra_args"
 
     echo "Executing command:"
     echo "$CMD"
@@ -52,14 +39,9 @@ run_job() {
     # check on the status
     local STATUS=$?
     if [ $STATUS -ne 0 ]; then
-        echo "Run FAILED: $RUN_NAME (see ${OUTPUT_DIR}/log.txt)"
-        if [ "$STOP_ON_FAILURE" = true ]; then
-            echo "Stopping script due to failure."
-            exit $STATUS
-        fi
+        echo "Command FAILED: $CMD"
     else
-        echo "Run finished successfully: $RUN_NAME"
-        echo "DONE" > "${OUTPUT_DIR}/finished.txt"
+        echo "Run finished successfully: $CMD"
     fi
 }
 

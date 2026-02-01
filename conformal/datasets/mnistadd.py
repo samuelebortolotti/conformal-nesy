@@ -4,7 +4,7 @@ import random
 import numpy as np
 
 from conformal.datasets.mnist import MNISTLoader
-from conformal.utils.logic import Logic
+from conformal.utils.logic import HardLogic
 
 
 class MNISTAdditionDataset(Dataset):
@@ -57,7 +57,7 @@ class MNISTAdditionLoader(MNISTLoader):
         class_names = [str(i) for i in range(output_dim)]
         concept_names = [str(i) for i in range(concept_dim)]
 
-        logic = Logic(
+        logic = HardLogic(
             lambda x: x[:, 0] + x[:, 1], n_concepts=n_images, concept_dim=concept_dim
         )
 

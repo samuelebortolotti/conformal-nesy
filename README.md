@@ -18,6 +18,5 @@
 
 - interazione sul concetto da parte dell'utente, o sulla label o sui concetti.
 - cub tassonomia per famiglia diversa, definire un set di concetti categorici 28.
-- cosa si misura in conformal, a che punto sono arrivati.
-- che relazione c'e' tra p(y|c) e p(c|x)? Le varie calibrazioni, calibrazione multilabel, naive bayes, modelli markoviani
-- Test Optuna with dry-run
+- dataset gerarchici
+- se non supervisionati, la logica deve essere applicata con la permutazione

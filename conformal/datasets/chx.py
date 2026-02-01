@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from PIL import Image
 from sklearn.model_selection import train_test_split
 from torchvision import transforms
-from conformal.utils.logic import Logic
+from conformal.utils.logic import HardLogic
 from conformal.general_utils import log
 
 
@@ -187,7 +187,7 @@ class CHXLoader:
             ]
         )
 
-        logic = Logic(
+        logic = HardLogic(
             lambda x: (np.sum(x, axis=1) == 0).astype(np.int64),
             n_concepts=1,
             concept_dim=4,

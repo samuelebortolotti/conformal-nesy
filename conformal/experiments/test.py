@@ -7,8 +7,12 @@ import matplotlib.pyplot as plt
 
 from conformal.models import resnet18, lenet, linear
 from conformal.general_utils import log
-from conformal.utils.factories import DatasetFactory, NetworkFactory, NeSyFactory
-from conformal.models.dpl import DPL
+from conformal.utils.factories import (
+    DatasetFactory,
+    NetworkFactory,
+    NeSyFactory,
+    LogicFactory,
+)
 from conformal.datasets.loaders import create_dataloaders
 from conformal.experiments.utils import load_model
 from conformal.statistics.metrics import compute_statistics, conformal_metrics
@@ -148,8 +152,6 @@ def save_visual_examples(
             )
             ax_txt.axis("off")
 
-            plt.tight_layout()
-
             # Save
             fname = save_path / f"sample_{i}.pdf"
             log(fname, "DEBUG")
@@ -168,6 +170,7 @@ def conformal_evaluation(
     device,
     args,
     logic,
+    dataset,
     criterion,
     alpha_concepts=0.1,
     alpha_label=0.1,
@@ -225,13 +228,12 @@ def conformal_evaluation(
         model,
         device=device,
         logic=logic,
+        dataset=dataset,
         concept_dim=model.concept_dim,
         n_concepts=model.n_images,
         multiconcepts=multiconcept,
         multilabel=multilabel,
-        bonferroni=(
-            True if args.dataset in ["chx", "derma"] else False
-        ),  # in ["boia", "chx"] else False,
+        bonferroni=(True if args.dataset in ["chx", "derma"] else False),
     )
 
     log("=== 2. Conformal (Calibrating Concepts) ===", "INFO")
@@ -367,59 +369,6 @@ def conformal_evaluation(
 
     return results_storage
 
-    # if cp.logic.is_too_big:
-    #     log(
-    #         "[Warning] Skipping hard logic due to large logic size. Move to LTN?",
-    #         "WARNING",
-    #     )
-    #     return results_storage
-
-    # print("=== 6. Conformal with Concept and Label Refinement ===")
-
-    # concept_sets, label_sets = cp.predict_concepts_and_labels(
-    #     test_dl, use_hard_logic=False, concept_refinement=True
-    # )
-
-    # concept_coverage, concept_set_size = conformal_metrics(
-    #     concept_sets, all_g, multiclass=multiconcept
-    # )
-    # label_coverage, label_size = conformal_metrics(label_sets, all_labels)
-
-    # log(
-    #     f"[Conformal both Concepts and Labels with Concept and Label Refinement] Concept Coverage: {concept_coverage:.4f}",
-    #     "INFO",
-    # )
-    # log(
-    #     f"[Conformal both Concepts and Labels with Concept and Label  Refinement] Concept Set Size: {concept_set_size:.4f}",
-    #     "INFO",
-    # )
-    # log(
-    #     f"[Conformal both Concepts and Labels with Concept and Label  Refinement] Label Coverage: {label_coverage:.4f}",
-    #     "INFO",
-    # )
-    # log(
-    #     f"[Conformal both Concepts and Labels with Concept and Label  Refinement] Label Set Size: {label_size:.4f}",
-    #     "INFO",
-    # )
-
-    # save_visual_examples(
-    #     test_dl.dataset,
-    #     concept_sets,
-    #     label_sets,
-    #     "Conformal both Concepts and Labels with Concept and Label Refinement",
-    #     args.output_dir_path,
-    #     is_image=is_image,
-    # )
-
-    # results_storage[
-    #     "Conformal both Concepts and Labels with Concept and Label Refinement"
-    # ] = {
-    #     "coverage_concepts": concept_coverage,
-    #     "concept_size": concept_set_size,
-    #     "coverage_labels": label_coverage,
-    #     "label_size": label_size,
-    # }
-
 
 def main(experiment_name, results_output_h, stats_output_h, args, device):
     """Main function that parses the arguments and writes the output."""
@@ -455,6 +404,9 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     model = load_model(model, model_path, device)
     model.to(device)
 
+    # load the logic
+    logic_from_model = LogicFactory.get_logic(args.nesy, logic, model)
+
     alpha = 0.1
     result_storage = conformal_evaluation(
         model,
@@ -462,7 +414,8 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         test_dl,
         device,
         args,
-        logic,
+        logic_from_model,
+        args.dataset,
         criterion,
         alpha_concepts=alpha,
         alpha_label=alpha,

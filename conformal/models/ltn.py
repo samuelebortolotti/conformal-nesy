@@ -188,7 +188,7 @@ class LTN(NeSyModel):
 
         return torch.cat(block_outputs, dim=1).to(self.device)
 
-    def inference(self, concepts):
+    def inference(self, concepts, eval=False):
         """Apply the hard logic on the argmax of the concepts"""
         concept_copy = concepts.clone().squeeze().argmax(dim=-1).cpu().numpy()
         if self.dataset == "boia":
