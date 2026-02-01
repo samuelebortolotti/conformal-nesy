@@ -19,6 +19,7 @@ from conformal.statistics.metrics import compute_statistics, conformal_metrics
 from conformal.experiments.utils import collect_predictions
 from conformal.models.conformal import ConformalPredictor
 from conformal.utils.visualization import plot_conformal_comparison, plot_model_metrics
+from conformal.utils.visualization import plot_confusion_matrix
 
 
 def configure_global_arguments(parser):
@@ -170,18 +171,41 @@ def conformal_evaluation(
     device,
     args,
     logic,
-    dataset,
     criterion,
+    concept_names,
+    experiment_name,
     alpha_concepts=0.1,
     alpha_label=0.1,
 ):
     log("Starting conformal prediction evaluation...", "INFO")
 
-    results_storage = {}
+    log("Preparing the conformal predictor...", "INFO")
 
     multiconcept = False if args.dataset not in ["boia", "chx", "derma"] else True
     multilabel = False if args.dataset not in ["boia"] else True
     is_image = False if args.dataset in ["boia"] else True
+
+    cp = ConformalPredictor(
+        model,
+        device=device,
+        logic=logic,
+        dataset=args.dataset,
+        concept_dim=model.concept_dim,
+        n_concepts=model.n_images,
+        multiconcepts=multiconcept,
+        multilabel=multilabel,
+        bonferroni=(True if args.dataset in ["chx", "derma"] else False),
+    )
+
+    log("Computing the permutation if needed...", "INFO")
+    permutation = None
+
+    if args.concept_supervision == 0.0 and args.nesy not in ["dpl", "ltn"]:
+        log("Computing the permutation matrix since concepts cannot be inferred...")
+        permutation = cp.compute_permutation(val_dl)
+        cp.set_permutation(permutation)
+
+    results_storage = {}
 
     log("=== 1. Baseline (Standard Argmax) ===", "INFO")
 
@@ -202,15 +226,30 @@ def conformal_evaluation(
         device,
         multiclass=multiconcept,
         multilabel=multilabel,
+        permutation=permutation
     )
 
-    all_labels, all_preds, all_g, _, _, _, _ = collect_predictions(
+    all_labels, all_preds, all_g, all_c, _, _, _ = collect_predictions(
         model,
         test_dl,
         device,
         multiclass=True,  # To get the separated G
         multilabel=multilabel,
+        permutation=permutation
     )
+
+    if args.concept_supervision == 0.0 and args.nesy not in ["dpl", "ltn"]:
+        log("> Concept confusion matrix after permutation...", "INFO")
+        plot_confusion_matrix(
+            all_g.flatten(),
+            all_c.flatten(),
+            concept_names,
+            "Concept confusion matrix",
+            str(
+                args.output_dir_path / f"{experiment_name}.after_permutation_concept_confusion_matrix.pdf"
+            ),
+            multilabel=True if args.dataset in ["boia", "chx", "derma"] else False,
+        )
 
     results_storage["No Conformal"] = {
         "test_loss": test_loss,
@@ -221,20 +260,6 @@ def conformal_evaluation(
         "yece": test_yece,
         "cece": test_cece,
     }
-
-    log("Preparing the conformal predictor...", "INFO")
-
-    cp = ConformalPredictor(
-        model,
-        device=device,
-        logic=logic,
-        dataset=dataset,
-        concept_dim=model.concept_dim,
-        n_concepts=model.n_images,
-        multiconcepts=multiconcept,
-        multilabel=multilabel,
-        bonferroni=(True if args.dataset in ["chx", "derma"] else False),
-    )
 
     log("=== 2. Conformal (Calibrating Concepts) ===", "INFO")
 
@@ -415,19 +440,20 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         device,
         args,
         logic_from_model,
-        args.dataset,
         criterion,
+        concept_names,
+        experiment_name,
         alpha_concepts=alpha,
         alpha_label=alpha,
     )
 
     plot_conformal_comparison(
-        result_storage, args.output_dir_path, target_coverage=1 - alpha
+        result_storage, str(args.output_dir_path / f"{experiment_name}"), target_coverage=1 - alpha
     )
 
     plot_model_metrics(
         result_storage["No Conformal"],
-        args.output_dir_path,
+        str(args.output_dir_path / f"{experiment_name}"),
         concept_names=args.concept_names if hasattr(args, "concept_names") else None,
         multiconcepts=True if args.dataset in ["boia", "chx", "derma"] else False,
     )

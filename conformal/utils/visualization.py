@@ -214,13 +214,13 @@ def entropy_plot_over_time(
     plt.close()
 
 
-def plot_conformal_comparison(results_storage, output_path, target_coverage=0.9):
+def plot_conformal_comparison(results_storage, file_name, target_coverage=0.9):
     """
     Scatter plot comparing Label Coverage vs Average Set Size for different methods.
 
     Args:
         results_storage (dict): Dictionary containing metrics for each method.
-        output_path (Path): Path to save the image.
+        file_name (Path): Path to save the image.
         target_coverage (float): The desired coverage level (1 - alpha).
     """
 
@@ -274,19 +274,19 @@ def plot_conformal_comparison(results_storage, output_path, target_coverage=0.9)
         plt.grid(True, linestyle="--", alpha=0.3)
         plt.legend(loc="best", frameon=True, fancybox=True, shadow=True)
         plt.tight_layout()
-        plt.savefig(output_path / f"conformal_comparison_{name}.pdf", dpi=300)
+        plt.savefig(f"{file_name}.conformal_comparison_{name}.pdf", dpi=300)
         plt.close()
 
 
 def plot_model_metrics(
-    baseline_results, output_path, concept_names=None, multiconcepts=False
+    baseline_results, file_name, concept_names=None, multiconcepts=False
 ):
     """
     Plots scalar performance metrics (F1, Loss, ECE) and per-concept entropy.
 
     Args:
         baseline_results (dict): The dictionary stored under results_storage['No Conformal']
-        output_path (Path): Directory to save plots.
+        file_name (Path): File name to save plots.
         concept_names (list): Optional list of names for the concepts.
     """
 
@@ -307,7 +307,7 @@ def plot_model_metrics(
     plt.ylabel("Score")
     plt.title("Classification Performance (F1)")
     plt.tight_layout()
-    plt.savefig(output_path / "metric_f1_scores.pdf", dpi=300)
+    plt.savefig(f"{file_name}.metric_f1_scores.pdf", dpi=300)
     plt.close()
 
     unc_metrics = {
@@ -325,7 +325,7 @@ def plot_model_metrics(
     plt.title("Calibration & Uncertainty Metrics")
     plt.grid(axis="y", linestyle="--", alpha=0.5)
     plt.tight_layout()
-    plt.savefig(output_path / "metric_uncertainty.pdf", dpi=300)
+    plt.savefig(f"{file_name}.metric_uncertainty.pdf", dpi=300)
     plt.close()
 
     h_per_val = np.array(baseline_results.get("H_c_per_value", []))
@@ -383,5 +383,5 @@ def plot_model_metrics(
         plt.ylim(0, max(h_per_val.max() * 1.1, 1.0))  # Dynamic limit
 
         plt.tight_layout()
-        plt.savefig(output_path / "metric_entropy_per_concept.pdf", dpi=300)
+        plt.savefig(f"{file_name}.metric_entropy_per_concept.pdf", dpi=300)
         plt.close()

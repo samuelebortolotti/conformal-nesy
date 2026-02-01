@@ -5,9 +5,9 @@ import copy
 from sklearn.metrics import f1_score
 from conformal.models.dpl import DPL
 from conformal.utils.factories import NetworkFactory
+from conformal.utils.alignment import align_knowledge_input
 
-
-def collect_predictions(model, data_loader, device, multiclass=False, multilabel=False):
+def collect_predictions(model, data_loader, device, multiclass=False, multilabel=False, permutation=None):
     """
     Compute loss and F1 score for the dataset (train or validation).
     Returns raw logits/probabilities after None.
@@ -24,6 +24,13 @@ def collect_predictions(model, data_loader, device, multiclass=False, multilabel
         target = target.to(device)
 
         output, conc_pred, _ = model(data, eval=True)
+
+        if permutation is not None:
+            conc_pred = align_knowledge_input(
+                conc_pred.detach().cpu().numpy(),
+                permutation
+            )
+            conc_pred = torch.tensor(conc_pred, device=device)
 
         all_preds.append(output.argmax(dim=-1).cpu().numpy())
         all_labels.append(target.cpu().numpy())

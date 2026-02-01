@@ -2,6 +2,11 @@ import torch
 import numpy as np
 import itertools
 from conformal.general_utils import log
+from conformal.utils.alignment import (
+    align_concepts,
+    apply_knowledge_permutation,
+    align_knowledge_input,
+)
 
 
 class ConformalPredictor:
@@ -34,6 +39,37 @@ class ConformalPredictor:
         self.per_concept_thresholds = None
         self.label_threshold = None
         self.bonferroni = bonferroni
+        self.permutation = None
+
+    @torch.no_grad()
+    def compute_permutation(self, dl):
+        """Compute concept permutation"""
+        self.model.eval()
+
+        all_probs = []
+        all_labels = []
+
+        for data, concepts, _ in dl:
+            data = data.to(self.device)
+            concepts = concepts.cpu().numpy()
+
+            _, conc_pred, _ = self.model(data, eval=True)
+            conc_pred = conc_pred.cpu().numpy()
+
+            all_probs.append(conc_pred)
+            all_labels.append(concepts)
+
+        probs = np.concatenate(all_probs, axis=0)
+        labels = np.concatenate(all_labels, axis=0)
+
+        _, permutation = align_concepts(probs, labels, multiclass=self.multiconcepts)
+
+        log(f"[Conformal] Learned concept permutation:\n{permutation}", "INFO")
+        return permutation
+
+    def set_permutation(self, permutation):
+        """Setting permutation"""
+        self.permutation = permutation
 
     @torch.no_grad()
     def compute_conformity_scores(self, dl):
@@ -47,9 +83,17 @@ class ConformalPredictor:
         self.model.eval()
         all_scores = []
 
+        # TODO: apply permutation
         for data, concepts, _ in dl:
             data, concepts = data.to(self.device), concepts.to(self.device)
             _, conc_pred, _ = self.model(data, eval=True)
+
+            if self.permutation is not None:
+                conc_pred = align_knowledge_input(
+                    conc_pred.cpu().numpy(),
+                    self.permutation,
+                )
+                conc_pred = torch.tensor(conc_pred, device=self.device)
 
             # For each concept, compute 1 - probability of true label
             if self.multiconcepts:
@@ -161,6 +205,8 @@ class ConformalPredictor:
         """
         batch_sets = []
 
+        # TODO: apply permutation
+
         # conc_pred shape: (Batch, N_Concepts, N_Classes)
         for i in range(conc_pred.size(0)):  # Per sample
             sample_set = []
@@ -242,7 +288,15 @@ class ConformalPredictor:
                 refined_batch_tuples.append(tuples)
                 continue
 
-            derived_labels = self.logic.forward(tuples)
+            if self.permutation is not None:
+                tuples = torch.nn.functional.one_hot(
+                    torch.tensor(tuples),
+                    self.concept_dim if self.dataset.startswith("mnist") else 2
+                )
+                apply_knowledge_permutation(tuples, self.permutation)
+                tuples = torch.argmax(tuples, dim=-1).detach().cpu().numpy()
+                derived_labels = self.logic.forward(tuples)
+
             if hasattr(derived_labels, "cpu"):
                 derived_labels = derived_labels.cpu().numpy()
 
@@ -270,6 +324,17 @@ class ConformalPredictor:
 
         # Flatten all tuples into one massive matrix for a single logic pass
         big_matrix = np.concatenate(batch_concept_tuples, axis=0)
+
+        if self.permutation is not None:
+            big_matrix = apply_knowledge_permutation(
+                torch.nn.functional.one_hot(
+                    torch.tensor(big_matrix),
+                    self.concept_dim if self.dataset.startswith("mnist") else 2
+                ),
+                self.permutation,
+            )
+            big_matrix = torch.argmax(big_matrix, dim=-1).detach().cpu().numpy()
+
         # Vectorized Logic Pass
         raw_labels = self.logic.forward(big_matrix)
 
@@ -318,6 +383,13 @@ class ConformalPredictor:
 
             # Forward Pass
             label_pred, conc_pred, _ = self.model(data, eval=True)
+
+            if self.permutation is not None:
+                conc_pred = align_knowledge_input(
+                    conc_pred.cpu().numpy(),
+                    self.permutation,
+                )
+                conc_pred = torch.tensor(conc_pred, device=self.device)
 
             # Build the initial "Conformal Tuples" (Cartesian Product)
             batch_marginal = self._build_concept_sets_for_batch(conc_pred)

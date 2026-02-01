@@ -58,7 +58,7 @@ def align_distribution_with_labels(probs, labels, multiclass=False):
 
         # Build permutation matrix
         P = np.zeros((n_classes, n_classes), dtype=int)
-        P[row_ind, col_ind] = 1
+        P[col_ind, row_ind] = 1
 
         # Apply permutation
         aligned_probs = probs @ P
@@ -83,7 +83,7 @@ def align_distribution_with_labels(probs, labels, multiclass=False):
         # Step 3: Hungarian algorithm
         row_ind, col_ind = linear_sum_assignment(-contingency)
         P = np.zeros((N, N), dtype=int)
-        P[row_ind, col_ind] = 1
+        P[col_ind, row_ind] = 1
 
         # Step 4: Apply permutation along N
         aligned_probs = np.zeros_like(probs)
