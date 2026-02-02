@@ -193,6 +193,7 @@ class LTN(NeSyModel):
         concept_copy = concepts.clone().squeeze().argmax(dim=-1).cpu().numpy()
         if self.dataset == "boia":
             return self._inference_boia(concept_copy), None
+
         return (
             F.one_hot(
                 torch.tensor(self.logic.forward(concept_copy)),

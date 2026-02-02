@@ -300,6 +300,7 @@ def evaluate_and_log_model(
         all_labels, all_preds, all_g, all_c, _, all_label_prob, all_concept_prob = (
             collect_predictions(
                 model,
+                args.dataset,
                 test_dl,
                 device,
                 multiclass=(

@@ -105,17 +105,19 @@ def apply_knowledge_permutation(probs, perm):
     probs = probs @ inverse_permutation(perm)
     return probs
 
+def apply_3d_knowledge_permutation(probs, perm):
+    N, _, _ = probs.shape
+    aligned_probs = np.zeros_like(probs)
+    for i in range(N):
+        aligned_probs[i] = inverse_permutation(perm) @ probs[i]
+    return aligned_probs
+
 
 def align_knowledge_input(probs, perm):
-
     if probs.ndim == 2:
         aligned_probs = apply_knowledge_permutation(probs, perm)
     elif probs.ndim == 3:
-        N, M, C = probs.shape
-        probs = probs.reshape(-1, C)
-
-        aligned_probs = apply_knowledge_permutation(probs, perm)
-        aligned_probs = aligned_probs.reshape(N, M, C)
+        aligned_probs = apply_3d_knowledge_permutation(probs, perm)
     else:
         raise ValueError("probs must be either (N, C) or (N, M, C)")
 

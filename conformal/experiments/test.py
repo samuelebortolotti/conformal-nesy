@@ -231,6 +231,7 @@ def conformal_evaluation(
 
     all_labels, all_preds, all_g, all_c, _, _, _ = collect_predictions(
         model,
+        args.dataset,
         test_dl,
         device,
         multiclass=True,  # To get the separated G

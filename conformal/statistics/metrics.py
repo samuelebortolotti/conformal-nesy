@@ -6,11 +6,7 @@ import numpy as np
 
 from sklearn.metrics import f1_score, confusion_matrix
 
-from conformal.utils.alignment import (
-    align_concepts,
-    apply_knowledge_permutation,
-    align_knowledge_input,
-)
+from conformal.utils.alignment import align_knowledge_input
 
 def compute_ece(probs, labels, n_bins=15):
     """Compute Expected Calibration Error (ECE)."""
@@ -63,10 +59,11 @@ def compute_statistics(
 
         if permutation is not None:
             conc_pred = align_knowledge_input(
-                conc_pred.detach().cpu().numpy(),
+                conc_pred.detach().cpu().numpy() if dataset.startswith("mnist") else conc_pred.squeeze(1).detach().cpu().numpy(),
                 permutation
             )
             conc_pred = torch.tensor(conc_pred, device=device)
+            conc_pred = conc_pred if dataset.startswith("mnist") else conc_pred.unsqueeze(1)
 
         loss = model.compute_loss(
             dataset=dataset,

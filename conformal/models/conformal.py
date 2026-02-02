@@ -62,7 +62,11 @@ class ConformalPredictor:
         probs = np.concatenate(all_probs, axis=0)
         labels = np.concatenate(all_labels, axis=0)
 
-        _, permutation = align_concepts(probs, labels, multiclass=self.multiconcepts)
+        _, permutation = align_concepts(
+            probs if self.dataset.startswith("mnist") else probs.squeeze(1),
+            labels,
+            multiclass=self.multiconcepts
+        )
 
         log(f"[Conformal] Learned concept permutation:\n{permutation}", "INFO")
         return permutation
@@ -90,10 +94,11 @@ class ConformalPredictor:
 
             if self.permutation is not None:
                 conc_pred = align_knowledge_input(
-                    conc_pred.cpu().numpy(),
-                    self.permutation,
+                    conc_pred.detach().cpu().numpy() if self.dataset.startswith("mnist") else conc_pred.squeeze(1).detach().cpu().numpy(),
+                    self.permutation
                 )
                 conc_pred = torch.tensor(conc_pred, device=self.device)
+                conc_pred = conc_pred if self.dataset.startswith("mnist") else conc_pred.unsqueeze(1)
 
             # For each concept, compute 1 - probability of true label
             if self.multiconcepts:
@@ -292,9 +297,9 @@ class ConformalPredictor:
                 tuples = torch.nn.functional.one_hot(
                     torch.tensor(tuples),
                     self.concept_dim if self.dataset.startswith("mnist") else 2
-                )
-                apply_knowledge_permutation(tuples, self.permutation)
-                tuples = torch.argmax(tuples, dim=-1).detach().cpu().numpy()
+                ).detach().cpu().numpy()
+                tuples = align_knowledge_input(tuples, self.permutation)
+                tuples = np.argmax(tuples, axis=-1)
                 derived_labels = self.logic.forward(tuples)
 
             if hasattr(derived_labels, "cpu"):
@@ -326,14 +331,15 @@ class ConformalPredictor:
         big_matrix = np.concatenate(batch_concept_tuples, axis=0)
 
         if self.permutation is not None:
-            big_matrix = apply_knowledge_permutation(
-                torch.nn.functional.one_hot(
-                    torch.tensor(big_matrix),
-                    self.concept_dim if self.dataset.startswith("mnist") else 2
-                ),
+            big_matrix = torch.nn.functional.one_hot(
+                torch.tensor(big_matrix),
+                self.concept_dim if self.dataset.startswith("mnist") else 2
+            ).detach().cpu().numpy()
+            big_matrix = align_knowledge_input(
+                big_matrix,
                 self.permutation,
             )
-            big_matrix = torch.argmax(big_matrix, dim=-1).detach().cpu().numpy()
+            big_matrix = np.argmax(big_matrix, axis=-1)
 
         # Vectorized Logic Pass
         raw_labels = self.logic.forward(big_matrix)
@@ -386,10 +392,11 @@ class ConformalPredictor:
 
             if self.permutation is not None:
                 conc_pred = align_knowledge_input(
-                    conc_pred.cpu().numpy(),
-                    self.permutation,
+                    conc_pred.detach().cpu().numpy() if self.dataset.startswith("mnist") else conc_pred.squeeze(1).detach().cpu().numpy(),
+                    self.permutation
                 )
                 conc_pred = torch.tensor(conc_pred, device=self.device)
+                conc_pred = conc_pred if self.dataset.startswith("mnist") else conc_pred.unsqueeze(1)
 
             # Build the initial "Conformal Tuples" (Cartesian Product)
             batch_marginal = self._build_concept_sets_for_batch(conc_pred)
