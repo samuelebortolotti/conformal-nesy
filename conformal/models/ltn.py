@@ -54,6 +54,7 @@ class LTN(NeSyModel):
         or_op,
         imp_op,
         p,
+        extra,
     ):
         super().__init__(
             n_images, encoder, entangled, concept_dim, output_dim, dataset, device
@@ -70,7 +71,7 @@ class LTN(NeSyModel):
         self.equiv_op = self._build_equiv(and_op, imp_op)
 
         self.sat_agg_op = self._build_sat_agg()
-        self.ltn_loss = self._get_ltn_loss(concept_dim, output_dim, n_images, dataset)
+        self.ltn_loss = self._get_ltn_loss(concept_dim, output_dim, n_images, dataset, extra)
 
     def _build_sat_agg(self):
         return ltn.fuzzy_ops.SatAgg()
@@ -129,7 +130,7 @@ class LTN(NeSyModel):
     def _build_imp(self, imp_op):
         return ltn.Connective(self._select_imp_operator(imp_op))
 
-    def _get_ltn_loss(self, concept_dim, output_dim, n_images, dataset):
+    def _get_ltn_loss(self, concept_dim, output_dim, n_images, dataset, extra):
         if dataset in ["mnistadd", "mnisthalf", "mnistaddn"]:
             return mnist_add_ltn_loss(
                 n_images=n_images,
@@ -157,6 +158,7 @@ class LTN(NeSyModel):
                 sat_agg_op=self.sat_agg_op,
             )
         elif dataset == "chx":
+            raise NotImplementedError("Missing SUM in CHX")
             return chx_ltn_loss(
                 equiv_op=self.equiv_op,
                 forall_op=self.forall_op,

@@ -279,15 +279,11 @@ class ConformalPredictor:
 
             # get the batch
             for sample_mask in mask:
-                sample_list = []
-                for j in range(sample_mask.shape[0]):
-                    included_list = [
-                        torch.where(sample_mask[j, k])[0].cpu().numpy()
-                        for k in range(sample_mask.shape[1])
-                    ]
-                    sample_list.append(included_list)
-
-                batch_sets.append(sample_list)
+                included_list = [
+                    torch.where(sample_mask[0, k])[0].cpu().numpy()
+                    for k in range(sample_mask.shape[1])
+                ]
+                batch_sets.append(included_list)
 
             return batch_sets
 

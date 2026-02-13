@@ -52,7 +52,7 @@ def get_args():
         "output_dir_path",
         metavar="OUTPUT_DIR",
         type=pathlib.Path,
-        help="XML output directory.",
+        help="Output directory.",
     )
     parser.add_argument(
         "--output-compression",

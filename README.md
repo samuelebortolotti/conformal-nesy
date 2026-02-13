@@ -16,7 +16,5 @@
 > 
 > Better move to Clevr?
 
-- interazione sul concetto da parte dell'utente, o sulla label o sui concetti.
-- cub tassonomia per famiglia diversa, definire un set di concetti categorici 28.
-- dataset gerarchici
-- se non supervisionati, la logica deve essere applicata con la permutazione
+- TODO: cambiare CHX per migliori classi e farlo fittare meglio
+- TODO: fix ltn

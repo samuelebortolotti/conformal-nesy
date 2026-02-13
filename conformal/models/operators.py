@@ -26,7 +26,7 @@ def mnist_sump_circuit(sequence_len=2, n_digits=10, output_dim=2):
     n_worlds = len(possible_worlds)
     n_queries = len(range(0, output_dim))
     look_up = {i: c for i, c in zip(range(n_worlds), possible_worlds)}
-    w_q = torch.zeros(n_worlds, n_queries)  # (100, 2)
+    w_q = torch.zeros(n_worlds, n_queries)
     for w in range(n_worlds):
         digit1, digit2 = look_up[w]
         for q in range(n_queries):
@@ -453,21 +453,25 @@ def boia_dsl_weights(n_images, concept_dim, output_dim, device):
 ##
 
 
-def chx_circuit():
+def chx_circuit(multi_class=False):
     possible_worlds = list(product(range(2), repeat=4))
     n_worlds = len(possible_worlds)
-    n_queries = 2
+    n_queries = 2 if not multi_class else 5
     look_up = {i: c for i, c in zip(range(n_worlds), possible_worlds)}
 
     w_q = torch.zeros(n_worlds, n_queries)
     for w in range(n_worlds):
         fracture, pneumothorax, airspace_opacity, nodule_mass = look_up[w]
 
-        # Healty vs not healty
-        if fracture + pneumothorax + airspace_opacity + nodule_mass == 0:
-            w_q[w, 1] = 1
+        if not multi_class:
+            # Healty vs not healty
+            if fracture + pneumothorax + airspace_opacity + nodule_mass == 0:
+                w_q[w, 1] = 1
+            else:
+                w_q[w, 0] = 1
         else:
-            w_q[w, 0] = 1
+            active = sum([fracture, pneumothorax, airspace_opacity, nodule_mass])
+            w_q[w, active] = 1
     return w_q
 
 

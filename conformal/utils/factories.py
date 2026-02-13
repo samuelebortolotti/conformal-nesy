@@ -58,7 +58,7 @@ class DatasetFactory:
         elif name == "boia":
             return BOIALoader(**kwargs).load()
         elif name == "chx":
-            return CHXLoader(**kwargs).load()
+            return CHXLoader(chx_multi_class=args.chx_multi_class, **kwargs).load()
         elif name == "derma":
             return DERMALoader(**kwargs).load()
         else:
@@ -70,6 +70,8 @@ class NeSyFactory:
     def get_nesy_model(
         name: str, n_images, model, concept_dim, output_dim, device, logic, args
     ):
+        extra = {"chx-multi-class": getattr(args, "chx_multi_class", False)}
+        
         if name.lower() == "dpl":
             return DPL(
                 n_images=n_images,
@@ -79,6 +81,7 @@ class NeSyFactory:
                 output_dim=output_dim,
                 dataset=args.dataset,
                 device=device,
+                extra=extra
             )
         elif name.lower() == "ltn":
             return LTN(
@@ -94,6 +97,7 @@ class NeSyFactory:
                 or_op=args.or_op,
                 imp_op=args.imp_op,
                 p=args.p,
+                extra=extra
             )
         elif name.lower() == "linpred":
             return LinearPredictor(

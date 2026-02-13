@@ -16,7 +16,12 @@ from conformal.models import resnet18, lenet, linear
 
 def configure_global_arguments(parser):
     """Global arguments for CHX"""
-    pass
+    parser.add_argument(
+        "--chx-multi-class",
+        action="store_true",
+        default=False,
+        help="Divide the Abnormal/Healthy into 4 classes",
+    )
 
 
 class CHXDataset(Dataset):
@@ -50,6 +55,7 @@ class CHXLoader:
         test_split=0.2,
         val_split=0.1,
         device="cuda",
+        chx_multi_class=False,
     ):
         self.data_dir = data_dir
         self.batch_size = batch_size
@@ -58,6 +64,7 @@ class CHXLoader:
         self.device = device
         self.label_weights = []
         self.concepts_weights = []
+        self.chx_multi_class = chx_multi_class
 
     def _download_and_extract_needed(self, needed_filenames):
         """Downloads NIH tarballs only to extract specific annotated images."""
@@ -142,8 +149,32 @@ class CHXLoader:
         for col in concept_cols:
             df_agg[col] = (df_agg[col] >= 0.5).astype(int)
 
-        # Target mapping
-        df_agg["target"] = (df_agg[concept_cols].sum(axis=1) == 0).astype(int)
+        # Number of activated concepts
+        concept_count = df_agg[concept_cols].sum(axis=1)
+
+        # depending on the class
+        if self.chx_multi_class:
+            # TODO: maybe with the help of a clinitian we could rearrange something better
+            df_agg["target"] = np.select(
+                [
+                    concept_count == 0, # 0 = Healthy
+                    concept_count == 1, # 1 = Green
+                    concept_count == 2, # 2 = Yellow
+                    concept_count == 3, # 3 = Red
+                    concept_count == 4, # 4 = Critical
+                ],
+                [0, 1, 2, 3, 4],
+                default=-1
+            )
+
+            assert (df_agg["target"] >= 0).all(), "Invalid targets generated"
+            class_names = ["Healthy", "Green code", "Yellow code", "Red code", "Critical code"]
+            n_classes = 5
+        else:
+            df_agg["target"] = (concept_count == 0).astype(int)
+            class_names = ["Abnormal", "Healthy"]
+            n_classes = 2
+
 
         img_dir = os.path.join(self.data_dir, "images_nih", "images")
         df_agg["path"] = df_agg["Image ID"].apply(lambda x: os.path.join(img_dir, x))
@@ -164,9 +195,10 @@ class CHXLoader:
         )
 
         # Label weights
-        y_counts = np.bincount(y_train)
+        y_counts = np.bincount(y_train, minlength=n_classes)
         self.label_weights = torch.tensor(
-            len(y_train) / (2.0 * y_counts), dtype=torch.float
+            len(y_train) / (n_classes * y_counts),
+            dtype=torch.float
         )
 
         # Concept weights
@@ -193,11 +225,18 @@ class CHXLoader:
             ]
         )
 
-        logic = HardLogic(
-            lambda x: (np.sum(x, axis=1) == 0).astype(np.int64),
-            n_concepts=1,
-            concept_dim=4,
-        )
+        if not self.chx_multi_class:
+            logic = HardLogic(
+                lambda x: (np.sum(x, axis=1) == 0).astype(np.int64),
+                n_concepts=1,
+                concept_dim=4,
+            )
+        else:
+            logic = HardLogic(
+                lambda x: np.sum(x, axis=1).astype(np.int64),
+                n_concepts=1,
+                concept_dim=4,
+            )
 
         return (
             CHXDataset(x_train, c_train, y_train, transform),
@@ -205,9 +244,9 @@ class CHXLoader:
             CHXDataset(x_test, c_test, y_test, transform),
             (3, 224, 224),
             4,
-            2,
+            n_classes,
             1,
-            ["Abnormal", "Healthy"],
+            class_names,
             concept_cols,
             logic,
             torch.nn.CrossEntropyLoss(weight=self.label_weights),

@@ -18,13 +18,13 @@ def configure_global_arguments(parser):
 
 class DPL(NeSyModel):
     def __init__(
-        self, n_images, encoder, entangled, concept_dim, output_dim, dataset, device
+        self, n_images, encoder, entangled, concept_dim, output_dim, dataset, device, extra
     ):
         super().__init__(
             n_images, encoder, entangled, concept_dim, output_dim, dataset, device
         )
         self.circuit_data = self._build_circuit(
-            concept_dim, output_dim, n_images, dataset
+            concept_dim, output_dim, n_images, dataset, extra
         )
 
         # If BOIA, circuit is factorized
@@ -35,7 +35,7 @@ class DPL(NeSyModel):
         else:
             self.circuit = self.circuit_data.to(self.device)
 
-    def _build_circuit(self, concept_dim, output_dim, n_images, dataset):
+    def _build_circuit(self, concept_dim, output_dim, n_images, dataset, extra):
         if dataset in ["mnistadd", "mnisthalf", "mnistaddn"]:
             return mnist_circuit(
                 sequence_len=n_images, n_digits=concept_dim, output_dim=output_dim
@@ -47,7 +47,7 @@ class DPL(NeSyModel):
         elif dataset == "boia":
             return boia_circuit()
         elif dataset == "chx":
-            return chx_circuit()
+            return chx_circuit(multi_class=extra["chx-multi-class"])
         elif dataset == "derma":
             return derma_circuit()
         raise NotImplementedError(f"Circuit for dataset {dataset} not implemented.")
