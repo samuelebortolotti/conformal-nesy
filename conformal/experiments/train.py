@@ -19,18 +19,12 @@ from conformal.statistics.statistics import Statistics, Results
 from conformal.utils.visualization import plot_confusion_matrix
 from conformal.experiments.utils import collect_predictions
 from conformal.statistics.metrics import compute_statistics
+from conformal.datasets import boia, chx, derma, mnistadd, mnisthalf, mnistsump, mnistaddn
 
 
 def configure_global_arguments(parser):
     """Configure global arguments that are shared across models and datasets."""
 
-    parser.add_argument(
-        "dataset",
-        metavar="DATASET",
-        choices={"mnistadd", "mnisthalf", "mnistsump", "boia", "chx", "derma"},
-        default="mnistadd",
-        help="Dataset",
-    )
     parser.add_argument(
         "--batch-size", type=int, default=64, help="Batch size for training."
     )
@@ -68,10 +62,14 @@ def train_parser(parser):
     # models
     configure_global_arguments(parser)
 
-    subparsers = parser.add_subparsers(dest="model")
-    resnet18.configure_subparsers(subparsers)
-    lenet.configure_subparsers(subparsers)
-    linear.configure_subparsers(subparsers)
+    subparsers = parser.add_subparsers(dest="dataset")
+    mnistadd.configure_subparsers(subparsers)
+    mnisthalf.configure_subparsers(subparsers)
+    mnistsump.configure_subparsers(subparsers)
+    mnistaddn.configure_subparsers(subparsers)
+    derma.configure_subparsers(subparsers)
+    chx.configure_subparsers(subparsers)
+    boia.configure_subparsers(subparsers)
 
 
 def configure_subparsers(subparsers):
@@ -376,7 +374,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         criterion,
         concept_weights,
         label_weights,
-    ) = DatasetFactory.get_dataset(name=args.dataset, device=args.device)
+    ) = DatasetFactory.get_dataset(args, name=args.dataset, device=args.device)
 
     train_dl, val_dl, test_dl = create_dataloaders(
         train_ds, val_ds, test_ds, batch_size=args.batch_size

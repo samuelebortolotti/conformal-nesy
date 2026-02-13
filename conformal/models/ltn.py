@@ -130,8 +130,9 @@ class LTN(NeSyModel):
         return ltn.Connective(self._select_imp_operator(imp_op))
 
     def _get_ltn_loss(self, concept_dim, output_dim, n_images, dataset):
-        if dataset == "mnistadd" or dataset == "mnisthalf":
+        if dataset in ["mnistadd", "mnisthalf", "mnistaddn"]:
             return mnist_add_ltn_loss(
+                n_images=n_images,
                 and_op=self.and_op,
                 exists_op=self.exists_op,
                 forall_op=self.forall_op,
@@ -193,6 +194,8 @@ class LTN(NeSyModel):
         concept_copy = concepts.clone().squeeze().argmax(dim=-1).cpu().numpy()
         if self.dataset == "boia":
             return self._inference_boia(concept_copy), None
+
+        print(concept_copy.shape, concept_copy[:3])
 
         return (
             F.one_hot(

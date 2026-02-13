@@ -5,8 +5,8 @@ from torch import nn
 import numpy as np
 
 from sklearn.metrics import f1_score, confusion_matrix
-
 from conformal.utils.alignment import align_knowledge_input
+from conformal.general_utils import log
 
 def compute_ece(probs, labels, n_bins=15):
     """Compute Expected Calibration Error (ECE)."""
@@ -202,7 +202,7 @@ def compute_statistics(
     )
 
 
-def conformal_metrics(prediction_tuples, true_labels):
+def conformal_metrics(prediction_tuples, true_labels, ignore_token=-1):
     """
     Compute conformal metrics for concept combinations (tuples).
 
@@ -210,30 +210,94 @@ def conformal_metrics(prediction_tuples, true_labels):
         prediction_tuples: List of np.ndarrays [Samples][Combinations, Concepts]
         true_labels: np.ndarray [Samples, Concepts]
     """
-    true_labels = np.array(true_labels)
     N = len(true_labels)
 
     coverage_total = 0.0
     set_size_total = 0.0
 
-    # Loop through the examples (samples)
     for i in range(N):
-        # This is your matrix of all valid conformal combinations for this sample
         sample_tuples = prediction_tuples[i]
-
-        # The ground truth combination we are looking for
         ground_truth = true_labels[i]
 
-        # Check the presence of the true combination in the predicted tuples
-        if sample_tuples.size > 0:
-            if np.any(np.all(sample_tuples == ground_truth, axis=-1)):
+        assert len(ground_truth.shape) == 1, f"Ground-truth: dim of the worlds. Got {ground_truth.shape, ground_truth.tolist()}"
+        assert len(sample_tuples.shape) == 2 or len(sample_tuples) == 0, f"Predictions: must be number of elements in the conformal set, size of the world. Got {sample_tuples.shape, sample_tuples.tolist(), len(sample_tuples)}"
+
+        # Filter tuples: ignore any tuple that is all ignore tokens
+        valid_mask = ~np.all(sample_tuples == ignore_token, axis=-1)
+        valid_tuples = sample_tuples[valid_mask]
+
+        # Check if ground truth exists in valid tuples
+        if valid_tuples.size > 0:
+            if np.any(np.all(ground_truth == valid_tuples, axis=-1)):
                 coverage_total += 1
 
-        # Increment total set size by the number of unique tuples predicted
-        set_size_total += len(sample_tuples)
+        # print(sample_tuples, np.all(sample_tuples == ignore_token, axis=-1), len(valid_tuples))
+
+        set_size_total += len(valid_tuples)
 
     # Calculate final averages
     coverage = coverage_total / N
     avg_set_size = set_size_total / N
 
     return coverage, avg_set_size
+
+
+def prediction_consistency(concept_tuples, label_sets, logic, EMPTY_TOKEN=-1):
+    """
+    Consistency metrics for the predicted concept tuples and the predicted label sets.
+    """
+    N = len(concept_tuples)
+    total_concepts = 0
+    consistent_concepts = 0
+    total_labels = 0
+    covered_labels = 0
+
+    for i in range(N):
+        tuples_i = concept_tuples[i]
+        labels_i = label_sets[i]
+
+        # Some concepts are empty
+        concept_empty_mask = np.any(tuples_i == EMPTY_TOKEN, axis=-1)
+            
+        assert len(tuples_i.shape) == 2, f"Concepts: should be size conformal, dim of the worlds. Got {tuples_i.shape, tuples_i.tolist()}"
+        assert len(labels_i.shape) == 2 or len(labels_i) == 0, f"Labels: should be size conformal, size of the world. Got {labels_i.shape, labels_i.tolist(), len(labels_i)}"
+
+        # filter the valid concepts
+        valid_tuples = tuples_i[~concept_empty_mask]
+
+        # Concept consistency: fraction of tuples producing at least one label in predicted label set
+        for t in valid_tuples:
+            derived_label = logic.forward(t.reshape(1, -1))
+            derived_label = np.array(derived_label).ravel()
+            total_concepts += 1
+            if np.any(np.isin(derived_label, labels_i)):
+                consistent_concepts += 1
+            else:
+                log(f"Inconsistent concept tuple: {t} -> derived label {derived_label} not in predicted labels {labels_i} for sample {i}", "INFO")
+                log(f"Tuples: {valid_tuples.tolist()}", "INFO")
+                log(f"Labels: {labels_i.tolist()}", "INFO")
+
+        # Label consistency: fraction of predicted labels covered by at least one concept tuple
+        total_labels += len(labels_i)
+        for l in labels_i:
+            covered = False
+            for t in valid_tuples:
+                derived_label = logic.forward(t.reshape(1, -1))
+                derived_label = np.array(derived_label).ravel()
+                if np.any(np.isin(l, derived_label)):
+                    covered = True
+                    break
+            if covered:
+                covered_labels += 1
+            else:
+                log(f"Inconsistent label: {l} not covered by any concept tuple for sample {i}", "INFO")
+                log(f"Tuples: {valid_tuples.tolist()}", "INFO")
+                log(f"Labels: {labels_i.tolist()}", "INFO")
+
+    log(f"Total Concepts: {total_concepts}, Consistent Concepts: {consistent_concepts}", "INFO")
+    log(f"Total Labels: {total_labels}, Covered Labels: {covered_labels}", "INFO")
+
+    concept_consistency = consistent_concepts / total_concepts if total_concepts > 0 else 1.0
+    label_consistency = covered_labels / total_labels if total_labels > 0 else 1.0
+
+    return concept_consistency, label_consistency

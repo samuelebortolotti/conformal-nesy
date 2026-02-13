@@ -4,7 +4,14 @@ import torchvision
 from torch.utils.data import Dataset
 from medmnist import DermaMNIST
 from torchvision import transforms
+from conformal.models import resnet18, lenet, linear
 from conformal.utils.logic import HardLogic
+
+
+def configure_global_arguments(parser):
+    """Global arguments for DERMA-MNIST"""
+    pass
+
 
 
 class DERMALoader:
@@ -131,3 +138,17 @@ class DERMAMINST(Dataset):
         concepts[class_id] = 1
 
         return img, concepts, torch.tensor(label, dtype=torch.long)
+
+def configure_subparsers(subparsers):
+    """Configure subparsers."""
+    # Subparser for DERMA-MNIST
+    derma_mnist_parser = subparsers.add_parser(
+        "derma",
+        help="Use DERMA-MNIST as dataset",
+    )
+    configure_global_arguments(derma_mnist_parser)
+
+    subparsers = derma_mnist_parser.add_subparsers(dest="model")
+    resnet18.configure_subparsers(subparsers)
+    lenet.configure_subparsers(subparsers)
+    linear.configure_subparsers(subparsers)

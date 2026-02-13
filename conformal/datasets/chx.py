@@ -11,6 +11,12 @@ from sklearn.model_selection import train_test_split
 from torchvision import transforms
 from conformal.utils.logic import HardLogic
 from conformal.general_utils import log
+from conformal.models import resnet18, lenet, linear
+
+
+def configure_global_arguments(parser):
+    """Global arguments for CHX"""
+    pass
 
 
 class CHXDataset(Dataset):
@@ -208,3 +214,17 @@ class CHXLoader:
             self.concepts_weights,
             self.label_weights,
         )
+
+def configure_subparsers(subparsers):
+    """Configure subparsers."""
+    # Subparser for CHX
+    chx_parser = subparsers.add_parser(
+        "chx",
+        help="Use CHX as dataset",
+    )
+    configure_global_arguments(chx_parser)
+
+    subparsers = chx_parser.add_subparsers(dest="model")
+    resnet18.configure_subparsers(subparsers)
+    lenet.configure_subparsers(subparsers)
+    linear.configure_subparsers(subparsers)

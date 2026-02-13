@@ -4,7 +4,12 @@ import numpy as np
 from torch.utils.data import Dataset, random_split
 from conformal.utils.logic import HardLogic
 from conformal.general_utils import log
+from conformal.models import resnet18, lenet, linear
 import pickle
+
+def configure_global_arguments(parser):
+    """Global arguments for BOIA"""
+    pass
 
 CONCEPTS_ORDER = {
     "red_light": 3,
@@ -308,3 +313,17 @@ class BOIALoader:
             self.concept_weights,
             self.label_weights,
         )
+
+def configure_subparsers(subparsers):
+    """Configure subparsers."""
+    # Subparser for BOIA
+    boia_parser = subparsers.add_parser(
+        "boia",
+        help="Use BOIA as dataset",
+    )
+    configure_global_arguments(boia_parser)
+
+    subparsers = boia_parser.add_subparsers(dest="model")
+    resnet18.configure_subparsers(subparsers)
+    lenet.configure_subparsers(subparsers)
+    linear.configure_subparsers(subparsers)

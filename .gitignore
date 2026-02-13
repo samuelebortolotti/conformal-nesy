@@ -25,4 +25,6 @@ animal-with-attributes.py
 conformal/experiments/active.py
 conformal/datasets/cub.py
 
-CONF
+CONF*
+
+*.png

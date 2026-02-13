@@ -11,7 +11,7 @@ mkdir -p "$BASE_OUTPUT_DIR"
 
 STOP_ON_FAILURE=true 
 
-DATASETS_MNIST=("mnistadd" "mnisthalf" "mnistsump")
+DATASETS_MNIST=("mnisthalf" "mnistsump") # "mnistadd" 
 MODELS_MNIST=("lenet")
 DATASETS_IMG=("chx" "derma")
 MODELS_IMG=("resnet18")

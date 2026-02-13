@@ -36,13 +36,13 @@ class DPL(NeSyModel):
             self.circuit = self.circuit_data.to(self.device)
 
     def _build_circuit(self, concept_dim, output_dim, n_images, dataset):
-        if dataset == "mnistadd" or dataset == "mnisthalf":
+        if dataset in ["mnistadd", "mnisthalf", "mnistaddn"]:
             return mnist_circuit(
-                sequence_len=n_images, n_digits=concept_dim, oputput_dim=output_dim
+                sequence_len=n_images, n_digits=concept_dim, output_dim=output_dim
             )
         elif dataset == "mnistsump":
             return mnist_sump_circuit(
-                sequence_len=n_images, n_digits=concept_dim, oputput_dim=output_dim
+                sequence_len=n_images, n_digits=concept_dim, output_dim=output_dim
             )
         elif dataset == "boia":
             return boia_circuit()

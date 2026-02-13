@@ -4,7 +4,6 @@ import itertools
 from conformal.general_utils import log
 from conformal.utils.alignment import (
     align_concepts,
-    apply_knowledge_permutation,
     align_knowledge_input,
 )
 
@@ -40,6 +39,7 @@ class ConformalPredictor:
         self.label_threshold = None
         self.bonferroni = bonferroni
         self.permutation = None
+        self.EMPTY_TOKEN = -1
 
     @torch.no_grad()
     def compute_permutation(self, dl):
@@ -87,12 +87,12 @@ class ConformalPredictor:
         self.model.eval()
         all_scores = []
 
-        # TODO: apply permutation
         for data, concepts, _ in dl:
             data, concepts = data.to(self.device), concepts.to(self.device)
             _, conc_pred, _ = self.model(data, eval=True)
 
             if self.permutation is not None:
+                log("Applying permutation to concept predictions for conformity score computation...", "INFO")
                 conc_pred = align_knowledge_input(
                     conc_pred.detach().cpu().numpy() if self.dataset.startswith("mnist") else conc_pred.squeeze(1).detach().cpu().numpy(),
                     self.permutation
@@ -174,12 +174,40 @@ class ConformalPredictor:
                 f"[Conformal] Applying Bonferroni: Joint alpha {alpha} -> Per-concept alpha {eff_alpha:.4f}",
                 "INFO",
             )
+        else:
+            log(
+                f"[Conformal] Calibrating per-concept thresholds with alpha {alpha} (no Bonferroni adjustment)",
+                "INFO",
+            )
 
         # Compute the (1 - eff_alpha) quantile for each concept column
         self.per_concept_thresholds = np.quantile(scores, 1 - eff_alpha, axis=0)
         log(
             f"[Conformal] Per-concept thresholds: {self.per_concept_thresholds}", "INFO"
         )
+
+        # SANITY CHECK
+
+        import matplotlib.pyplot as plt
+
+        for i in range(k):
+            concept_scores = scores[:, i]
+            q = self.per_concept_thresholds[i]
+
+            plt.figure()
+
+            # Histogram of scores
+            plt.hist(concept_scores, bins=50)
+
+            # Quantile line
+            plt.axvline(q)
+
+            plt.title(f"Concept {i} score distribution")
+            plt.xlabel("Nonconformity score")
+            plt.ylabel("Frequency")
+            plt.savefig(f"concept_{i}_scores.png")
+            plt.close()
+
 
     def calibrate_labels(self, dl, alpha=0.1):
         """
@@ -199,57 +227,95 @@ class ConformalPredictor:
                 f"[Conformal] Applying Bonferroni (Multilabel): Joint alpha {alpha} -> Per-label alpha {eff_alpha:.4f}",
                 "INFO",
             )
-
+        else:
+            log(
+                f"[Conformal] Calibrating label threshold with alpha {alpha} (no Bonferroni adjustment)",
+                "INFO",
+            )
+        
         self.label_threshold = np.quantile(scores, 1 - eff_alpha, axis=0)
         log(f"[Conformal] Label threshold: {self.label_threshold}", "INFO")
 
+        # SANITY CHECK
+
+        import matplotlib.pyplot as plt
+
+        for i in range(k):
+            label_scores = scores if len(scores.shape) == 1 else scores[:, i]
+            q = self.label_threshold
+
+            plt.figure()
+
+            # Histogram of scores
+            plt.hist(label_scores, bins=50)
+
+            # Quantile line
+            plt.axvline(q)
+
+            plt.title(f"Label {i} score distribution")
+            plt.xlabel("Nonconformity score")
+            plt.ylabel("Frequency")
+            plt.savefig(f"label_{i}_scores.png")
+            plt.close()
+
+
     def _build_concept_sets_for_batch(self, conc_pred):
-        """
-        Private helper: Converts raw concept predictions (tensor)
-        into a list of included label sets using thresholds.
-        """
-        batch_sets = []
 
-        # TODO: apply permutation
+        # aggregate the thresholds
+        thresholds = torch.tensor(
+            self.per_concept_thresholds,
+            device=conc_pred.device
+        )
 
-        # conc_pred shape: (Batch, N_Concepts, N_Classes)
-        for i in range(conc_pred.size(0)):  # Per sample
-            sample_set = []
-            for j in range(conc_pred.size(1)):  # Per concept
+        # build the scores
+        scores = 1 - conc_pred
 
-                # Include class k if: 1 - prob[k] <= threshold
-                if self.multiconcepts:
-                    included_list = []
-                    for k in range(self.per_concept_thresholds.shape[0]):
-                        included = (
-                            torch.where(
-                                1 - conc_pred[i, j, k, :][:]
-                                <= self.per_concept_thresholds[k]
-                            )[0]
-                            .cpu()
-                            .numpy()
-                        )
-                        included_list.append(included)
-                    # NOTE: otherwise it becomes a list of another one
-                    batch_sets.append(included_list)
-                else:
-                    included = (
-                        torch.where(
-                            1 - conc_pred[i, j, :] <= self.per_concept_thresholds[j]
-                        )[0]
-                        .cpu()
-                        .numpy()
-                    )
-                    sample_set.append(included)
-                    batch_sets.append(sample_set)
-        return batch_sets
+        if self.multiconcepts:
+
+            thresholds = thresholds.view(1,1,-1,1)
+            mask = scores <= thresholds
+
+            batch_sets = []
+
+            # get the batch
+            for sample_mask in mask:
+                sample_list = []
+                for j in range(sample_mask.shape[0]):
+                    included_list = [
+                        torch.where(sample_mask[j, k])[0].cpu().numpy()
+                        for k in range(sample_mask.shape[1])
+                    ]
+                    sample_list.append(included_list)
+
+                batch_sets.append(sample_list)
+
+            return batch_sets
+
+        else:
+            thresholds = thresholds.view(1, -1, 1)
+            mask = scores <= thresholds
+
+            # get the batch
+            batch_sets = [
+                [
+                    torch.where(sample_mask[j])[0].cpu().numpy()
+                    for j in range(sample_mask.shape[0])
+                ]
+                for sample_mask in mask
+            ]
+
+            return batch_sets
 
     def _generate_combinations(self, marginal_list):
-        """Helper to process empty sets and generate Cartesian products."""
-        processed = [
-            s if s.size > 0 else np.arange(self.concept_dim) for s in marginal_list
-        ]
-        return np.array(list(itertools.product(*processed)))
+        """Generate Cartesian product of concept sets, handling empty sets with a placeholder token."""
+        processed = []
+        for s in marginal_list:
+            if len(s) == 0:
+                processed.append(np.array([self.EMPTY_TOKEN], dtype=int))
+            else:
+                processed.append(s)
+        return np.array(list(itertools.product(*processed)), dtype=int)
+
 
     @torch.no_grad()
     def predict_concepts(self, dl):
@@ -289,8 +355,18 @@ class ConformalPredictor:
         refined_batch_tuples = []
 
         for labels, tuples in zip(label_prediction_set, concept_prediction_tuples):
-            if tuples.size == 0 or len(labels) == 0:
+            if tuples.size == 0:
+                # Keep tuples as is when empty
                 refined_batch_tuples.append(tuples)
+                continue
+
+            # empty tuples mask
+            empty_mask = (tuples == self.EMPTY_TOKEN).any(axis=1)
+
+            if len(labels) == 0:
+                # keep only those containing the EMPTY_TOKEN
+                filtered_tuples = tuples[empty_mask]
+                refined_batch_tuples.append(filtered_tuples)
                 continue
 
             if self.permutation is not None:
@@ -300,17 +376,88 @@ class ConformalPredictor:
                 ).detach().cpu().numpy()
                 tuples = align_knowledge_input(tuples, self.permutation)
                 tuples = np.argmax(tuples, axis=-1)
-                derived_labels = self.logic.forward(tuples)
 
-            if hasattr(derived_labels, "cpu"):
-                derived_labels = derived_labels.cpu().numpy()
+            # Filter them
+            filtered_tuples = tuples[~empty_mask]
+            derived_labels = self.logic.forward(filtered_tuples)
 
             # Keep tuples that result in an allowed label
-            mask = np.isin(derived_labels, labels)
-            valid_tuples = tuples[mask]
+            valid_tuples = filtered_tuples[np.isin(derived_labels, labels)]
             refined_batch_tuples.append(valid_tuples)
 
         return refined_batch_tuples
+    
+
+    def _refine_label_prediction_set(
+        self, label_prediction_set, concept_prediction_tuples
+    ):
+        """
+        Refines label tuples based on concept predictions.
+        Returns only the filtered tuples.
+        """
+        refined_label_sets = []
+
+        for labels, tuples in zip(label_prediction_set, concept_prediction_tuples):
+            if len(tuples) == 0 or len(labels) == 0:
+                refined_label_sets.append(np.array([], dtype=int))
+                continue
+
+            # empty tuples mask
+            empty_mask = np.any(tuples == self.EMPTY_TOKEN, axis=1)
+
+            if self.permutation is not None:
+                tuples = torch.nn.functional.one_hot(
+                    torch.tensor(tuples),
+                    self.concept_dim if self.dataset.startswith("mnist") else 2
+                ).detach().cpu().numpy()
+
+                tuples = align_knowledge_input(tuples, self.permutation)
+                tuples = np.argmax(tuples, axis=-1)
+
+            filtered_tuple = tuples[~empty_mask]
+            derived_labels = self.logic.forward(filtered_tuple)
+
+            # Keep labels that are produced by a tuple
+            valid_mask = np.isin(labels, derived_labels)
+            valid_labels = np.expand_dims(labels[valid_mask], axis=1)
+            refined_label_sets.append(valid_labels)
+
+        return refined_label_sets
+
+    
+    def _apply_logic(self, concept_matrix):
+        if concept_matrix.size == 0:
+            return np.array([], dtype=int)
+
+        # EMPTY rows containing EMPTY_TOKEN in any concept column are invalid
+        invalid_mask = (concept_matrix == self.EMPTY_TOKEN).any(axis=1)
+        valid_mask = ~invalid_mask
+
+        raw_labels = np.empty(concept_matrix.shape[0], dtype=object)
+
+        # Process valid rows
+        if np.any(valid_mask):
+            valid_matrix = concept_matrix[valid_mask]
+
+            if self.permutation is not None:
+                valid_matrix = torch.nn.functional.one_hot(
+                    torch.tensor(valid_matrix),
+                    self.concept_dim if self.dataset.startswith("mnist") else 2
+                ).detach().cpu().numpy()
+                valid_matrix = align_knowledge_input(valid_matrix, self.permutation)
+                valid_matrix = np.argmax(valid_matrix, axis=-1)
+
+            labels_valid = self.logic.forward(valid_matrix)
+            if hasattr(labels_valid, "cpu"):
+                labels_valid = labels_valid.cpu().numpy()
+
+            labels_valid = np.array(labels_valid).ravel()
+            raw_labels[valid_mask] = labels_valid
+
+        # Assign empty arrays for invalid tuples
+        raw_labels[invalid_mask] = None
+        return raw_labels
+
 
     def _compute_derived_labels_from_tuples(self, batch_concept_tuples):
         """
@@ -324,7 +471,7 @@ class ConformalPredictor:
         if not batch_concept_tuples:
             return []
 
-        # Track indices to split the massive batch later
+        # Track indices to split the batch later
         sample_counts = [t.shape[0] for t in batch_concept_tuples]
 
         # Flatten all tuples into one massive matrix for a single logic pass
@@ -341,11 +488,8 @@ class ConformalPredictor:
             )
             big_matrix = np.argmax(big_matrix, axis=-1)
 
-        # Vectorized Logic Pass
-        raw_labels = self.logic.forward(big_matrix)
-
-        if hasattr(raw_labels, "cpu"):
-            raw_labels = raw_labels.cpu().numpy()
+        # Apply logic to the big matrix
+        raw_labels = self._apply_logic(big_matrix)
 
         # Ensure labels are flat (for single-label classification tasks)
         raw_labels = np.array(raw_labels).ravel()
@@ -356,15 +500,72 @@ class ConformalPredictor:
         for count in sample_counts:
             # Slice labels belonging to this specific sample
             sample_preds = raw_labels[cursor : cursor + count]
-            unique_labels = np.unique(sample_preds)
+            # remove the None
+            clean_preds = np.array([x for x in sample_preds if x is not None])
+            unique_labels = np.unique(clean_preds)
+            if unique_labels.size == 1 and unique_labels[0] is None:
+                unique_labels = np.array([])
             batch_label_sets.append(unique_labels.reshape(-1, 1))
             cursor += count
 
         return batch_label_sets
 
+
+    @torch.no_grad()
+    def predict_labels(self, label_pred, batch_tuples=None, use_hard_logic=False):
+        """
+        Builds conformal label prediction sets.
+        """
+
+        if use_hard_logic:
+            if batch_tuples is None:
+                raise ValueError("batch_tuples required when use_hard_logic=True")
+
+            batch_label_sets = self._compute_derived_labels_from_tuples(
+                batch_tuples
+            )
+            return batch_label_sets
+
+        # Standard conformal label prediction
+        if self.label_threshold is None:
+            raise ValueError("Run calibrate_labels first.")
+
+        scores = 1 - label_pred
+
+        threshold = torch.tensor(
+            self.label_threshold,
+            device=label_pred.device
+        )
+
+        if self.multilabel:
+            # label_pred shape: (B, N_labels, N_classes)
+            thresholds = threshold.view(1, -1, 1)
+
+            mask = scores <= thresholds
+
+            batch_label_sets = [
+                [
+                    torch.where(mask[b, j])[0].unsqueeze(1).cpu().numpy()
+                    for j in range(mask.shape[1])
+                ]
+                for b in range(mask.shape[0])
+            ]
+
+        else:
+            # label_pred shape: (B, N_classes)
+            mask = scores <= threshold
+
+            batch_label_sets = [
+                torch.where(mask[b])[0].unsqueeze(1).cpu().numpy()
+                for b in range(mask.shape[0])
+            ]
+
+        return batch_label_sets
+
+
     @torch.no_grad()
     def predict_concepts_and_labels(
-        self, dl, use_hard_logic=False, concept_refinement=True
+        self, dl, use_hard_logic=False, concept_refinement=True, label_refinement=False
     ):
         """
         Predicts both concept sets and label sets in a single pass.
@@ -400,46 +601,32 @@ class ConformalPredictor:
 
             # Build the initial "Conformal Tuples" (Cartesian Product)
             batch_marginal = self._build_concept_sets_for_batch(conc_pred)
+
             batch_tuples = []
             for sample_m in batch_marginal:
-                # Handle empty sets by treating them as full range (wildcards)
-                fill_dim = self.concept_dim if self.dataset.startswith("mnist") else 2
-                processed = [s if s.size > 0 else np.arange(fill_dim) for s in sample_m]
-                sample_tuples = np.array(list(itertools.product(*processed)))
+                sample_tuples = self._generate_combinations(sample_m)
                 batch_tuples.append(sample_tuples)
 
             all_concept_tuples.extend(batch_tuples)
 
             # Build Label Sets
-            if use_hard_logic:
-                batch_label_sets = self._compute_derived_labels_from_tuples(
-                    batch_tuples
-                )
-            else:
-                # Standard Conformal Label prediction (1 - prob <= threshold)
-                batch_label_sets = []
-                for i in range(label_pred.size(0)):
-                    if self.multilabel:
-                        included = [
-                            torch.where(
-                                1 - label_pred[i, j, :] <= self.label_threshold[j]
-                            )[0]
-                            .cpu()
-                            .numpy()
-                            for j in range(label_pred.size(1))
-                        ]
-                    else:
-                        included = (
-                            torch.where(1 - label_pred[i, :] <= self.label_threshold)[0]
-                            .cpu()
-                            .numpy()
-                        )
-                    batch_label_sets.append(included.reshape(-1, 1))
+            batch_label_sets = self.predict_labels(
+                label_pred,
+                batch_tuples=batch_tuples,
+                use_hard_logic=use_hard_logic
+            )
             all_label_sets.extend(batch_label_sets)
+
 
         # 3. Concept Refinement: Filter tuples based on predicted labels
         if not use_hard_logic and concept_refinement:
             all_concept_tuples = self._refine_concept_prediction_set(
+                all_label_sets, all_concept_tuples
+            )
+
+        if not use_hard_logic and label_refinement:
+            # Refine label sets based on concept tuples (not implemented here)
+            all_label_sets = self._refine_label_prediction_set(
                 all_label_sets, all_concept_tuples
             )
 

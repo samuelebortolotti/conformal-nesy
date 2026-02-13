@@ -1,9 +1,6 @@
 import abc
 import torch
 
-from conformal.utils.other import outer_product
-
-
 class BaseLogic(abc.ABC):
     def __init__(self, n_concepts, concept_dim, is_too_big=False):
         self.n_concepts = n_concepts

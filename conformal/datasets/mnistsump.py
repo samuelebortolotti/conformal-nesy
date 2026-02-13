@@ -1,8 +1,13 @@
 from conformal.datasets.mnist import MNISTLoader
 from conformal.datasets.mnistadd import MNISTAdditionDataset
 from conformal.utils.logic import HardLogic
+from conformal.models import resnet18, lenet, linear
 from conformal.datasets.mnistadd import mnist_addition_weights
 import torch
+
+def configure_global_arguments(parser):
+    """Global arguments for MNIST-SumParity"""
+    pass
 
 
 class MNISTSumParityDataset(MNISTAdditionDataset):
@@ -47,3 +52,17 @@ class MNISTSumParityLoader(MNISTLoader):
             self.concept_weights,
             self.label_weights,
         )
+
+def configure_subparsers(subparsers):
+    """Configure subparsers."""
+    # Subparser for MNIST-Sumparity
+    mnist_sump_parser = subparsers.add_parser(
+        "mnistsump",
+        help="Use MNIST-SumParity as dataset",
+    )
+    configure_global_arguments(mnist_sump_parser)
+
+    subparsers = mnist_sump_parser.add_subparsers(dest="model")
+    resnet18.configure_subparsers(subparsers)
+    lenet.configure_subparsers(subparsers)
+    linear.configure_subparsers(subparsers)

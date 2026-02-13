@@ -2,7 +2,12 @@ from conformal.datasets.mnist import MNISTLoader
 from conformal.datasets.mnistadd import MNISTAdditionDataset
 from conformal.utils.logic import HardLogic
 from conformal.datasets.mnistadd import mnist_addition_weights
+from conformal.models import resnet18, lenet, linear
 import torch
+
+def configure_global_arguments(parser):
+    """Global arguments for MNIST-Half"""
+    pass
 
 
 class MNISTHalfDataset(MNISTAdditionDataset):
@@ -60,3 +65,17 @@ class MNISTHalfLoader(MNISTLoader):
             self.concept_weights,
             self.label_weights,
         )
+
+def configure_subparsers(subparsers):
+    """Configure subparsers."""
+    # Subparser for MNIST-Half
+    mnist_half_parser = subparsers.add_parser(
+        "mnisthalf",
+        help="Use MNIST-Half as dataset",
+    )
+    configure_global_arguments(mnist_half_parser)
+
+    subparsers = mnist_half_parser.add_subparsers(dest="model")
+    resnet18.configure_subparsers(subparsers)
+    lenet.configure_subparsers(subparsers)
+    linear.configure_subparsers(subparsers)

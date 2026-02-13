@@ -5,6 +5,7 @@ from conformal.models.linear import Linear
 from conformal.datasets.mnistadd import MNISTAdditionLoader
 from conformal.datasets.mnistsump import MNISTSumParityLoader
 from conformal.datasets.mnisthalf import MNISTHalfLoader
+from conformal.datasets.mnistaddn import MNISTAdditionNLoader
 from conformal.datasets.derma import DERMALoader
 from conformal.datasets.boia import BOIALoader
 from conformal.datasets.chx import CHXLoader
@@ -12,7 +13,7 @@ from conformal.models.dpl import DPL
 from conformal.models.ltn import LTN
 from conformal.models.linear_predictor import LinearPredictor
 from conformal.models.dsl import DSL
-from conformal.utils.logic import DSLLogic, HardLogic, LinearLayerLogic
+from conformal.utils.logic import DSLLogic, LinearLayerLogic
 
 
 class OptimizerFactory:
@@ -44,7 +45,7 @@ class NetworkFactory:
 
 class DatasetFactory:
     @staticmethod
-    def get_dataset(name: str, **kwargs):
+    def get_dataset(args, name: str, **kwargs):
         name = name.lower()
         if name == "mnistadd":
             return MNISTAdditionLoader(**kwargs).load()
@@ -52,6 +53,8 @@ class DatasetFactory:
             return MNISTSumParityLoader(**kwargs).load()
         elif name == "mnisthalf":
             return MNISTHalfLoader(**kwargs).load()
+        elif name == "mnistaddn":
+            return MNISTAdditionNLoader(n_digits=args.n_digits, **kwargs).load()
         elif name == "boia":
             return BOIALoader(**kwargs).load()
         elif name == "chx":

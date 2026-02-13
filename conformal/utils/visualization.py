@@ -224,8 +224,8 @@ def plot_conformal_comparison(results_storage, file_name, target_coverage=0.9):
         target_coverage (float): The desired coverage level (1 - alpha).
     """
 
-    markers = ["o", "s", "^", "D", "p"]
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
+    markers = ['o', 's', '^', 'D', 'p', '*', 'X']
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
 
     plotted_methods = []
 
@@ -276,6 +276,54 @@ def plot_conformal_comparison(results_storage, file_name, target_coverage=0.9):
         plt.tight_layout()
         plt.savefig(f"{file_name}.conformal_comparison_{name}.pdf", dpi=300)
         plt.close()
+
+
+def plot_consistency_comparison(results_storage, file_name, target_coverage=0.9):
+    """
+    Scatter plot comparing Concept and Label Consistency 
+
+    Args:
+        results_storage (dict): Dictionary containing metrics for each method.
+        file_name (Path): Path to save the image.
+        target_coverage (float): The desired coverage level (1 - alpha).
+    """
+
+    markers = ['o', 's', '^', 'D', 'p', '*', 'X']
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
+
+    plt.figure(figsize=(10, 7))
+
+    for i, (method_name, metrics) in enumerate(results_storage.items()):
+        if "concept_consistency" not in metrics or "label_consistency" not in metrics:
+            continue
+
+        x = metrics["concept_consistency"]
+        y = metrics["label_consistency"]
+
+        plt.scatter(
+            x,
+            y,
+            label=method_name,
+            s=150,
+            alpha=0.9,
+            edgecolors="black",
+            linewidth=1.5,
+            marker=markers[i % len(markers)],
+            c=colors[i % len(colors)],
+        )
+
+    plt.plot([0, 1], [0, 1], color="gray", linestyle="--", alpha=0.7, label="Perfect Consistency")
+
+    plt.title("Prediction Consistency: Concepts vs Labels", fontsize=14)
+    plt.xlabel("Concept Consistency (Higher is better)", fontsize=12)
+    plt.ylabel("Label Consistency (Higher is better)", fontsize=12)
+    plt.xlim(0, 1.1)
+    plt.ylim(0, 1.1)
+    plt.grid(True, linestyle="--", alpha=0.3)
+    plt.legend(loc="best", frameon=True, fancybox=True, shadow=True)
+    plt.tight_layout()
+    plt.savefig(f"{file_name}.consistency_comparison.pdf", dpi=300)
+    plt.close()
 
 
 def plot_model_metrics(

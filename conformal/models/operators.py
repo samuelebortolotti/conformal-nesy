@@ -8,24 +8,23 @@ from conformal.general_utils import log
 # ===============
 
 
-def mnist_circuit(sequence_len=2, n_digits=10, oputput_dim=19):
+def mnist_circuit(sequence_len=2, n_digits=10, output_dim=19):
     possible_worlds = list(product(range(n_digits), repeat=sequence_len))
     n_worlds = len(possible_worlds)
-    n_queries = len(range(0, oputput_dim))
-    look_up = {i: c for i, c in zip(range(n_worlds), possible_worlds)}
-    w_q = torch.zeros(n_worlds, n_queries)  # (100, 20)
+    n_queries = len(range(0, output_dim))
+    look_up = {i: c for i, c in enumerate(possible_worlds)}
+    w_q = torch.zeros(n_worlds, n_queries)
     for w in range(n_worlds):
-        digit1, digit2 = look_up[w]
-        for q in range(n_queries):
-            if digit1 + digit2 == q:
-                w_q[w, q] = 1
+        digits = look_up[w]
+        total = sum(digits)
+        w_q[w, total] = 1
     return w_q
 
 
-def mnist_sump_circuit(sequence_len=2, n_digits=10, oputput_dim=2):
+def mnist_sump_circuit(sequence_len=2, n_digits=10, output_dim=2):
     possible_worlds = list(product(range(n_digits), repeat=sequence_len))
     n_worlds = len(possible_worlds)
-    n_queries = len(range(0, oputput_dim))
+    n_queries = len(range(0, output_dim))
     look_up = {i: c for i, c in zip(range(n_worlds), possible_worlds)}
     w_q = torch.zeros(n_worlds, n_queries)  # (100, 2)
     for w in range(n_worlds):
@@ -42,12 +41,13 @@ class BaseMNISTLTNLoss(torch.nn.Module):
     Encapsulates the common logic for variable creation and satisfaction aggregation.
     """
 
-    def __init__(self, and_op, exists_op, forall_op, n_outputs) -> None:
+    def __init__(self, and_op, exists_op, forall_op, n_outputs, n_images=2) -> None:
         super().__init__()
         self.and_op = and_op
         self.exists_op = exists_op
         self.forall_op = forall_op
         self.n_outputs = n_outputs
+        self.n_images = n_images
 
     def condition(self):
         """Override this method to define the specific logic rule."""
@@ -55,8 +55,10 @@ class BaseMNISTLTNLoss(torch.nn.Module):
 
     def forward(self, pred_concepts, labels):
         # Variables representing the two input images and the target label
-        x = ltn.Variable("x", pred_concepts[:, 0])
-        y = ltn.Variable("y", pred_concepts[:, 1])
+        image_vars = [
+            ltn.Variable(f"x{i}", pred_concepts[:, i])
+            for i in range(self.n_images)
+        ]
         n = ltn.Variable("n", labels)
 
         # LTN predicate for digit classification
@@ -65,16 +67,30 @@ class BaseMNISTLTNLoss(torch.nn.Module):
         )
 
         # Range variables for all possible digit values (0-9)
-        d1 = ltn.Variable("d1", torch.arange(pred_concepts.shape[-1]))
-        d2 = ltn.Variable("d2", torch.arange(pred_concepts.shape[-1]))
+        digit_range = torch.arange(pred_concepts.shape[-1])
+        # Digit variables
+        digit_vars = [
+            ltn.Variable(f"d{i}", digit_range)
+            for i in range(self.n_images)
+        ]
+        # digit predictions
+        pred_list = [
+            digit_pred(image_vars[i], digit_vars[i])
+            for i in range(self.n_images)
+        ]
+
+        # reduce with AND operator
+        and_formula = pred_list[0]
+        for p in pred_list[1:]:
+            and_formula = self.and_op(and_formula, p)
 
         # The core logical formula: Forall x,y,n: Exists d1,d2 such that (d1+d2 satisfy condition)
         sat_agg = self.forall_op(
-            ltn.diag(x, y, n),
+            ltn.diag(*image_vars, n),
             self.exists_op(
-                [d1, d2],
-                self.and_op(digit_pred(x, d1), digit_pred(y, d2)),
-                cond_vars=[d1, d2, n],
+                digit_vars,
+                and_formula,
+                cond_vars=[*digit_vars, n],
                 cond_fn=self.condition(),
             ),
         )
@@ -88,7 +104,10 @@ class mnist_add_ltn_loss(BaseMNISTLTNLoss):
     """Loss for standard addition: d1 + d2 == n"""
 
     def condition(self):
-        return lambda d1, d2, n: torch.eq(d1.value + d2.value, n.value)
+        return lambda *vars: torch.eq(
+            sum(v.value for v in vars[:-1]),
+            vars[-1].value,
+        )
 
 
 class mnist_sump_ltn_loss(BaseMNISTLTNLoss):

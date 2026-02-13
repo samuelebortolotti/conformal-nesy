@@ -1,4 +1,5 @@
 import torch
+import argparse
 
 
 def outer_product(x):
@@ -12,3 +13,9 @@ def outer_product(x):
         result = result.reshape(B, -1)
 
     return result
+
+def int_ge_2(value):
+    ivalue = int(value)
+    if ivalue < 2:
+        raise argparse.ArgumentTypeError("p must be >= 2")
+    return ivalue
