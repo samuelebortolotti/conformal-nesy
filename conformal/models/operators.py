@@ -1,4 +1,5 @@
 from itertools import product
+from functools import reduce
 import torch
 import ltn
 from conformal.general_utils import log
@@ -54,7 +55,7 @@ class BaseMNISTLTNLoss(torch.nn.Module):
         raise NotImplementedError
 
     def forward(self, pred_concepts, labels):
-        # Variables representing the two input images and the target label
+        # Variables representing the input images and the target label
         image_vars = [
             ltn.Variable(f"x{i}", pred_concepts[:, i])
             for i in range(self.n_images)
@@ -66,33 +67,27 @@ class BaseMNISTLTNLoss(torch.nn.Module):
             func=lambda digits, d_idx: torch.gather(digits, 1, d_idx)
         )
 
-        # Range variables for all possible digit values (0-9)
-        digit_range = torch.arange(pred_concepts.shape[-1])
-        # Digit variables
+        # Digit variables for all possible digit values
         digit_vars = [
-            ltn.Variable(f"d{i}", digit_range)
+            ltn.Variable(f"d{i}", torch.arange(pred_concepts.shape[-1]))
             for i in range(self.n_images)
         ]
-        # digit predictions
-        pred_list = [
-            digit_pred(image_vars[i], digit_vars[i])
-            for i in range(self.n_images)
-        ]
-
-        # reduce with AND operator
-        and_formula = pred_list[0]
-        for p in pred_list[1:]:
-            and_formula = self.and_op(and_formula, p)
 
         # The core logical formula: Forall x,y,n: Exists d1,d2 such that (d1+d2 satisfy condition)
         sat_agg = self.forall_op(
             ltn.diag(*image_vars, n),
             self.exists_op(
                 digit_vars,
-                and_formula,
+                reduce(
+                    lambda a, b: self.and_op(a, b),
+                    [
+                        digit_pred(xi, di)
+                        for xi, di in zip(image_vars, digit_vars)
+                    ]
+                ),
                 cond_vars=[*digit_vars, n],
-                cond_fn=self.condition(),
-            ),
+                cond_fn=self.condition()
+            )
         )
 
         log(f"LTN loss: {1 - sat_agg.value}", "DEBUG")
