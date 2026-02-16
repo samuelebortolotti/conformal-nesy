@@ -271,6 +271,7 @@ def plot_conformal_comparison(results_storage, file_name, target_coverage=0.9):
         )
         plt.xlabel("Marginal Coverage (Higher is better)", fontsize=12)
         plt.ylabel("Average Set Size (Lower is better, Ideal=1)", fontsize=12)
+        plt.xlim(0, 1)
         plt.grid(True, linestyle="--", alpha=0.3)
         plt.legend(loc="best", frameon=True, fancybox=True, shadow=True)
         plt.tight_layout()
@@ -338,22 +339,26 @@ def plot_model_metrics(
         concept_names (list): Optional list of names for the concepts.
     """
 
-    f1_metrics = {
-        "Label F1": baseline_results.get("test_f1", 0),
-        "Concept F1": baseline_results.get("test_c_f1", 0),
+    performance_metrics = {
+        "Y F1": baseline_results.get("test_f1", 0),
+        "Y Acc": baseline_results.get("test_acc", 0),
+        "Y Rec": baseline_results.get("test_rec", 0),
+        "C F1": baseline_results.get("test_c_f1", 0),
+        "C Acc": baseline_results.get("test_c_acc", 0),
+        "C Rec": baseline_results.get("test_c_rec", 0),
     }
 
     plt.figure(figsize=(6, 5))
     plt.bar(
-        f1_metrics.keys(),
-        f1_metrics.values(),
-        color=["#2ca02c", "#1f77b4"],
+        performance_metrics.keys(),
+        performance_metrics.values(),
+        color=["#2ca02c", "#1f77b4", "#ff7f0e", "#d62728", "#9467bd", "#8c564b"],
         alpha=0.8,
         width=0.5,
     )
     plt.ylim(0, 1.1)
     plt.ylabel("Score")
-    plt.title("Classification Performance (F1)")
+    plt.title("Classification Performance")
     plt.tight_layout()
     plt.savefig(f"{file_name}.metric_f1_scores.pdf", dpi=300)
     plt.close()

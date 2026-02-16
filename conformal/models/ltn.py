@@ -158,13 +158,14 @@ class LTN(NeSyModel):
                 sat_agg_op=self.sat_agg_op,
             )
         elif dataset == "chx":
-            raise NotImplementedError("Missing SUM in CHX")
             return chx_ltn_loss(
                 equiv_op=self.equiv_op,
                 forall_op=self.forall_op,
                 not_op=self.not_op,
                 exists_op=self.exists_op,
                 sat_agg_op=self.sat_agg_op,
+                and_op=self.and_op,
+                multi_class=extra["chx-multi-class"],
             )
         elif dataset == "derma":
             return derma_ltn_loss(

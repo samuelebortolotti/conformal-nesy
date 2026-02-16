@@ -471,7 +471,7 @@ def chx_circuit(multi_class=False):
 
 
 class chx_ltn_loss(torch.nn.Module):
-    def __init__(self, equiv_op, forall_op, not_op, exists_op, sat_agg_op) -> None:
+    def __init__(self, equiv_op, forall_op, not_op, exists_op, sat_agg_op, and_op, multi_class) -> None:
         """
         Logic: The sample is 'Healthy' (label 0) if all 4 concepts are absent.
         Otherwise, it is 'Unhealthy' (label 1).
@@ -482,8 +482,10 @@ class chx_ltn_loss(torch.nn.Module):
         self.not_op = not_op
         self.sat_agg_op = sat_agg_op
         self.exists_op = exists_op
+        self.multi_class = multi_class
+        self.and_op = and_op
 
-    def forward(self, pred_concepts, labels):
+    def forward_healthy_malignant(self, pred_concepts, labels):
         x = ltn.Variable("x", pred_concepts[:, 0, :, 1])
         l = ltn.Variable("l", labels)
         indices = ltn.Variable("indices", torch.arange(4))
@@ -513,6 +515,55 @@ class chx_ltn_loss(torch.nn.Module):
         sat_agg = self.sat_agg_op(healty, malignant)
         log(f"LTN loss: {1 - sat_agg}", "DEBUG")
         return 1 - sat_agg
+
+    def forward(self, pred_concepts, labels):
+        if self.multi_class:
+            return self.forward_multi_class(pred_concepts, labels)
+        return self.forward_healthy_malignant(pred_concepts, labels)
+
+    def forward_multi_class(self, pred_concepts, labels):
+        x = ltn.Variable("x", pred_concepts[:, 0, :, 1])
+        l = ltn.Variable("l", labels)
+
+        # Symptom variables
+        symptom_vars = [
+            ltn.Variable(f"s{i}", torch.arange(2))  # binary: 0 or 1
+            for i in range(4)
+        ]
+
+        # predicates
+        is_present = ltn.Predicate(
+            func=lambda c, idx: torch.gather(c, 1, idx.long())
+        )
+
+        # label is the sum of symtom
+        def condition():
+            return lambda *vars: torch.eq(
+                sum(v.value for v in vars[:-1]),
+                vars[-1].value
+            )
+
+        # Sat Agg
+        sat_agg = self.forall_op(
+            ltn.diag(x, l),
+            self.exists_op(
+                symptom_vars,
+                self.and_op(
+                    self.and_op(
+                        self.and_op(
+                            is_present(x, symptom_vars[0]),
+                            is_present(x, symptom_vars[1]),
+                        ),
+                        is_present(x, symptom_vars[2]),
+                    ),
+                    is_present(x, symptom_vars[3]),
+                ),
+                cond_vars=[*symptom_vars, l],
+                cond_fn=condition()
+            )
+        )
+        log(f"LTN loss: {1 - sat_agg.value}", "DEBUG")
+        return 1 - sat_agg.value
 
 
 def chx_dsl_weights(n_images, concept_dim, output_dim, device):

@@ -6,11 +6,10 @@
 #
 # PURPOSE: Check no crashes happens
 
-DATASETS_MNIST=("mnistadd" "mnisthalf" "mnistsump")
+DATASETS_MNIST=("mnistadd" "mnisthalf" "mnistsump", "mnistaddn --n-digits 4")
 MODELS_MNIST=("lenet")
 DATASETS_IMG=("chx" "derma")
-MODELS_IMG=("resnet18")
-PRETRAINED_FLAG="--pretrained"
+MODELS_IMG=("resnet18 --pretrained")
 DATASETS_BOIA=("boia")
 MODELS_BOIA=("linear")
 NESY_VARIANTS=("dpl" "ltn" "dsl" "linpred")
@@ -26,10 +25,10 @@ run_job() {
 
     CMD="python -m conformal \
         CONF --dry-run train \
-        $dataset \
         --concept-sup $cs \
         --epochs $EPOCHS \
-        $model $nesy $extra_args"
+        $dataset $extra_args \
+        $model $nesy"
 
     echo "Executing command:"
     echo "$CMD"
@@ -67,7 +66,7 @@ for dataset in "${DATASETS_IMG[@]}"; do
     for model in "${MODELS_IMG[@]}"; do
         for nesy in "${NESY_VARIANTS[@]}"; do
             for cs in "${CONCEPT_SUPS[@]}"; do
-                run_job "$dataset" "$model" "$nesy" "$cs" "$PRETRAINED_FLAG"
+                run_job "$dataset" "$model" "$nesy" "$cs" ""
             done
         done
     done

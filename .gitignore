@@ -28,3 +28,5 @@ conformal/datasets/cub.py
 CONF*
 
 *.png
+
+viva.py

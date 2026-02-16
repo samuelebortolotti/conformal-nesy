@@ -187,6 +187,7 @@ def conformal_evaluation(
         dataset=args.dataset,
         concept_dim=model.concept_dim,
         n_concepts=model.n_images,
+        experiment_name=str(args.output_dir_path / f"{experiment_name}"),
         multiconcepts=multiconcept,
         multilabel=multilabel,
         bonferroni=True,
@@ -213,6 +214,10 @@ def conformal_evaluation(
         test_yece,
         test_cece,
         _,
+        test_acc,
+        test_rec,
+        test_c_acc,
+        test_c_rec
     ) = compute_statistics(
         model,
         args.dataset,
@@ -227,7 +232,11 @@ def conformal_evaluation(
     log("Metrics on the test set (no conformal):", "INFO")
     log(f"Test Loss: {test_loss:.4f}", "INFO")
     log(f"Test F1 Score: {test_f1:.4f}", "INFO")
+    log(f"Test Accuracy Score: {test_acc:.4f}", "INFO")
+    log(f"Test Recall Score: {test_rec:.4f}", "INFO")
     log(f"Test Concept F1 Score: {test_c_f1:.4f}", "INFO")
+    log(f"Test Concept Accuracy Score: {test_c_acc:.4f}", "INFO")
+    log(f"Test Concept Recall Score: {test_c_rec:.4f}", "INFO")
     log(f"Test Concept Entropy H(c): {test_H_c:.4f}", "INFO")
     log(f"Test YECE: {test_yece:.4f}", "INFO")
     log(f"Test CECE: {test_cece:.4f}", "INFO")
@@ -264,16 +273,37 @@ def conformal_evaluation(
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
 
+    concept_coverage, concept_set_size = conformal_metrics(np.expand_dims(all_c, axis=1), all_g)
+
+    log(f"[NeSy] Concept Coverage: {concept_coverage:.4f}", "INFO")
+    log(f"[NeSy] Concept Set Size: {concept_set_size:.4f}", "INFO")
+
+    label_coverage, label_size = conformal_metrics(
+        np.expand_dims(np.expand_dims(all_preds, axis=1), axis=1), 
+        np.expand_dims(all_labels, axis=1)
+    )
+
+    log(f"[NeSy] Label Coverage: {label_coverage:.4f}", "INFO")
+    log(f"[NeSy] Label Set Size: {label_size:.4f}", "INFO")
+
     results_storage["No Conformal"] = {
         "test_loss": test_loss,
         "test_f1": test_f1,
+        "test_acc": test_acc,
+        "test_rec": test_rec,
         "test_c_f1": test_c_f1,
+        "test_c_acc": test_c_acc,
+        "test_c_rec": test_c_rec,
         "H_c": test_H_c,
         "H_c_per_value": test_H_c_per_value,
         "yece": test_yece,
         "cece": test_cece,
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
+        "coverage_concepts": concept_coverage,
+        "concept_size": concept_set_size,
+        "coverage_labels": label_coverage,
+        "label_size": label_size,
     }
 
     log("=== 2. Conformal (Calibrating Concepts) ===", "INFO")
@@ -283,6 +313,10 @@ def conformal_evaluation(
 
     log("Predicting conformal sets on the test set...", "INFO")
     concept_sets = cp.predict_concepts(test_dl)
+
+    # Same as for NeSy standard
+    log(f"[Conformal Concepts Only] Label Coverage: {label_coverage:.4f}", "INFO")
+    log(f"[Conformal Concepts Only] Label Set Size: {label_size:.4f}", "INFO")
 
     concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
 
@@ -299,6 +333,8 @@ def conformal_evaluation(
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
 
     results_storage["Conformal Concepts Only"] = {
+        "coverage_labels": label_coverage,
+        "label_size": label_size,
         "coverage_concepts": concept_coverage,
         "concept_size": concept_set_size,
         "concept_consistency": concept_consistency,
@@ -448,7 +484,7 @@ def conformal_evaluation(
         "label_consistency": label_consistency,
     }
 
-    log("=== 5. Conformal with Label Refinement ===", "INFO")
+    log("=== 6. Conformal with Label Refinement ===", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=False, concept_refinement=False, label_refinement=True
@@ -500,7 +536,7 @@ def conformal_evaluation(
         "label_consistency": label_consistency,
     }
 
-    log("=== 5. Conformal with Concept and Label Refinement ===", "INFO")
+    log("=== 7. Conformal with Concept and Label Refinement ===", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=False, concept_refinement=True, label_refinement=True

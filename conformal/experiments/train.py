@@ -227,7 +227,7 @@ def train(
             label_weights,
         )
 
-        val_loss, val_f1, val_c_f1, H_c, H_c_per_value, yece, cece, _ = (
+        val_loss, val_f1, val_c_f1, H_c, H_c_per_value, yece, cece, _, _, _, _, _ = (
             compute_statistics(
                 model,
                 args.dataset,
@@ -277,7 +277,7 @@ def evaluate_and_log_model(
     log(f"> Load the best model: f1 = {statistics.best_f1}", "INFO")
     model.load_state_dict(statistics.best_model)
 
-    test_loss, test_f1, test_c_f1, H_c, H_c_per_value, yece, cece, _ = (
+    test_loss, test_f1, test_c_f1, H_c, H_c_per_value, yece, cece, _, _, _, _, _ = (
         compute_statistics(
             model,
             args.dataset,

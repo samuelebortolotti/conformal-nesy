@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import numpy as np
 
-from sklearn.metrics import f1_score, confusion_matrix
+from sklearn.metrics import f1_score, accuracy_score, recall_score, confusion_matrix
 from conformal.utils.alignment import align_knowledge_input
 from conformal.general_utils import log
 
@@ -27,6 +27,7 @@ def compute_ece(probs, labels, n_bins=15):
             avg_conf_in_bin = np.mean(confidences[in_bin])
             ece += np.abs(acc_in_bin - avg_conf_in_bin) * prop_in_bin
     return ece
+
 
 
 def compute_statistics(
@@ -109,15 +110,21 @@ def compute_statistics(
         all_c = all_conc_pred.argmax(axis=3).squeeze(1)
 
     if multilabel:
-        f1 = 0.0
+        f1, acc, rec = 0.0, 0.0, 0.0
         for idx in range(all_labels.shape[1]):
             f1 += f1_score(all_labels[:, idx], all_preds[:, idx], average="macro")
+            acc += accuracy_score(all_labels[:, idx], all_preds[:, idx], normalize=True)
+            rec += recall_score(all_labels[:, idx], all_preds[:, idx], average="macro")
         f1 /= all_labels.shape[1]
+        acc /= all_labels.shape[1]
+        rec /= all_labels.shape[1]
     else:
         f1 = f1_score(all_labels, all_preds, labels=present_labels, average="macro")
+        acc = accuracy_score(all_labels, all_preds, normalize=True)
+        rec = recall_score(all_labels, all_preds, labels=present_labels, average="macro")
 
     if multiclass:
-        c_f1 = 0.0
+        c_f1, c_acc, c_rec = 0.0, 0.0, 0.0
         for idx in range(all_g.shape[1]):
             col_present_concepts = np.unique(all_g[:, idx])
             c_f1 += f1_score(
@@ -126,9 +133,33 @@ def compute_statistics(
                 labels=col_present_concepts,
                 average="macro",
             )
+            c_acc += accuracy_score(
+                all_g[:, idx],
+                all_c[:, idx],
+                normalize=True,
+            )
+            c_rec += recall_score(
+                all_g[:, idx],
+                all_c[:, idx],
+                labels=col_present_concepts,
+                average="macro",
+            )
         c_f1 /= all_g.shape[1]
+        c_acc /= all_g.shape[1]
+        c_rec /= all_g.shape[1]
     else:
         c_f1 = f1_score(
+            all_g.flatten(),
+            all_c.flatten(),
+            labels=present_concepts,
+            average="macro",
+        )
+        c_acc = accuracy_score(
+            all_g.flatten(),
+            all_c.flatten(),
+            normalize=True,
+        )
+        c_rec = recall_score(
             all_g.flatten(),
             all_c.flatten(),
             labels=present_concepts,
@@ -143,10 +174,6 @@ def compute_statistics(
         )
     else:
         cm = all_c.astype(float).T @ all_g.astype(float)
-
-    # Print as a 10x10 matrix
-    # print("Confusion Matrix:")
-    # print(cm)
 
     if multilabel:
         y_ece = 0.0
@@ -199,6 +226,10 @@ def compute_statistics(
         y_ece,
         c_ece,
         None,
+        acc,
+        rec,
+        c_acc,
+        c_rec
     )
 
 
@@ -273,9 +304,9 @@ def prediction_consistency(concept_tuples, label_sets, logic, EMPTY_TOKEN=-1):
             if np.any(np.isin(derived_label, labels_i)):
                 consistent_concepts += 1
             else:
-                log(f"Inconsistent concept tuple: {t} -> derived label {derived_label} not in predicted labels {labels_i} for sample {i}", "INFO")
-                log(f"Tuples: {valid_tuples.tolist()}", "INFO")
-                log(f"Labels: {labels_i.tolist()}", "INFO")
+                log(f"Inconsistent concept tuple: {t} -> derived label {derived_label} not in predicted labels {labels_i} for sample {i}", "DEBUG")
+                log(f"Tuples: {valid_tuples.tolist()}", "DEBUG")
+                log(f"Labels: {labels_i.tolist()}", "DEBUG")
 
         # Label consistency: fraction of predicted labels covered by at least one concept tuple
         total_labels += len(labels_i)
@@ -290,9 +321,9 @@ def prediction_consistency(concept_tuples, label_sets, logic, EMPTY_TOKEN=-1):
             if covered:
                 covered_labels += 1
             else:
-                log(f"Inconsistent label: {l} not covered by any concept tuple for sample {i}", "INFO")
-                log(f"Tuples: {valid_tuples.tolist()}", "INFO")
-                log(f"Labels: {labels_i.tolist()}", "INFO")
+                log(f"Inconsistent label: {l} not covered by any concept tuple for sample {i}", "DEBUG")
+                log(f"Tuples: {valid_tuples.tolist()}", "DEBUG")
+                log(f"Labels: {labels_i.tolist()}", "DEBUG")
 
     log(f"Total Concepts: {total_concepts}, Consistent Concepts: {consistent_concepts}", "INFO")
     log(f"Total Labels: {total_labels}, Covered Labels: {covered_labels}", "INFO")

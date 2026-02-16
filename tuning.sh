@@ -11,14 +11,15 @@ mkdir -p "$BASE_OUTPUT_DIR"
 
 STOP_ON_FAILURE=true 
 
-DATASETS_MNIST=("mnisthalf" "mnistsump") # "mnistadd" 
+DATASETS_MNIST=("mnistadd") # "mnistadd" 
+DATASETS_MNIST_2=("mnistaddn")
+DATASETS_MNIST_FLAGS=("--n-digits 3" "--n-digits 4" "--n-digits 5")
 MODELS_MNIST=("lenet")
-DATASETS_IMG=("chx" "derma")
-MODELS_IMG=("resnet18")
-PRETRAINED_FLAG="--pretrained"
+DATASETS_IMG=("chx") #  "derma"
+MODELS_IMG=("resnet18 --pretrained")
 DATASETS_BOIA=("boia")
 MODELS_BOIA=("linear")
-NESY_VARIANTS=("dpl" "ltn" "dsl" "linpred")
+NESY_VARIANTS=("dpl" "ltn") # "dsl" "linpred")
 CONCEPT_SUPS=("0.0" "1.0")
 EPOCHS=20
 
@@ -38,10 +39,10 @@ run_job() {
     CMD="python -m conformal \
         CONF --dry-run optuna \
         --optuna-path $OUTPUT_DIR \
-        $dataset \
         --concept-sup $cs \
         --epochs $EPOCHS \
-        $model $nesy $extra_args \
+        $dataset $extra_args \
+        $model $nesy \
         > \"${OUTPUT_DIR}/log.txt\" 2>&1"
 
     echo "Executing command:"
@@ -78,32 +79,49 @@ for dataset in "${DATASETS_MNIST[@]}"; do
 done
 
 echo "[INFO] MNIST done!"
-echo "[INFO} Starting CHX / DERMA..."
+echo "[INFO} Starting MNIST-N..."
+
+# MNIST
+for dataset in "${DATASETS_MNIST_2[@]}"; do
+    for model in "${MODELS_MNIST[@]}"; do
+        for nesy in "${NESY_VARIANTS[@]}"; do
+            for cs in "${CONCEPT_SUPS[@]}"; do
+                for nd in "${DATASETS_MNIST_FLAGS[@]}"; do
+                    run_job "$dataset" "$model" "$nesy" "$cs" "$nd"
+                done
+            done
+        done
+    done
+done
+
+echo "[INFO] MNIST-ADDN done!"
+echo "[INFO} Starting CHX..."
 
 # CHX / DERMA
 for dataset in "${DATASETS_IMG[@]}"; do
     for model in "${MODELS_IMG[@]}"; do
         for nesy in "${NESY_VARIANTS[@]}"; do
             for cs in "${CONCEPT_SUPS[@]}"; do
-                run_job "$dataset" "$model" "$nesy" "$cs" "$PRETRAINED_FLAG"
+                run_job "$dataset" "$model" "$nesy" "$cs" "--chx-multi-class"
             done
         done
     done
 done
 
-echo "[INFO] CHX / DERMA done!"
-echo "[INFO} Starting BOIA..."
+echo "[INFO] CHX done!"
 
-# BOIA
-for dataset in "${DATASETS_BOIA[@]}"; do
-    for model in "${MODELS_BOIA[@]}"; do
-        for nesy in "${NESY_VARIANTS[@]}"; do
-            for cs in "${CONCEPT_SUPS[@]}"; do
-                run_job "$dataset" "$model" "$nesy" "$cs" ""
-            done
-        done
-    done
-done
+# echo "[INFO} Starting BOIA..."
 
-echo "[INFO] BOIA done!"
-echo "All runs completed."
+# # BOIA
+# for dataset in "${DATASETS_BOIA[@]}"; do
+#     for model in "${MODELS_BOIA[@]}"; do
+#         for nesy in "${NESY_VARIANTS[@]}"; do
+#             for cs in "${CONCEPT_SUPS[@]}"; do
+#                 run_job "$dataset" "$model" "$nesy" "$cs" ""
+#             done
+#         done
+#     done
+# done
+
+# echo "[INFO] BOIA done!"
+# echo "All runs completed."

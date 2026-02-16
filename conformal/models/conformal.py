@@ -15,6 +15,7 @@ class ConformalPredictor:
         device,
         logic,
         dataset,
+        experiment_name,
         concept_dim=10,
         n_concepts=2,
         multiconcepts=False,
@@ -34,6 +35,7 @@ class ConformalPredictor:
         self.multiconcepts = multiconcepts
         self.multilabel = multilabel
         self.dataset = dataset
+        self.experiment_name = experiment_name
 
         self.per_concept_thresholds = None
         self.label_threshold = None
@@ -187,7 +189,6 @@ class ConformalPredictor:
         )
 
         # SANITY CHECK
-
         import matplotlib.pyplot as plt
 
         for i in range(k):
@@ -205,7 +206,7 @@ class ConformalPredictor:
             plt.title(f"Concept {i} score distribution")
             plt.xlabel("Nonconformity score")
             plt.ylabel("Frequency")
-            plt.savefig(f"concept_{i}_scores.png")
+            plt.savefig(f"{self.experiment_name}_concept_{i}_scores.pdf")
             plt.close()
 
 
@@ -255,7 +256,7 @@ class ConformalPredictor:
             plt.title(f"Label {i} score distribution")
             plt.xlabel("Nonconformity score")
             plt.ylabel("Frequency")
-            plt.savefig(f"label_{i}_scores.png")
+            plt.savefig(f"{self.experiment_name}_label_{i}_scores.pdf")
             plt.close()
 
 
