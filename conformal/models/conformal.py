@@ -21,6 +21,7 @@ class ConformalPredictor:
         multiconcepts=False,
         multilabel=False,
         bonferroni=False,
+        kernelize=False,
     ):
         """
         model: PyTorch model returning (label_pred, concept_pred)
@@ -40,6 +41,7 @@ class ConformalPredictor:
         self.per_concept_thresholds = None
         self.label_threshold = None
         self.bonferroni = bonferroni
+        self.kernelize = kernelize
         self.permutation = None
         self.EMPTY_TOKEN = -1
 
@@ -67,7 +69,7 @@ class ConformalPredictor:
         _, permutation = align_concepts(
             probs if self.dataset.startswith("mnist") else probs.squeeze(1),
             labels,
-            multiclass=self.multiconcepts
+            multiclass=self.multiconcepts,
         )
 
         log(f"[Conformal] Learned concept permutation:\n{permutation}", "INFO")
@@ -94,13 +96,24 @@ class ConformalPredictor:
             _, conc_pred, _ = self.model(data, eval=True)
 
             if self.permutation is not None:
-                log("Applying permutation to concept predictions for conformity score computation...", "INFO")
+                log(
+                    "Applying permutation to concept predictions for conformity score computation...",
+                    "INFO",
+                )
                 conc_pred = align_knowledge_input(
-                    conc_pred.detach().cpu().numpy() if self.dataset.startswith("mnist") else conc_pred.squeeze(1).detach().cpu().numpy(),
-                    self.permutation
+                    (
+                        conc_pred.detach().cpu().numpy()
+                        if self.dataset.startswith("mnist")
+                        else conc_pred.squeeze(1).detach().cpu().numpy()
+                    ),
+                    self.permutation,
                 )
                 conc_pred = torch.tensor(conc_pred, device=self.device)
-                conc_pred = conc_pred if self.dataset.startswith("mnist") else conc_pred.unsqueeze(1)
+                conc_pred = (
+                    conc_pred
+                    if self.dataset.startswith("mnist")
+                    else conc_pred.unsqueeze(1)
+                )
 
             # For each concept, compute 1 - probability of true label
             if self.multiconcepts:
@@ -209,7 +222,6 @@ class ConformalPredictor:
             plt.savefig(f"{self.experiment_name}_concept_{i}_scores.pdf")
             plt.close()
 
-
     def calibrate_labels(self, dl, alpha=0.1):
         """
         Calibrate threshold for the final label set.
@@ -233,7 +245,7 @@ class ConformalPredictor:
                 f"[Conformal] Calibrating label threshold with alpha {alpha} (no Bonferroni adjustment)",
                 "INFO",
             )
-        
+
         self.label_threshold = np.quantile(scores, 1 - eff_alpha, axis=0)
         log(f"[Conformal] Label threshold: {self.label_threshold}", "INFO")
 
@@ -259,21 +271,17 @@ class ConformalPredictor:
             plt.savefig(f"{self.experiment_name}_label_{i}_scores.pdf")
             plt.close()
 
-
     def _build_concept_sets_for_batch(self, conc_pred):
 
         # aggregate the thresholds
-        thresholds = torch.tensor(
-            self.per_concept_thresholds,
-            device=conc_pred.device
-        )
+        thresholds = torch.tensor(self.per_concept_thresholds, device=conc_pred.device)
 
         # build the scores
         scores = 1 - conc_pred
 
         if self.multiconcepts:
 
-            thresholds = thresholds.view(1,1,-1,1)
+            thresholds = thresholds.view(1, 1, -1, 1)
             mask = scores <= thresholds
 
             batch_sets = []
@@ -312,7 +320,6 @@ class ConformalPredictor:
             else:
                 processed.append(s)
         return np.array(list(itertools.product(*processed)), dtype=int)
-
 
     @torch.no_grad()
     def predict_concepts(self, dl):
@@ -367,10 +374,15 @@ class ConformalPredictor:
                 continue
 
             if self.permutation is not None:
-                tuples = torch.nn.functional.one_hot(
-                    torch.tensor(tuples),
-                    self.concept_dim if self.dataset.startswith("mnist") else 2
-                ).detach().cpu().numpy()
+                tuples = (
+                    torch.nn.functional.one_hot(
+                        torch.tensor(tuples),
+                        self.concept_dim if self.dataset.startswith("mnist") else 2,
+                    )
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
                 tuples = align_knowledge_input(tuples, self.permutation)
                 tuples = np.argmax(tuples, axis=-1)
 
@@ -383,7 +395,6 @@ class ConformalPredictor:
             refined_batch_tuples.append(valid_tuples)
 
         return refined_batch_tuples
-    
 
     def _refine_label_prediction_set(
         self, label_prediction_set, concept_prediction_tuples
@@ -403,10 +414,15 @@ class ConformalPredictor:
             empty_mask = np.any(tuples == self.EMPTY_TOKEN, axis=1)
 
             if self.permutation is not None:
-                tuples = torch.nn.functional.one_hot(
-                    torch.tensor(tuples),
-                    self.concept_dim if self.dataset.startswith("mnist") else 2
-                ).detach().cpu().numpy()
+                tuples = (
+                    torch.nn.functional.one_hot(
+                        torch.tensor(tuples),
+                        self.concept_dim if self.dataset.startswith("mnist") else 2,
+                    )
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
 
                 tuples = align_knowledge_input(tuples, self.permutation)
                 tuples = np.argmax(tuples, axis=-1)
@@ -421,7 +437,6 @@ class ConformalPredictor:
 
         return refined_label_sets
 
-    
     def _apply_logic(self, concept_matrix):
         if concept_matrix.size == 0:
             return np.array([], dtype=int)
@@ -437,10 +452,15 @@ class ConformalPredictor:
             valid_matrix = concept_matrix[valid_mask]
 
             if self.permutation is not None:
-                valid_matrix = torch.nn.functional.one_hot(
-                    torch.tensor(valid_matrix),
-                    self.concept_dim if self.dataset.startswith("mnist") else 2
-                ).detach().cpu().numpy()
+                valid_matrix = (
+                    torch.nn.functional.one_hot(
+                        torch.tensor(valid_matrix),
+                        self.concept_dim if self.dataset.startswith("mnist") else 2,
+                    )
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
                 valid_matrix = align_knowledge_input(valid_matrix, self.permutation)
                 valid_matrix = np.argmax(valid_matrix, axis=-1)
 
@@ -454,7 +474,6 @@ class ConformalPredictor:
         # Assign empty arrays for invalid tuples
         raw_labels[invalid_mask] = None
         return raw_labels
-
 
     def _compute_derived_labels_from_tuples(self, batch_concept_tuples):
         """
@@ -475,10 +494,15 @@ class ConformalPredictor:
         big_matrix = np.concatenate(batch_concept_tuples, axis=0)
 
         if self.permutation is not None:
-            big_matrix = torch.nn.functional.one_hot(
-                torch.tensor(big_matrix),
-                self.concept_dim if self.dataset.startswith("mnist") else 2
-            ).detach().cpu().numpy()
+            big_matrix = (
+                torch.nn.functional.one_hot(
+                    torch.tensor(big_matrix),
+                    self.concept_dim if self.dataset.startswith("mnist") else 2,
+                )
+                .detach()
+                .cpu()
+                .numpy()
+            )
             big_matrix = align_knowledge_input(
                 big_matrix,
                 self.permutation,
@@ -507,7 +531,6 @@ class ConformalPredictor:
 
         return batch_label_sets
 
-
     @torch.no_grad()
     def predict_labels(self, label_pred, batch_tuples=None, use_hard_logic=False):
         """
@@ -518,9 +541,7 @@ class ConformalPredictor:
             if batch_tuples is None:
                 raise ValueError("batch_tuples required when use_hard_logic=True")
 
-            batch_label_sets = self._compute_derived_labels_from_tuples(
-                batch_tuples
-            )
+            batch_label_sets = self._compute_derived_labels_from_tuples(batch_tuples)
             return batch_label_sets
 
         # Standard conformal label prediction
@@ -529,10 +550,7 @@ class ConformalPredictor:
 
         scores = 1 - label_pred
 
-        threshold = torch.tensor(
-            self.label_threshold,
-            device=label_pred.device
-        )
+        threshold = torch.tensor(self.label_threshold, device=label_pred.device)
 
         if self.multilabel:
             # label_pred shape: (B, N_labels, N_classes)
@@ -558,7 +576,6 @@ class ConformalPredictor:
             ]
 
         return batch_label_sets
-
 
     @torch.no_grad()
     def predict_concepts_and_labels(
@@ -590,11 +607,19 @@ class ConformalPredictor:
 
             if self.permutation is not None:
                 conc_pred = align_knowledge_input(
-                    conc_pred.detach().cpu().numpy() if self.dataset.startswith("mnist") else conc_pred.squeeze(1).detach().cpu().numpy(),
-                    self.permutation
+                    (
+                        conc_pred.detach().cpu().numpy()
+                        if self.dataset.startswith("mnist")
+                        else conc_pred.squeeze(1).detach().cpu().numpy()
+                    ),
+                    self.permutation,
                 )
                 conc_pred = torch.tensor(conc_pred, device=self.device)
-                conc_pred = conc_pred if self.dataset.startswith("mnist") else conc_pred.unsqueeze(1)
+                conc_pred = (
+                    conc_pred
+                    if self.dataset.startswith("mnist")
+                    else conc_pred.unsqueeze(1)
+                )
 
             # Build the initial "Conformal Tuples" (Cartesian Product)
             batch_marginal = self._build_concept_sets_for_batch(conc_pred)
@@ -608,12 +633,9 @@ class ConformalPredictor:
 
             # Build Label Sets
             batch_label_sets = self.predict_labels(
-                label_pred,
-                batch_tuples=batch_tuples,
-                use_hard_logic=use_hard_logic
+                label_pred, batch_tuples=batch_tuples, use_hard_logic=use_hard_logic
             )
             all_label_sets.extend(batch_label_sets)
-
 
         # 3. Concept Refinement: Filter tuples based on predicted labels
         if not use_hard_logic and concept_refinement:

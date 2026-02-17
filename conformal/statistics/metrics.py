@@ -8,6 +8,7 @@ from sklearn.metrics import f1_score, accuracy_score, recall_score, confusion_ma
 from conformal.utils.alignment import align_knowledge_input
 from conformal.general_utils import log
 
+
 def compute_ece(probs, labels, n_bins=15):
     """Compute Expected Calibration Error (ECE)."""
     confidences = np.max(probs, axis=1)
@@ -27,7 +28,6 @@ def compute_ece(probs, labels, n_bins=15):
             avg_conf_in_bin = np.mean(confidences[in_bin])
             ece += np.abs(acc_in_bin - avg_conf_in_bin) * prop_in_bin
     return ece
-
 
 
 def compute_statistics(
@@ -60,11 +60,17 @@ def compute_statistics(
 
         if permutation is not None:
             conc_pred = align_knowledge_input(
-                conc_pred.detach().cpu().numpy() if dataset.startswith("mnist") else conc_pred.squeeze(1).detach().cpu().numpy(),
-                permutation
+                (
+                    conc_pred.detach().cpu().numpy()
+                    if dataset.startswith("mnist")
+                    else conc_pred.squeeze(1).detach().cpu().numpy()
+                ),
+                permutation,
             )
             conc_pred = torch.tensor(conc_pred, device=device)
-            conc_pred = conc_pred if dataset.startswith("mnist") else conc_pred.unsqueeze(1)
+            conc_pred = (
+                conc_pred if dataset.startswith("mnist") else conc_pred.unsqueeze(1)
+            )
 
         loss = model.compute_loss(
             dataset=dataset,
@@ -121,7 +127,9 @@ def compute_statistics(
     else:
         f1 = f1_score(all_labels, all_preds, labels=present_labels, average="macro")
         acc = accuracy_score(all_labels, all_preds, normalize=True)
-        rec = recall_score(all_labels, all_preds, labels=present_labels, average="macro")
+        rec = recall_score(
+            all_labels, all_preds, labels=present_labels, average="macro"
+        )
 
     if multiclass:
         c_f1, c_acc, c_rec = 0.0, 0.0, 0.0
@@ -229,7 +237,7 @@ def compute_statistics(
         acc,
         rec,
         c_acc,
-        c_rec
+        c_rec,
     )
 
 
@@ -250,8 +258,12 @@ def conformal_metrics(prediction_tuples, true_labels, ignore_token=-1):
         sample_tuples = prediction_tuples[i]
         ground_truth = true_labels[i]
 
-        assert len(ground_truth.shape) == 1, f"Ground-truth: dim of the worlds. Got {ground_truth.shape, ground_truth.tolist()}"
-        assert len(sample_tuples.shape) == 2 or len(sample_tuples) == 0, f"Predictions: must be number of elements in the conformal set, size of the world. Got {sample_tuples.shape, sample_tuples.tolist(), len(sample_tuples)}"
+        assert (
+            len(ground_truth.shape) == 1
+        ), f"Ground-truth: dim of the worlds. Got {ground_truth.shape, ground_truth.tolist()}"
+        assert (
+            len(sample_tuples.shape) == 2 or len(sample_tuples) == 0
+        ), f"Predictions: must be number of elements in the conformal set, size of the world. Got {sample_tuples.shape, sample_tuples.tolist(), len(sample_tuples)}"
 
         # Filter tuples: ignore any tuple that is all ignore tokens
         valid_mask = ~np.all(sample_tuples == ignore_token, axis=-1)
@@ -289,9 +301,13 @@ def prediction_consistency(concept_tuples, label_sets, logic, EMPTY_TOKEN=-1):
 
         # Some concepts are empty
         concept_empty_mask = np.any(tuples_i == EMPTY_TOKEN, axis=-1)
-            
-        assert len(tuples_i.shape) == 2, f"Concepts: should be size conformal, dim of the worlds. Got {tuples_i.shape, tuples_i.tolist()}"
-        assert len(labels_i.shape) == 2 or len(labels_i) == 0, f"Labels: should be size conformal, size of the world. Got {labels_i.shape, labels_i.tolist(), len(labels_i)}"
+
+        assert (
+            len(tuples_i.shape) == 2
+        ), f"Concepts: should be size conformal, dim of the worlds. Got {tuples_i.shape, tuples_i.tolist()}"
+        assert (
+            len(labels_i.shape) == 2 or len(labels_i) == 0
+        ), f"Labels: should be size conformal, size of the world. Got {labels_i.shape, labels_i.tolist(), len(labels_i)}"
 
         # filter the valid concepts
         valid_tuples = tuples_i[~concept_empty_mask]
@@ -304,7 +320,10 @@ def prediction_consistency(concept_tuples, label_sets, logic, EMPTY_TOKEN=-1):
             if np.any(np.isin(derived_label, labels_i)):
                 consistent_concepts += 1
             else:
-                log(f"Inconsistent concept tuple: {t} -> derived label {derived_label} not in predicted labels {labels_i} for sample {i}", "DEBUG")
+                log(
+                    f"Inconsistent concept tuple: {t} -> derived label {derived_label} not in predicted labels {labels_i} for sample {i}",
+                    "DEBUG",
+                )
                 log(f"Tuples: {valid_tuples.tolist()}", "DEBUG")
                 log(f"Labels: {labels_i.tolist()}", "DEBUG")
 
@@ -321,14 +340,22 @@ def prediction_consistency(concept_tuples, label_sets, logic, EMPTY_TOKEN=-1):
             if covered:
                 covered_labels += 1
             else:
-                log(f"Inconsistent label: {l} not covered by any concept tuple for sample {i}", "DEBUG")
+                log(
+                    f"Inconsistent label: {l} not covered by any concept tuple for sample {i}",
+                    "DEBUG",
+                )
                 log(f"Tuples: {valid_tuples.tolist()}", "DEBUG")
                 log(f"Labels: {labels_i.tolist()}", "DEBUG")
 
-    log(f"Total Concepts: {total_concepts}, Consistent Concepts: {consistent_concepts}", "INFO")
+    log(
+        f"Total Concepts: {total_concepts}, Consistent Concepts: {consistent_concepts}",
+        "INFO",
+    )
     log(f"Total Labels: {total_labels}, Covered Labels: {covered_labels}", "INFO")
 
-    concept_consistency = consistent_concepts / total_concepts if total_concepts > 0 else 1.0
+    concept_consistency = (
+        consistent_concepts / total_concepts if total_concepts > 0 else 1.0
+    )
     label_consistency = covered_labels / total_labels if total_labels > 0 else 1.0
 
     return concept_consistency, label_consistency

@@ -5,6 +5,7 @@ from conformal.models import resnet18, lenet, linear
 from conformal.datasets.mnistadd import mnist_addition_weights
 import torch
 
+
 def configure_global_arguments(parser):
     """Global arguments for MNIST-SumParity"""
     pass
@@ -52,6 +53,7 @@ class MNISTSumParityLoader(MNISTLoader):
             self.concept_weights,
             self.label_weights,
         )
+
 
 def configure_subparsers(subparsers):
     """Configure subparsers."""

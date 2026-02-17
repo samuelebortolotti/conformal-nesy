@@ -7,6 +7,7 @@ from conformal.datasets.mnist import MNISTLoader
 from conformal.utils.logic import HardLogic
 from conformal.models import resnet18, lenet, linear
 
+
 def configure_global_arguments(parser):
     """Global arguments for MNIST-Addition"""
     pass
@@ -114,6 +115,7 @@ def mnist_addition_weights(train_ds, label_count, digit_count, device):
     concept_weights = [c_weights_shared, c_weights_shared]
 
     return label_weights, concept_weights
+
 
 def configure_subparsers(subparsers):
     """Configure subparsers."""

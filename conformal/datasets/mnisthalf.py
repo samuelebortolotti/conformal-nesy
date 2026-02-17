@@ -5,6 +5,7 @@ from conformal.datasets.mnistadd import mnist_addition_weights
 from conformal.models import resnet18, lenet, linear
 import torch
 
+
 def configure_global_arguments(parser):
     """Global arguments for MNIST-Half"""
     pass
@@ -65,6 +66,7 @@ class MNISTHalfLoader(MNISTLoader):
             self.concept_weights,
             self.label_weights,
         )
+
 
 def configure_subparsers(subparsers):
     """Configure subparsers."""

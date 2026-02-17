@@ -1,0 +1,2 @@
+optun~=4.4.0
+optuna-integration~=4.7.0

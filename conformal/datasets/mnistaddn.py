@@ -15,6 +15,7 @@ def configure_global_arguments(parser):
         "--n-digits", type=int_ge_2, default="3", help="Number of MNIST-digits"
     )
 
+
 class MNISTAdditionNDataset(Dataset):
     def __init__(self, base_dataset, n_digits=3, filter_fn=None):
         self.dataset = base_dataset
@@ -80,9 +81,7 @@ def mnist_addition_n_weights(train_ds, label_count, digit_count, n_digits, devic
         dtype=torch.float32,
     ).to(device)
 
-    train_concepts = np.array(
-        [p[1].numpy() for p in train_ds.samples]
-    ).flatten()
+    train_concepts = np.array([p[1].numpy() for p in train_ds.samples]).flatten()
 
     concept_counts = np.bincount(train_concepts, minlength=digit_count)
 
@@ -108,7 +107,7 @@ class MNISTAdditionNLoader(MNISTLoader):
         base_train, base_val, base_test, _, _, _, _, _, _, _, _ = super().load()
 
         input_dim = (1, 28, 28 * self.n_digits)
-        output_dim = 9 * self.n_digits + 1   # possible sums: 0..9*n
+        output_dim = 9 * self.n_digits + 1  # possible sums: 0..9*n
         concept_dim = 10
         n_images = self.n_digits
 

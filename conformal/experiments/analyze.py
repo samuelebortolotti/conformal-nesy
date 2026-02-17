@@ -3,7 +3,15 @@ import pandas as pd
 from pathlib import Path
 
 from conformal.general_utils import log
-from conformal.datasets import boia, chx, derma, mnistadd, mnisthalf, mnistsump, mnistaddn
+from conformal.datasets import (
+    boia,
+    chx,
+    derma,
+    mnistadd,
+    mnisthalf,
+    mnistsump,
+    mnistaddn,
+)
 
 
 def configure_global_arguments(parser):
@@ -90,7 +98,7 @@ def load_results(files, folder_name, seed_position):
         log(f"Loading {f}", "DEBUG")
 
         # Extract seed
-        seed = extract_seed(Path(f).name, folder_name, seed_position)
+        _, seed = extract_seed(Path(f).name, folder_name, seed_position)
 
         settings_dict = {}
         current_setting = None
@@ -135,7 +143,7 @@ def build_seed_regex(args):
     Build a regex that matches get_basename(args) but with any seed.
     """
     keys_ordered = [k for k in vars(args) if k not in ["func", "model_path"]]
-    
+
     regex_parts = []
     for k in keys_ordered:
         v = str(vars(args)[k])
@@ -153,7 +161,7 @@ def extract_seed(f, folder_name, seed_position):
     """Extract the seed from the file"""
     f = f.replace(folder_name + "_", "")
     f = f.split("_")
-    return f[seed_position]
+    return f, f[seed_position]
 
 
 def get_seed_position(args):
@@ -169,8 +177,8 @@ def flatten_results(seed, results_dict):
     rows = []
     for setting, df_metrics in results_dict.items():
         for _, row in df_metrics.iterrows():
-            metric_name = row['metric']
-            value = row['value']
+            metric_name = row["metric"]
+            value = row["value"]
 
             if isinstance(value, (int, float)):
                 rows.append(
@@ -184,7 +192,73 @@ def flatten_results(seed, results_dict):
     return rows
 
 
-def generate_latex_table(rows, caption="Results Summary"):
+def beautify_table(table_df):
+    # Format the numbers
+    def latex_pm_format(x):
+        if isinstance(x, str) and "±" in x:
+            mean, std = [v.strip() for v in x.split("±")]
+            mean = f"{float(mean):.3g}"
+            std = f"{float(std):.3g}"
+            return f"${mean} \\pm {std}$"
+        return x
+
+    table_df = table_df.map(latex_pm_format)
+
+    # Escape _
+    table_df.index = [str(i).replace("_", r"\_") for i in table_df.index]
+
+    # Reduce Names
+    col_map = {
+        "Conformal Concepts Only": "CC",
+        "Conformal Hard Logic": "CH",
+        "Conformal both Concepts and Labels": "CCL",
+        "Conformal both Concepts and Labels with Concept Refinement": "CCLRefC",
+        "Conformal both Concepts and Labels with Label Refinement": "CCLRefL",
+        "Conformal both Concepts and Labels with Concept and Label Refinement": "CCLRefBoth",
+        "No Conformal": "NeSy",
+    }
+    table_df = table_df.rename(columns=col_map)
+
+    # Reorder columns so that CCLRefBoth is last (except NeSy column which is separate)
+    all_cols = list(table_df.columns)
+    if "NeSy" in all_cols:
+        all_cols.remove("NeSy")
+        all_cols = ["NeSy"] + all_cols
+    if "CCLRefBoth" in all_cols:
+        all_cols.remove("CCLRefBoth")
+        all_cols.append("CCLRefBoth")
+    table_df = table_df[all_cols]
+
+    return table_df
+
+
+def split_table(table_df):
+    # --- Table 1: H_c, cece, test* metrics → NeSy only ---
+    nesy_metrics = [
+        m
+        for m in table_df.index
+        if m in ["H\_c", "cece", "yece"] or m.startswith("test")
+    ]
+    nesy_table_df = table_df.loc[nesy_metrics, ["NeSy"]]
+    nesy_table_latex = nesy_table_df.to_latex(
+        escape=False,
+        na_rep="-",
+        column_format="l" + "c",
+    )
+
+    # --- Table 2: all other metrics → all columns except NeSy ---
+    other_metrics = [m for m in table_df.index if m not in nesy_metrics]
+    conformal_table_df = table_df.loc[other_metrics]
+    conformal_table_latex = conformal_table_df.to_latex(
+        escape=False,
+        na_rep="-",
+        column_format="l" + "c" * len(conformal_table_df.columns),
+    )
+
+    return conformal_table_latex, nesy_table_latex
+
+
+def generate_latex_table(rows):
     """
     Generate LaTeX table with mean \pm std per metric across seeds and settings.
     Args:
@@ -194,42 +268,56 @@ def generate_latex_table(rows, caption="Results Summary"):
         str: LaTeX table code
     """
     df = pd.DataFrame(rows)
-    df['seed'] = df['seed'].astype(int)
+    df["seed"] = df["seed"].astype(int)
 
-    agg_df = df.groupby(['setting', 'metric'])['value'].agg(['mean', 'std']).reset_index()
-    agg_df['mean_std'] = agg_df.apply(lambda x: f"{x['mean']:.4f} ± {x['std']:.4f}", axis=1)
-    table_df = agg_df.pivot(index='metric', columns='setting', values='mean_std')
-    table_df = table_df.sort_index()
-    latex_table = table_df.to_latex(
-        escape=False,
-        caption=caption,
-        label="tab:results",
-        na_rep="-",
-        column_format="l" + "c" * len(table_df.columns),
+    agg_df = (
+        df.groupby(["setting", "metric"])["value"].agg(["mean", "std"]).reset_index()
     )
-    return latex_table
+    agg_df["mean_std"] = agg_df.apply(
+        lambda x: f"{x['mean']:.4f} ± {x['std']:.4f}", axis=1
+    )
+    table_df = agg_df.pivot(index="metric", columns="setting", values="mean_std")
+    table_df = table_df.sort_index()
+
+    # bautify table
+    table_df = beautify_table(table_df)
+
+    # return splitted tables
+    return split_table(table_df)
 
 
 def main(experiment_name, results_output_h, stats_output_h, args, device):
     """Main function that parses the arguments and writes the output."""
     files = collect_result_files(args.output_dir_path, build_seed_regex(args))
-    loaded = load_results(files, str(args.output_dir_path), get_seed_position(args))
+    seed_position = get_seed_position(args)
+    loaded = load_results(files, str(args.output_dir_path), seed_position)
 
     all_rows = []
     for seed, data in loaded:
         all_rows.extend(flatten_results(seed, data))
-    latex_table = generate_latex_table(all_rows)
+    conformal_table, nesy_table = generate_latex_table(all_rows)
 
-    original_path = Path(stats_output_h.name)
-    results_stats_path = original_path.with_name(
-        f"{original_path.stem}.tex"
+    # Change the name with the number of seeds analyzed
+    splitted_path, _ = extract_seed(
+        stats_output_h.name.split("/")[-1], str(args.output_dir_path), seed_position
     )
+    splitted_path[seed_position] = f"{len(loaded)}_seeds"
+    splitted_path = "_".join(splitted_path)
+    splitted_path = Path(args.output_dir_path, splitted_path)
+    conformal_results_stats_path = splitted_path.with_name(
+        f"{splitted_path.stem}_conformal.tex"
+    )
+    nesy_results_stats_path = splitted_path.with_name(f"{splitted_path.stem}_nesy.tex")
 
-    log(f"LATEX:\n{latex_table}", "INFO")
+    log(f"CONFORMAL:\n{conformal_table}", "INFO")
+    log(f"NESY:\n{nesy_table}", "INFO")
 
-    log(f"Writing table of results to {results_stats_path}...", "INFO")
-    with open(results_stats_path, "w") as f:
-        f.write(f"{latex_table}")
+    log(f"Writing table of results to {conformal_results_stats_path}...", "INFO")
+    with open(conformal_results_stats_path, "w") as f:
+        f.write(f"{conformal_table}")
+    log(f"Writing table of results to {nesy_results_stats_path}...", "INFO")
+    with open(nesy_results_stats_path, "w") as f:
+        f.write(f"{nesy_table}")
     log("Results written successfully.", "INFO")
 
 

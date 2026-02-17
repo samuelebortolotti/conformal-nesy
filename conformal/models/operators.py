@@ -57,8 +57,7 @@ class BaseMNISTLTNLoss(torch.nn.Module):
     def forward(self, pred_concepts, labels):
         # Variables representing the input images and the target label
         image_vars = [
-            ltn.Variable(f"x{i}", pred_concepts[:, i])
-            for i in range(self.n_images)
+            ltn.Variable(f"x{i}", pred_concepts[:, i]) for i in range(self.n_images)
         ]
         n = ltn.Variable("n", labels)
 
@@ -80,14 +79,11 @@ class BaseMNISTLTNLoss(torch.nn.Module):
                 digit_vars,
                 reduce(
                     lambda a, b: self.and_op(a, b),
-                    [
-                        digit_pred(xi, di)
-                        for xi, di in zip(image_vars, digit_vars)
-                    ]
+                    [digit_pred(xi, di) for xi, di in zip(image_vars, digit_vars)],
                 ),
                 cond_vars=[*digit_vars, n],
-                cond_fn=self.condition()
-            )
+                cond_fn=self.condition(),
+            ),
         )
 
         log(f"LTN loss: {1 - sat_agg.value}", "DEBUG")
@@ -471,7 +467,9 @@ def chx_circuit(multi_class=False):
 
 
 class chx_ltn_loss(torch.nn.Module):
-    def __init__(self, equiv_op, forall_op, not_op, exists_op, sat_agg_op, and_op, multi_class) -> None:
+    def __init__(
+        self, equiv_op, forall_op, not_op, exists_op, sat_agg_op, and_op, multi_class
+    ) -> None:
         """
         Logic: The sample is 'Healthy' (label 0) if all 4 concepts are absent.
         Otherwise, it is 'Unhealthy' (label 1).
@@ -527,20 +525,16 @@ class chx_ltn_loss(torch.nn.Module):
 
         # Symptom variables
         symptom_vars = [
-            ltn.Variable(f"s{i}", torch.arange(2))  # binary: 0 or 1
-            for i in range(4)
+            ltn.Variable(f"s{i}", torch.arange(2)) for i in range(4)  # binary: 0 or 1
         ]
 
         # predicates
-        is_present = ltn.Predicate(
-            func=lambda c, idx: torch.gather(c, 1, idx.long())
-        )
+        is_present = ltn.Predicate(func=lambda c, idx: torch.gather(c, 1, idx.long()))
 
         # label is the sum of symtom
         def condition():
             return lambda *vars: torch.eq(
-                sum(v.value for v in vars[:-1]),
-                vars[-1].value
+                sum(v.value for v in vars[:-1]), vars[-1].value
             )
 
         # Sat Agg
@@ -559,8 +553,8 @@ class chx_ltn_loss(torch.nn.Module):
                     is_present(x, symptom_vars[3]),
                 ),
                 cond_vars=[*symptom_vars, l],
-                cond_fn=condition()
-            )
+                cond_fn=condition(),
+            ),
         )
         log(f"LTN loss: {1 - sat_agg.value}", "DEBUG")
         return 1 - sat_agg.value

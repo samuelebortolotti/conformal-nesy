@@ -7,9 +7,11 @@ from conformal.general_utils import log
 from conformal.models import resnet18, lenet, linear
 import pickle
 
+
 def configure_global_arguments(parser):
     """Global arguments for BOIA"""
     pass
+
 
 CONCEPTS_ORDER = {
     "red_light": 3,
@@ -313,6 +315,7 @@ class BOIALoader:
             self.concept_weights,
             self.label_weights,
         )
+
 
 def configure_subparsers(subparsers):
     """Configure subparsers."""

@@ -224,8 +224,16 @@ def plot_conformal_comparison(results_storage, file_name, target_coverage=0.9):
         target_coverage (float): The desired coverage level (1 - alpha).
     """
 
-    markers = ['o', 's', '^', 'D', 'p', '*', 'X']
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
+    markers = ["o", "s", "^", "D", "p", "*", "X"]
+    colors = [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+    ]
 
     plotted_methods = []
 
@@ -281,7 +289,7 @@ def plot_conformal_comparison(results_storage, file_name, target_coverage=0.9):
 
 def plot_consistency_comparison(results_storage, file_name, target_coverage=0.9):
     """
-    Scatter plot comparing Concept and Label Consistency 
+    Scatter plot comparing Concept and Label Consistency
 
     Args:
         results_storage (dict): Dictionary containing metrics for each method.
@@ -289,8 +297,16 @@ def plot_consistency_comparison(results_storage, file_name, target_coverage=0.9)
         target_coverage (float): The desired coverage level (1 - alpha).
     """
 
-    markers = ['o', 's', '^', 'D', 'p', '*', 'X']
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
+    markers = ["o", "s", "^", "D", "p", "*", "X"]
+    colors = [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+    ]
 
     plt.figure(figsize=(10, 7))
 
@@ -313,7 +329,14 @@ def plot_consistency_comparison(results_storage, file_name, target_coverage=0.9)
             c=colors[i % len(colors)],
         )
 
-    plt.plot([0, 1], [0, 1], color="gray", linestyle="--", alpha=0.7, label="Perfect Consistency")
+    plt.plot(
+        [0, 1],
+        [0, 1],
+        color="gray",
+        linestyle="--",
+        alpha=0.7,
+        label="Perfect Consistency",
+    )
 
     plt.title("Prediction Consistency: Concepts vs Labels", fontsize=14)
     plt.xlabel("Concept Consistency (Higher is better)", fontsize=12)

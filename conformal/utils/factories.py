@@ -71,7 +71,7 @@ class NeSyFactory:
         name: str, n_images, model, concept_dim, output_dim, device, logic, args
     ):
         extra = {"chx-multi-class": getattr(args, "chx_multi_class", False)}
-        
+
         if name.lower() == "dpl":
             return DPL(
                 n_images=n_images,
@@ -81,7 +81,7 @@ class NeSyFactory:
                 output_dim=output_dim,
                 dataset=args.dataset,
                 device=device,
-                extra=extra
+                extra=extra,
             )
         elif name.lower() == "ltn":
             return LTN(
@@ -97,7 +97,7 @@ class NeSyFactory:
                 or_op=args.or_op,
                 imp_op=args.imp_op,
                 p=args.p,
-                extra=extra
+                extra=extra,
             )
         elif name.lower() == "linpred":
             return LinearPredictor(

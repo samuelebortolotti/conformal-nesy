@@ -14,10 +14,27 @@ from conformal.utils.factories import (
 )
 from conformal.datasets.loaders import create_dataloaders
 from conformal.experiments.utils import load_model, collect_predictions
-from conformal.statistics.metrics import compute_statistics, conformal_metrics, prediction_consistency
+from conformal.statistics.metrics import (
+    compute_statistics,
+    conformal_metrics,
+    prediction_consistency,
+)
 from conformal.models.conformal import ConformalPredictor
-from conformal.utils.visualization import plot_conformal_comparison, plot_model_metrics, plot_consistency_comparison, plot_confusion_matrix
-from conformal.datasets import boia, chx, derma, mnistadd, mnisthalf, mnistsump, mnistaddn
+from conformal.utils.visualization import (
+    plot_conformal_comparison,
+    plot_model_metrics,
+    plot_consistency_comparison,
+    plot_confusion_matrix,
+)
+from conformal.datasets import (
+    boia,
+    chx,
+    derma,
+    mnistadd,
+    mnisthalf,
+    mnistsump,
+    mnistaddn,
+)
 
 
 def configure_global_arguments(parser):
@@ -179,6 +196,9 @@ def conformal_evaluation(
     multiconcept = False if args.dataset not in ["boia", "chx", "derma"] else True
     multilabel = False if args.dataset not in ["boia"] else True
     is_image = False if args.dataset in ["boia"] else True
+    kernelize = (
+        False if args.dataset not in ["boia"] else True
+    )  # do a sort of kernel trick when the dataset is too big
 
     cp = ConformalPredictor(
         model,
@@ -191,6 +211,7 @@ def conformal_evaluation(
         multiconcepts=multiconcept,
         multilabel=multilabel,
         bonferroni=True,
+        kernelize=kernelize,
     )
 
     log("Computing the permutation if needed...", "INFO")
@@ -217,7 +238,7 @@ def conformal_evaluation(
         test_acc,
         test_rec,
         test_c_acc,
-        test_c_rec
+        test_c_rec,
     ) = compute_statistics(
         model,
         args.dataset,
@@ -226,7 +247,7 @@ def conformal_evaluation(
         device,
         multiclass=multiconcept,
         multilabel=multilabel,
-        permutation=permutation
+        permutation=permutation,
     )
 
     log("Metrics on the test set (no conformal):", "INFO")
@@ -248,7 +269,7 @@ def conformal_evaluation(
         device,
         multiclass=True,  # To get the separated G
         multilabel=multilabel,
-        permutation=permutation
+        permutation=permutation,
     )
 
     if args.concept_supervision == 0.0 and args.nesy not in ["dpl", "ltn"]:
@@ -259,28 +280,39 @@ def conformal_evaluation(
             concept_names,
             "Concept confusion matrix",
             str(
-                args.output_dir_path / f"{experiment_name}.after_permutation_concept_confusion_matrix.pdf"
+                args.output_dir_path
+                / f"{experiment_name}.after_permutation_concept_confusion_matrix.pdf"
             ),
             multilabel=True if args.dataset in ["boia", "chx", "derma"] else False,
         )
 
     concept_consistency, label_consistency = prediction_consistency(
-        np.expand_dims(all_c, axis=1), 
-        np.expand_dims(np.expand_dims(all_preds, axis=1), axis=1), 
-        logic
+        np.expand_dims(all_c, axis=1),
+        (
+            np.expand_dims(np.expand_dims(all_preds, axis=1), axis=1)
+            if not multilabel
+            else np.expand_dims(all_preds, axis=1)
+        ),
+        logic,
     )
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
 
-    concept_coverage, concept_set_size = conformal_metrics(np.expand_dims(all_c, axis=1), all_g)
+    concept_coverage, concept_set_size = conformal_metrics(
+        np.expand_dims(all_c, axis=1), all_g
+    )
 
     log(f"[NeSy] Concept Coverage: {concept_coverage:.4f}", "INFO")
     log(f"[NeSy] Concept Set Size: {concept_set_size:.4f}", "INFO")
 
     label_coverage, label_size = conformal_metrics(
-        np.expand_dims(np.expand_dims(all_preds, axis=1), axis=1), 
-        np.expand_dims(all_labels, axis=1)
+        (
+            np.expand_dims(np.expand_dims(all_preds, axis=1), axis=1)
+            if not multilabel
+            else np.expand_dims(all_preds, axis=1)
+        ),
+        np.expand_dims(all_labels, axis=1) if not multilabel else all_labels,
     )
 
     log(f"[NeSy] Label Coverage: {label_coverage:.4f}", "INFO")
@@ -324,9 +356,7 @@ def conformal_evaluation(
     log(f"[Conformal Concepts Only] Concept Set Size: {concept_set_size:.4f}", "INFO")
 
     concept_consistency, label_consistency = prediction_consistency(
-        concept_sets,
-        np.expand_dims(np.expand_dims(all_preds, axis=1), axis=1), 
-        logic
+        concept_sets, np.expand_dims(np.expand_dims(all_preds, axis=1), axis=1), logic
     )
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
@@ -360,8 +390,7 @@ def conformal_evaluation(
     )
 
     label_coverage, label_size = conformal_metrics(
-        label_sets, 
-        np.expand_dims(all_labels, axis=1)
+        label_sets, np.expand_dims(all_labels, axis=1)
     )
 
     log(
@@ -372,7 +401,9 @@ def conformal_evaluation(
         f"[Conformal both Concepts and Labels] Label Set Size: {label_size:.4f}", "INFO"
     )
 
-    concept_consistency, label_consistency = prediction_consistency(concept_sets, label_sets, logic)
+    concept_consistency, label_consistency = prediction_consistency(
+        concept_sets, label_sets, logic
+    )
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
@@ -402,14 +433,15 @@ def conformal_evaluation(
     )
 
     label_coverage, label_size = conformal_metrics(
-        label_sets, 
-        np.expand_dims(all_labels, axis=1)
+        label_sets, np.expand_dims(all_labels, axis=1)
     )
 
     log(f"[Conformal Hard Logic] Label Coverage: {label_coverage:.4f}", "INFO")
     log(f"[Conformal Hard Logic] Label Set Size: {label_size:.4f}", "INFO")
 
-    concept_consistency, label_consistency = prediction_consistency(concept_sets, label_sets, logic)
+    concept_consistency, label_consistency = prediction_consistency(
+        concept_sets, label_sets, logic
+    )
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
@@ -440,8 +472,7 @@ def conformal_evaluation(
 
     concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
     label_coverage, label_size = conformal_metrics(
-        label_sets, 
-        np.expand_dims(all_labels, axis=1)
+        label_sets, np.expand_dims(all_labels, axis=1)
     )
 
     log(
@@ -461,7 +492,9 @@ def conformal_evaluation(
         "INFO",
     )
 
-    concept_consistency, label_consistency = prediction_consistency(concept_sets, label_sets, logic)
+    concept_consistency, label_consistency = prediction_consistency(
+        concept_sets, label_sets, logic
+    )
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
@@ -492,8 +525,7 @@ def conformal_evaluation(
 
     concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
     label_coverage, label_size = conformal_metrics(
-        label_sets, 
-        np.expand_dims(all_labels, axis=1)
+        label_sets, np.expand_dims(all_labels, axis=1)
     )
 
     log(
@@ -513,7 +545,9 @@ def conformal_evaluation(
         "INFO",
     )
 
-    concept_consistency, label_consistency = prediction_consistency(concept_sets, label_sets, logic)
+    concept_consistency, label_consistency = prediction_consistency(
+        concept_sets, label_sets, logic
+    )
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
@@ -543,10 +577,9 @@ def conformal_evaluation(
     )
 
     concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
-    
+
     label_coverage, label_size = conformal_metrics(
-        label_sets, 
-        np.expand_dims(all_labels, axis=1)
+        label_sets, np.expand_dims(all_labels, axis=1)
     )
 
     log(
@@ -566,7 +599,9 @@ def conformal_evaluation(
         "INFO",
     )
 
-    concept_consistency, label_consistency = prediction_consistency(concept_sets, label_sets, logic)
+    concept_consistency, label_consistency = prediction_consistency(
+        concept_sets, label_sets, logic
+    )
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
@@ -580,7 +615,9 @@ def conformal_evaluation(
         is_image=is_image,
     )
 
-    results_storage["Conformal both Concepts and Labels with Concept and Label Refinement"] = {
+    results_storage[
+        "Conformal both Concepts and Labels with Concept and Label Refinement"
+    ] = {
         "coverage_concepts": concept_coverage,
         "concept_size": concept_set_size,
         "coverage_labels": label_coverage,
@@ -645,7 +682,9 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     )
 
     plot_conformal_comparison(
-        result_storage, str(args.output_dir_path / f"{experiment_name}"), target_coverage=1 - alpha
+        result_storage,
+        str(args.output_dir_path / f"{experiment_name}"),
+        target_coverage=1 - alpha,
     )
 
     plot_consistency_comparison(

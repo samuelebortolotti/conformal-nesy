@@ -18,7 +18,15 @@ def configure_global_arguments(parser):
 
 class DPL(NeSyModel):
     def __init__(
-        self, n_images, encoder, entangled, concept_dim, output_dim, dataset, device, extra
+        self,
+        n_images,
+        encoder,
+        entangled,
+        concept_dim,
+        output_dim,
+        dataset,
+        device,
+        extra,
     ):
         super().__init__(
             n_images, encoder, entangled, concept_dim, output_dim, dataset, device

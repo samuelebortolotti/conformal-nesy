@@ -7,7 +7,16 @@ from conformal.models.dpl import DPL
 from conformal.utils.factories import NetworkFactory
 from conformal.utils.alignment import align_knowledge_input
 
-def collect_predictions(model, dataset, data_loader, device, multiclass=False, multilabel=False, permutation=None):
+
+def collect_predictions(
+    model,
+    dataset,
+    data_loader,
+    device,
+    multiclass=False,
+    multilabel=False,
+    permutation=None,
+):
     """
     Compute loss and F1 score for the dataset (train or validation).
     Returns raw logits/probabilities after None.
@@ -27,11 +36,17 @@ def collect_predictions(model, dataset, data_loader, device, multiclass=False, m
 
         if permutation is not None:
             conc_pred = align_knowledge_input(
-                conc_pred.detach().cpu().numpy() if dataset.startswith("mnist") else conc_pred.squeeze(1).detach().cpu().numpy(),
-                permutation
+                (
+                    conc_pred.detach().cpu().numpy()
+                    if dataset.startswith("mnist")
+                    else conc_pred.squeeze(1).detach().cpu().numpy()
+                ),
+                permutation,
             )
             conc_pred = torch.tensor(conc_pred, device=device)
-            conc_pred = conc_pred if dataset.startswith("mnist") else conc_pred.unsqueeze(1)
+            conc_pred = (
+                conc_pred if dataset.startswith("mnist") else conc_pred.unsqueeze(1)
+            )
 
         all_preds.append(output.argmax(dim=-1).cpu().numpy())
         all_labels.append(target.cpu().numpy())

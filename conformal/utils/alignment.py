@@ -105,6 +105,7 @@ def apply_knowledge_permutation(probs, perm):
     probs = probs @ inverse_permutation(perm)
     return probs
 
+
 def apply_3d_knowledge_permutation(probs, perm):
     N, _, _ = probs.shape
     aligned_probs = np.zeros_like(probs)

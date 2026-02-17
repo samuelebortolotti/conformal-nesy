@@ -24,17 +24,37 @@ def configure_subparsers(subparsers):
 def objective(trial, base_args, experiment_name, output_dir, device):
     args = copy.deepcopy(base_args)
 
-    args.learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
-    args.momentum = trial.suggest_float("momentum", 1e-5, 1, log=True)
+    args.learning_rate = trial.suggest_categorical(
+        "learning_rate", [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
+    )
+    args.momentum = trial.suggest_categorical(
+        "momentum", [1e-5, 1e-4, 1e-3, 1e-2, 0.1, 0.5, 0.9, 0.99]
+    )
     args.batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256])
     args.opt = trial.suggest_categorical("opt", ["adam", "sgd"])
 
     if args.nesy == "ltn":
-        args.and_op = trial.suggest_categorical("and_op", ["godel", "prod", "luk"])
-        args.or_op = trial.suggest_categorical("or_op", ["godel", "prod", "luk"])
-        args.imp_op = trial.suggest_categorical(
-            "imp_op", ["godel", "prod", "luk", "goguen", "klenee"]
+        # consistent logic family
+
+        logic_family = trial.suggest_categorical(
+            "logic_family", ["godel", "product", "lukasiewicz"]
         )
+
+        if logic_family == "godel":
+            args.and_op = "godel"
+            args.or_op = "godel"
+            args.imp_op = "godel"
+
+        elif logic_family == "product":
+            args.and_op = "prod"
+            args.or_op = "prod"
+            args.imp_op = "goguen"
+
+        elif logic_family == "lukasiewicz":
+            args.and_op = "luk"
+            args.or_op = "luk"
+            args.imp_op = "luk"
+
         args.p = trial.suggest_categorical("p", list(range(1, 10)))
     elif args.nesy == "dsl":
         args.epsilon_symbols = trial.suggest_float(
@@ -73,15 +93,23 @@ def run_study(
     output_dir.mkdir(exist_ok=True)
     device = device
 
+    # create sampler
+    sampler = optuna.integration.BoTorchSampler(
+        n_startup_trials=10,
+        independent_sampler=optuna.samplers.TPESampler(seed=args.seed),
+        seed=args.seed,
+    )
+
     if storage:
         study = optuna.create_study(
             direction=direction,
+            sampler=sampler,
             study_name=study_name,
             storage=storage,
             load_if_exists=True,
         )
     else:
-        study = optuna.create_study(direction=direction)
+        study = optuna.create_study(direction=direction, sampler=sampler)
 
     study.optimize(
         lambda trial: objective(

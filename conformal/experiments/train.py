@@ -19,7 +19,15 @@ from conformal.statistics.statistics import Statistics, Results
 from conformal.utils.visualization import plot_confusion_matrix
 from conformal.experiments.utils import collect_predictions
 from conformal.statistics.metrics import compute_statistics
-from conformal.datasets import boia, chx, derma, mnistadd, mnisthalf, mnistsump, mnistaddn
+from conformal.datasets import (
+    boia,
+    chx,
+    derma,
+    mnistadd,
+    mnisthalf,
+    mnistsump,
+    mnistaddn,
+)
 
 
 def configure_global_arguments(parser):

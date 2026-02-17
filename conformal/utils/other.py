@@ -14,6 +14,7 @@ def outer_product(x):
 
     return result
 
+
 def int_ge_2(value):
     ivalue = int(value)
     if ivalue < 2:

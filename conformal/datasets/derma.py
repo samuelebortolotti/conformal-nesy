@@ -13,7 +13,6 @@ def configure_global_arguments(parser):
     pass
 
 
-
 class DERMALoader:
     def __init__(
         self,
@@ -138,6 +137,7 @@ class DERMAMINST(Dataset):
         concepts[class_id] = 1
 
         return img, concepts, torch.tensor(label, dtype=torch.long)
+
 
 def configure_subparsers(subparsers):
     """Configure subparsers."""

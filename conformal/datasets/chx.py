@@ -157,24 +157,29 @@ class CHXLoader:
             # TODO: maybe with the help of a clinitian we could rearrange something better
             df_agg["target"] = np.select(
                 [
-                    concept_count == 0, # 0 = Healthy
-                    concept_count == 1, # 1 = Green
-                    concept_count == 2, # 2 = Yellow
-                    concept_count == 3, # 3 = Red
-                    concept_count == 4, # 4 = Critical
+                    concept_count == 0,  # 0 = Healthy
+                    concept_count == 1,  # 1 = Green
+                    concept_count == 2,  # 2 = Yellow
+                    concept_count == 3,  # 3 = Red
+                    concept_count == 4,  # 4 = Critical
                 ],
                 [0, 1, 2, 3, 4],
-                default=-1
+                default=-1,
             )
 
             assert (df_agg["target"] >= 0).all(), "Invalid targets generated"
-            class_names = ["Healthy", "Green code", "Yellow code", "Red code", "Critical code"]
+            class_names = [
+                "Healthy",
+                "Green code",
+                "Yellow code",
+                "Red code",
+                "Critical code",
+            ]
             n_classes = 5
         else:
             df_agg["target"] = (concept_count == 0).astype(int)
             class_names = ["Abnormal", "Healthy"]
             n_classes = 2
-
 
         img_dir = os.path.join(self.data_dir, "images_nih", "images")
         df_agg["path"] = df_agg["Image ID"].apply(lambda x: os.path.join(img_dir, x))
@@ -197,8 +202,7 @@ class CHXLoader:
         # Label weights
         y_counts = np.bincount(y_train, minlength=n_classes)
         self.label_weights = torch.tensor(
-            len(y_train) / (n_classes * y_counts),
-            dtype=torch.float
+            len(y_train) / (n_classes * y_counts), dtype=torch.float
         )
 
         # Concept weights
@@ -253,6 +257,7 @@ class CHXLoader:
             self.concepts_weights,
             self.label_weights,
         )
+
 
 def configure_subparsers(subparsers):
     """Configure subparsers."""

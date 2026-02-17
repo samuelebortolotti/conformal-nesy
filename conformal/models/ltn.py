@@ -71,7 +71,9 @@ class LTN(NeSyModel):
         self.equiv_op = self._build_equiv(and_op, imp_op)
 
         self.sat_agg_op = self._build_sat_agg()
-        self.ltn_loss = self._get_ltn_loss(concept_dim, output_dim, n_images, dataset, extra)
+        self.ltn_loss = self._get_ltn_loss(
+            concept_dim, output_dim, n_images, dataset, extra
+        )
 
     def _build_sat_agg(self):
         return ltn.fuzzy_ops.SatAgg()
