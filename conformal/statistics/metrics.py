@@ -258,6 +258,9 @@ def conformal_metrics(prediction_tuples, true_labels, ignore_token=-1):
         sample_tuples = prediction_tuples[i]
         ground_truth = true_labels[i]
 
+        # print(ground_truth)
+        # print(len(sample_tuples), sample_tuples, len(sample_tuples[0]))
+
         assert (
             len(ground_truth.shape) == 1
         ), f"Ground-truth: dim of the worlds. Got {ground_truth.shape, ground_truth.tolist()}"

@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from conformal.models import dpl, ltn, linear_predictor, dsl
 
@@ -12,23 +13,36 @@ class LeNet(nn.Module):
         super().__init__()
         self.input_shape = input_shape
 
-        self.model = nn.Sequential(
+        self.features = nn.Sequential(
             nn.Conv2d(input_shape[0], 6, kernel_size=5, stride=1, padding=2),
             nn.Tanh(),
             nn.AvgPool2d(kernel_size=2, stride=2),
             nn.Conv2d(6, 16, kernel_size=5),
             nn.Tanh(),
             nn.AvgPool2d(kernel_size=2, stride=2),
-            nn.Flatten(),
-            nn.Linear(16 * 5 * 5, 120),
+        )
+
+        self.flatten_dim = self._get_flatten_dim(input_shape)
+
+        self.classifier = nn.Sequential(
+            nn.Linear(self.flatten_dim, 120),
             nn.Tanh(),
             nn.Linear(120, 84),
             nn.Tanh(),
             nn.Linear(84, num_classes),
         )
 
+    def _get_flatten_dim(self, input_shape):
+        with torch.no_grad():
+            dummy = torch.zeros(1, *input_shape)
+            out = self.features(dummy)
+            return out.view(1, -1).size(1)
+
     def forward(self, x):
-        return self.model(x)
+        x = self.features(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
 
 
 def configure_subparsers(subparsers):

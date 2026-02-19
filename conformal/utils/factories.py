@@ -9,6 +9,11 @@ from conformal.datasets.mnistaddn import MNISTAdditionNLoader
 from conformal.datasets.derma import DERMALoader
 from conformal.datasets.boia import BOIALoader
 from conformal.datasets.chx import CHXLoader
+from conformal.datasets.rival import RIVAL10Loader
+from conformal.datasets.cifar import CIFAR10Loader
+from conformal.datasets.cebab import CeBaBLoader
+from conformal.models.bert import Bert
+from conformal.models.lama import Lama
 from conformal.models.dpl import DPL
 from conformal.models.ltn import LTN
 from conformal.models.linear_predictor import LinearPredictor
@@ -32,13 +37,17 @@ class OptimizerFactory:
 
 class NetworkFactory:
     @staticmethod
-    def get_network(name: str, input_shape=(1, 28, 28), output_dim=10, args=None):
+    def get_network(name: str, input_shape=(1, 28, 28), output_dim=10, args=None, n_images=2):
         if name.lower() == "resnet18":
             return ResNet18(input_shape=input_shape, num_classes=output_dim)
         elif name.lower() == "lenet":
             return LeNet(input_shape=input_shape, num_classes=output_dim)
         elif name.lower() == "linear":
             return Linear(input_shape=input_shape, num_classes=output_dim)
+        elif name.lower() == "bert":
+            return Bert(num_concepts=n_images, num_concept_dim=output_dim)
+        elif name.lower() == "lama":
+            return Lama(num_concepts=n_images, num_concept_dim=output_dim)
         else:
             raise ValueError(f"Unknown network type: {name}")
 
@@ -61,6 +70,18 @@ class DatasetFactory:
             return CHXLoader(chx_multi_class=args.chx_multi_class, **kwargs).load()
         elif name == "derma":
             return DERMALoader(**kwargs).load()
+        elif name == "cifar":
+            return CIFAR10Loader(**kwargs).load()
+        elif name == "rival":
+            return RIVAL10Loader(**kwargs).load()
+        elif name == "cebab":
+            if args.model == "bert":
+                tokenizer = "bert-base-uncased"
+            elif args.model == "lama":
+                tokenizer = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+            else:
+                raise ValueError(f"Unknown tokenizer for CeBaB instantiation: {args.model} chosen")
+            return CeBaBLoader(tokenizer_name=tokenizer, **kwargs).load()
         else:
             raise ValueError(f"Unknown dataset: {name}")
 

@@ -27,7 +27,7 @@ class MNISTHalfLoader(MNISTLoader):
 
         base_train, base_val, base_test, _, _, _, _, _, _, _, _ = super().load()
 
-        input_dim = (1, 28, 56)
+        input_dim = (1, 28, 28)
         output_dim = 9
         concept_dim = 5
         n_images = 2

@@ -5,6 +5,8 @@ from conformal.models.operators import (
     boia_ltn_loss,
     chx_ltn_loss,
     derma_ltn_loss,
+    cifar_ltn_loss,
+    cebab_ltn_loss
 )
 from conformal.models.nesy import NeSyModel
 import torch
@@ -176,6 +178,24 @@ class LTN(NeSyModel):
                 not_op=self.not_op,
                 exists_op=self.exists_op,
                 sat_agg_op=self.sat_agg_op,
+            )
+        elif dataset in ["cifar", "rival"]:
+            return cifar_ltn_loss(
+                equiv_op=self.equiv_op,
+                forall_op=self.forall_op,
+                not_op=self.not_op,
+                and_op=self.and_op,
+                sat_agg_op=self.sat_agg_op,
+                or_op=self.or_op
+            )
+        elif dataset == "cebab":
+            return cebab_ltn_loss(
+                equiv_op=self.equiv_op,
+                forall_op=self.forall_op,
+                not_op=self.not_op,
+                and_op=self.and_op,
+                sat_agg_op=self.sat_agg_op,
+                or_op=self.or_op
             )
 
         raise NotImplementedError(

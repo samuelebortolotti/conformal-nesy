@@ -7,6 +7,8 @@ from conformal.models.operators import (
     boia_circuit,
     chx_circuit,
     derma_circuit,
+    cifar_circuit,
+    cebab_circuit,
 )
 from conformal.models.nesy import NeSyModel
 
@@ -58,6 +60,10 @@ class DPL(NeSyModel):
             return chx_circuit(multi_class=extra["chx-multi-class"])
         elif dataset == "derma":
             return derma_circuit()
+        elif dataset in ["cifar", "rival"]:
+            return cifar_circuit()
+        elif dataset in ["cebab"]:
+            return cebab_circuit()
         raise NotImplementedError(f"Circuit for dataset {dataset} not implemented.")
 
     def inference(self, concepts, eval=False):
@@ -68,7 +74,7 @@ class DPL(NeSyModel):
         # Standard DPL logic
         worlds = (
             outer_product(concepts.squeeze(1))
-            if self.dataset in ["chx", "derma"]
+            if self.dataset in ["chx", "derma", "rival", "cifar"]
             else outer_product(concepts)
         )
         query_prob = torch.matmul(worlds, self.circuit)

@@ -34,6 +34,9 @@ from conformal.datasets import (
     mnisthalf,
     mnistsump,
     mnistaddn,
+    cifar,
+    rival,
+    cebab
 )
 
 
@@ -84,6 +87,9 @@ def test_parser(parser):
     derma.configure_subparsers(subparsers)
     chx.configure_subparsers(subparsers)
     boia.configure_subparsers(subparsers)
+    cifar.configure_subparsers(subparsers)
+    rival.configure_subparsers(subparsers)
+    cebab.configure_subparsers(subparsers)
 
 
 def configure_subparsers(subparsers):
@@ -193,12 +199,13 @@ def conformal_evaluation(
 
     log("Preparing the conformal predictor...", "INFO")
 
-    multiconcept = False if args.dataset not in ["boia", "chx", "derma"] else True
+    multiconcept = (
+        False
+        if args.dataset not in ["boia", "chx", "derma", "cifar", "rival"]
+        else True
+    )
     multilabel = False if args.dataset not in ["boia"] else True
-    is_image = False if args.dataset in ["boia"] else True
-    kernelize = (
-        False if args.dataset not in ["boia"] else True
-    )  # do a sort of kernel trick when the dataset is too big
+    is_image = False if args.dataset in ["boia", "cebab"] else True
 
     cp = ConformalPredictor(
         model,
@@ -211,7 +218,6 @@ def conformal_evaluation(
         multiconcepts=multiconcept,
         multilabel=multilabel,
         bonferroni=True,
-        kernelize=kernelize,
     )
 
     log("Computing the permutation if needed...", "INFO")
@@ -245,6 +251,7 @@ def conformal_evaluation(
         test_dl,
         criterion,
         device,
+        is_train=False,
         multiclass=multiconcept,
         multilabel=multilabel,
         permutation=permutation,
@@ -283,7 +290,11 @@ def conformal_evaluation(
                 args.output_dir_path
                 / f"{experiment_name}.after_permutation_concept_confusion_matrix.pdf"
             ),
-            multilabel=True if args.dataset in ["boia", "chx", "derma"] else False,
+            multilabel=(
+                True
+                if args.dataset in ["boia", "chx", "derma", "cifar", "rival"]
+                else False
+            ),
         )
 
     concept_consistency, label_consistency = prediction_consistency(
@@ -654,7 +665,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
 
     log("Loading the model", "INFO")
 
-    model = NetworkFactory.get_network(args.model, input_dim, concept_dim, args)
+    model = NetworkFactory.get_network(args.model, input_dim, concept_dim, args, n_images)
     model = NeSyFactory.get_nesy_model(
         args.nesy, n_images, model, concept_dim, output_dim, device, logic, args
     )
@@ -666,7 +677,8 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     # load the logic
     logic_from_model = LogicFactory.get_logic(args.nesy, logic, model)
 
-    alpha = 0.1
+    alpha_concepts = 0.1
+    alpha_label = 0.1
     result_storage = conformal_evaluation(
         model,
         val_dl,
@@ -677,14 +689,14 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         criterion,
         concept_names,
         experiment_name,
-        alpha_concepts=alpha,
-        alpha_label=alpha,
+        alpha_concepts=alpha_concepts,
+        alpha_label=alpha_label,
     )
 
     plot_conformal_comparison(
         result_storage,
         str(args.output_dir_path / f"{experiment_name}"),
-        target_coverage=1 - alpha,
+        target_coverage=1 - alpha_concepts,
     )
 
     plot_consistency_comparison(
@@ -695,7 +707,11 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         result_storage["No Conformal"],
         str(args.output_dir_path / f"{experiment_name}"),
         concept_names=args.concept_names if hasattr(args, "concept_names") else None,
-        multiconcepts=True if args.dataset in ["boia", "chx", "derma"] else False,
+        multiconcepts=(
+            True
+            if args.dataset in ["boia", "chx", "derma", "cifar", "rival"]
+            else False
+        ),
     )
 
     log("Results Summary:", "INFO")

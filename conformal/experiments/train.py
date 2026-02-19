@@ -14,7 +14,6 @@ from conformal.utils.factories import (
     NeSyFactory,
 )
 from conformal.datasets.loaders import create_dataloaders
-from conformal.models import resnet18, lenet, linear
 from conformal.statistics.statistics import Statistics, Results
 from conformal.utils.visualization import plot_confusion_matrix
 from conformal.experiments.utils import collect_predictions
@@ -27,6 +26,9 @@ from conformal.datasets import (
     mnisthalf,
     mnistsump,
     mnistaddn,
+    rival,
+    cifar,
+    cebab
 )
 
 
@@ -78,6 +80,9 @@ def train_parser(parser):
     derma.configure_subparsers(subparsers)
     chx.configure_subparsers(subparsers)
     boia.configure_subparsers(subparsers)
+    cifar.configure_subparsers(subparsers)
+    rival.configure_subparsers(subparsers)
+    cebab.configure_subparsers(subparsers)
 
 
 def configure_subparsers(subparsers):
@@ -128,7 +133,7 @@ def train_epoch(
         if args.concept_supervision > 0:
             concept_loss = 0.0
 
-            if args.dataset in ["chx", "boia", "derma"]:
+            if args.dataset in ["chx", "boia", "derma", "rival", "cifar"]:
                 for i in range(conc_pred.size(1)):
                     concept_loss += torch.nn.functional.nll_loss(
                         conc_pred[:, 0, i, :].log(),
@@ -141,7 +146,7 @@ def train_epoch(
                     concept_loss += torch.nn.functional.nll_loss(
                         conc_pred[:, i, :].log(),
                         concepts[:, i].long(),
-                        weight=concept_weights[i] if concept_weights else None,
+                        weight=concept_weights[i] if concept_weights is not None else None,
                     )
             concept_loss /= concepts.size(1)
             concept_loss = args.concept_supervision * concept_loss
@@ -185,7 +190,7 @@ def train_epoch(
         present_l = np.unique(all_labels)
         train_f1 = f1_score(all_labels, all_preds, labels=present_l, average="macro")
 
-    if args.dataset in ["boia", "chx", "derma"]:
+    if args.dataset in ["boia", "chx", "derma", "rival", "cifar"]:
         train_c_f1 = 0.0
         for idx in range(all_g.shape[1]):
             present_c = np.unique(all_g[:, idx])
@@ -244,7 +249,9 @@ def train(
                 device,
                 is_train=False,
                 multiclass=(
-                    False if args.dataset not in ["boia", "chx", "derma"] else True
+                    False
+                    if args.dataset not in ["boia", "chx", "derma", "cifar", "rival"]
+                    else True
                 ),
                 multilabel=False if args.dataset not in ["boia"] else True,
             )
@@ -293,7 +300,11 @@ def evaluate_and_log_model(
             criterion,
             device,
             is_train=False,
-            multiclass=False if args.dataset not in ["boia", "chx", "derma"] else True,
+            multiclass=(
+                False
+                if args.dataset not in ["boia", "chx", "derma", "rival", "cifar"]
+                else True
+            ),
             multilabel=False if args.dataset not in ["boia"] else True,
         )
     )
@@ -310,7 +321,9 @@ def evaluate_and_log_model(
                 test_dl,
                 device,
                 multiclass=(
-                    False if args.dataset not in ["boia", "chx", "derma"] else True
+                    False
+                    if args.dataset not in ["boia", "chx", "derma", "rival", "cifar"]
+                    else True
                 ),
                 multilabel=False if args.dataset not in ["boia"] else True,
             )
@@ -337,7 +350,11 @@ def evaluate_and_log_model(
             str(
                 args.output_dir_path / f"{experiment_name}.concept_confusion_matrix.pdf"
             ),
-            multilabel=True if args.dataset in ["boia", "chx", "derma"] else False,
+            multilabel=(
+                True
+                if args.dataset in ["boia", "chx", "derma", "rival", "cifar"]
+                else False
+            ),
         )
 
         res = Results(
@@ -390,7 +407,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
 
     log("Training model", "INFO")
 
-    model = NetworkFactory.get_network(args.model, input_dim, concept_dim, args)
+    model = NetworkFactory.get_network(args.model, input_dim, concept_dim, args, n_images=n_images)
     model = NeSyFactory.get_nesy_model(
         args.nesy, n_images, model, concept_dim, output_dim, device, logic, args
     )

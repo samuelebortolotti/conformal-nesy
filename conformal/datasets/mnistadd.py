@@ -55,7 +55,7 @@ class MNISTAdditionLoader(MNISTLoader):
     def load(self):
         base_train, base_val, base_test, _, _, _, _, _, _, _, _ = super().load()
 
-        input_dim = (1, 28, 56)
+        input_dim = (1, 28, 28)
         output_dim = 19
         concept_dim = 10
         n_images = 2

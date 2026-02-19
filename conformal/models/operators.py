@@ -671,22 +671,421 @@ def same_objects_circuit(n_images, n_colors=3, n_shapes=3, n_materials=2, n_size
         ) = look_up[w]
 
         same = True
-
         if color_1 != color_2:
             same = False
-
         if shape_1 != shape_2:
             same = False
-
         if material_1 != material_2:
             same = False
-
         if size_1 != size_2:
             same = False
-
         if same:
             w_q[w, 1] = 1  # Match
         else:
             w_q[w, 0] = 1  # No Match
 
     return w_q
+
+
+##
+# CIFAR
+##
+
+
+def cifar_circuit():
+    possible_worlds = list(product(range(2), repeat=7))
+    n_worlds = len(possible_worlds)
+    n_queries = 10
+    look_up = {i: c for i, c in zip(range(n_worlds), possible_worlds)}
+
+    w_q = torch.zeros(n_worlds, n_queries)
+    for w in range(n_worlds):
+        wheels, metallic, wings, animal, hairy, horns, long_snout = look_up[w]
+
+        is_vehicle = metallic * (1 - animal)
+        is_living = animal * (1 - metallic)
+
+        plane = is_vehicle * wings
+        car_truck = is_vehicle * wheels * (1 - wings)
+        ship = is_vehicle * (1 - wheels) * (1 - wings)
+        bird = is_living * wings
+        frog = is_living * (1 - hairy)
+        deer = is_living * (1 - wings) * hairy * horns
+        cat = is_living * (1 - wings) * hairy * (1 - horns) * (1 - long_snout)
+        dog_equine = is_living * (1 - wings) * hairy * (1 - horns) * long_snout
+
+        if plane:
+            w_q[w, 0] = 1
+        elif car_truck or wheels:
+            w_q[w, 1] = 0.5
+            w_q[w, 9] = 0.5
+        elif bird:
+            w_q[w, 2] = 1
+        elif cat:
+            w_q[w, 3] = 1
+        elif deer:
+            w_q[w, 4] = 1
+        elif dog_equine:
+            w_q[w, 5] = 0.5
+            w_q[w, 7] = 0.5
+        elif frog:
+            w_q[w, 6] = 1
+        elif ship:
+            w_q[w, 8] = 1
+        elif metallic:  # plane, car, truck and ship with equal prob
+            w_q[w, 0] = 0.25
+            w_q[w, 1] = 0.25
+            w_q[w, 9] = 0.25
+            w_q[w, 8] = 0.25
+        elif wings:  # plane or bird
+            w_q[w, 1] = 1
+            w_q[w, 2] = 1
+        elif hairy:
+            w_q[w, 3] = 0.25
+            w_q[w, 4] = 0.25
+            w_q[w, 5] = 0.25
+            w_q[w, 7] = 0.25
+        elif long_snout:
+            w_q[w, 4] = 1.0 / 3
+            w_q[w, 5] = 1.0 / 3
+            w_q[w, 7] = 1.0 / 3
+        else:  # can be anything
+            w_q[w, :] = 1.0 / 10
+    return w_q
+
+
+class cifar_ltn_loss(torch.nn.Module):
+    def __init__(self, equiv_op, forall_op, not_op, and_op, sat_agg_op, or_op):
+        super().__init__()
+
+        self.equiv_op = equiv_op
+        self.forall_op = forall_op
+        self.not_op = not_op
+        self.and_op = and_op
+        self.sat_agg_op = sat_agg_op
+        self.or_op = or_op
+        self.concept_names = ["whl", "met", "wng", "ani", "hai", "hrn", "snt"]
+
+    def forward(self, pred_concepts, labels):
+
+        c = ltn.Variable("c", pred_concepts[:, 0, :, 1])
+        l = ltn.Variable("l", labels)
+        class_targets = {
+            i: ltn.Constant(torch.tensor([i]))
+            for i in range(10)
+        }
+
+        is_present = ltn.Predicate(func=lambda c, idx: torch.gather(c, 1, idx.long()))
+        is_class = ltn.Predicate(
+            func=lambda l_val, target: (l_val == target).float().unsqueeze(-1)
+        )
+        idx = {
+            name: ltn.Constant(torch.tensor([i]))
+            for i, name in enumerate(self.concept_names)
+        }
+
+        # Rules
+        plane = self.forall_op(
+            ltn.diag(c, l),
+            self.equiv_op(
+                is_class(l, class_targets[0]),
+                self.and_op(
+                    self.and_op(
+                        is_present(c, idx["met"]), # met
+                        self.not_op(is_present(c, idx["ani"])) # not ani
+                    ), 
+                    is_present(c, idx["wng"]) # wing
+                )
+            )
+        )
+
+        car_truck = self.forall_op(
+            ltn.diag(c, l),
+            self.equiv_op(
+                self.or_op(is_class(l, class_targets[1]), is_class(l, class_targets[9])),
+                self.and_op(
+                    self.and_op(
+                        self.and_op(
+                            is_present(c, idx["whl"]), # wheels
+                            self.not_op(is_present(c, idx["wng"])) # not wing
+                        ),
+                        is_present(c, idx["met"]) # metallic
+                    ), 
+                    self.not_op(is_present(c, idx["ani"])) # not animal
+                )
+            )
+        )
+
+        bird = self.forall_op(
+            ltn.diag(c, l),
+            self.equiv_op(
+                is_class(l, class_targets[2]),
+                self.and_op(
+                    self.and_op(
+                        is_present(c, idx["ani"]), # ani
+                        self.not_op(is_present(c, idx["met"])) # not met
+                    ), 
+                    is_present(c, idx["wng"]) # wings
+                )
+            )
+        )
+
+        frog = self.forall_op(
+            ltn.diag(c, l),
+            self.equiv_op(
+                is_class(l, class_targets[6]),
+                self.and_op(
+                    self.and_op(
+                        is_present(c, idx["ani"]), # ani
+                        self.not_op(is_present(c, idx["met"])) # not met
+                    ), 
+                    self.not_op(is_present(c, idx["hai"])) # not hairy
+                )
+            )
+        )
+
+        deer = self.forall_op(
+            ltn.diag(c, l),
+            self.equiv_op(
+                is_class(l, class_targets[4]),
+                self.and_op(
+                    self.and_op(
+                        is_present(c, idx["ani"]), # ani
+                        self.not_op(is_present(c, idx["met"])) # not metal
+                    ),
+                    self.and_op(
+                        self.not_op(is_present(c, idx["wng"])), # not wing
+                        self.and_op(
+                            is_present(c, idx["hai"]), # hairy
+                            is_present(c, idx["hrn"]) # horn
+                        )
+                    )
+                )
+            )
+        )
+
+        dog_equine = self.forall_op(
+            ltn.diag(c, l),
+            self.equiv_op(
+                self.or_op(is_class(l, class_targets[5]), is_class(l, class_targets[7])),
+                self.and_op(
+                    self.and_op(
+                        is_present(c, idx["ani"]), # ani
+                        self.not_op(is_present(c, idx["met"])) # not metal
+                    ),
+                    self.and_op(
+                        self.not_op(is_present(c, idx["wng"])), # not wing
+                        self.and_op(
+                            is_present(c, idx["hai"]), # hairy
+                            self.and_op(
+                                self.not_op(is_present(c, idx["hrn"])), # not horns
+                                is_present(c, idx["snt"]) # long snout
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        ship = self.forall_op(
+            ltn.diag(c, l),
+            self.equiv_op(
+                is_class(l, class_targets[8]),
+                self.and_op(
+                    self.and_op(
+                        is_present(c, idx["met"]), # metal
+                        self.not_op(is_present(c, idx["ani"])) # not animal
+                    ),
+                    self.and_op(
+                        self.not_op(is_present(c, idx["whl"])), # not wheels
+                        self.not_op(is_present(c, idx["wng"])) # not wings
+                    )
+                )
+            )
+        )
+
+        sat_agg = self.sat_agg_op(plane, car_truck, bird, frog, deer, dog_equine, ship)
+
+        return 1 - sat_agg
+
+#
+# CEBAB
+##
+
+
+def cebab_circuit():
+    # 5 concepts, 4 values
+    # concepts: "food", "service", "noise", "ambiance", "rating"
+    # values: "positive", "negative", "neutral", "unknown"
+    possible_worlds = list(product(range(4), repeat=5))
+    n_worlds = len(possible_worlds)
+    n_queries = 5  # "positive", "negative", "neutral", "unknown", "conflict"
+    look_up = {i: c for i, c in zip(range(n_worlds), possible_worlds)}
+    w_q = torch.zeros(n_worlds, n_queries)
+
+
+    for w in range(n_worlds):
+        food, service, noice, ambiance, rating = look_up[w]
+        n_pos = sum([e == 0 for e in [food, service, noice, ambiance, rating]])
+        n_neg = sum([e == 1 for e in [food, service, noice, ambiance, rating]])
+        n_neu = sum([e == 2 for e in [food, service, noice, ambiance, rating]])
+        n_unk = sum([e == 3 for e in [food, service, noice, ambiance, rating]])
+
+        # majority is both positive and negative
+        if n_pos >= max(n_neu, n_unk) and n_pos == n_neg:
+            w_q[w, 4] = 1
+        # majority positive or (positive-unk, positive-neut)
+        elif n_pos >= max(n_neg, n_neu, n_unk):
+            w_q[w, 0] = 1
+        # majority negative  or (negative-unk, negative-neut)
+        elif n_neg >= max(n_pos, n_neu, n_unk):
+            w_q[w, 1] = 1
+        # majority neutral
+        elif n_neu >= max(n_pos, n_neg, n_unk):
+            w_q[w, 2] = 1
+        # majority unknown
+        else:
+            w_q[w, 3] = 1
+    return w_q
+
+
+class cebab_ltn_loss(torch.nn.Module):
+    def __init__(self, equiv_op, forall_op, not_op, and_op, sat_agg_op, or_op):
+        super().__init__()
+
+        self.equiv_op = equiv_op
+        self.forall_op = forall_op
+        self.not_op = not_op
+        self.and_op = and_op
+        self.sat_agg_op = sat_agg_op
+        self.or_op = or_op
+
+    def forward(self, pred_concepts, labels):
+        # sums
+        n_pos = pred_concepts[..., 0].sum(dim=1) 
+        n_neg = pred_concepts[..., 1].sum(dim=1)
+        n_neu = pred_concepts[..., 2].sum(dim=1)
+        n_unk = pred_concepts[..., 3].sum(dim=1)
+
+        v_pos = ltn.Variable("pos", n_pos)
+        v_neg = ltn.Variable("neg", n_neg)
+        v_neu = ltn.Variable("neu", n_neu)
+        v_unk = ltn.Variable("unk", n_unk)
+        l = ltn.Variable("l", labels)
+
+        class_targets = {
+            i: ltn.Constant(torch.tensor([i]))
+            for i in range(5)
+        }
+
+        is_class = ltn.Predicate(
+            func=lambda l_val, target: (l_val == target).float().unsqueeze(-1)
+        )
+
+        ge = ltn.Predicate(
+            func=lambda a, b: torch.sigmoid((a - b))
+        )
+        
+        eq = ltn.Predicate(
+            func=lambda a, b: torch.exp(-torch.abs(a - b))
+        )
+
+        # Conflict: pos >= neu AND pos >= unk AND pos == neg
+        is_conflict = self.forall_op(
+            ltn.diag(v_pos, v_neu, v_unk, v_neg, l),
+            self.equiv_op(
+                is_class(l, class_targets[4]),
+                self.and_op(
+                    ge(v_pos, v_neu),
+                    self.and_op(
+                        ge(v_pos, v_unk),
+                        eq(v_pos, v_neg)
+                    )
+                )
+            )
+        )
+
+        # Positive: pos > neg AND pos >= neu AND pos >= unk
+        is_positive = self.forall_op(
+            ltn.diag(v_pos, v_neu, v_unk, v_neg, l),
+            self.equiv_op(
+                is_class(l, class_targets[0]),
+                self.and_op(
+                    self.and_op(
+                        ge(v_pos, v_neg),
+                        self.not_op(eq(v_pos, v_neg))
+                    ),
+                    self.and_op(
+                        ge(v_pos, v_neu),
+                        ge(v_pos, v_unk)
+                    )
+                )
+            )
+        )
+        
+        # Negative: neg > pos AND neg >= neu AND neg >= unk
+        is_negative = self.forall_op(
+            ltn.diag(v_pos, v_neu, v_unk, v_neg, l),
+            self.equiv_op(
+                is_class(l, class_targets[1]),
+                self.and_op(
+                    self.and_op(
+                        ge(v_neg, v_pos),
+                        self.not_op(eq(v_neg, v_pos))
+                    ),
+                    self.and_op(
+                        ge(v_neg, v_neu),
+                        ge(v_neg, v_unk)
+                    )
+                )
+            )
+        )
+        
+        # Neutral: neu > pos AND neu > neg AND neu >= unk
+        is_neutral = self.forall_op(
+            ltn.diag(v_pos, v_neu, v_unk, v_neg, l),
+            self.equiv_op(
+                is_class(l, class_targets[2]),
+                self.and_op(
+                    self.and_op(
+                        ge(v_neu, v_pos),
+                        self.not_op(eq(v_neu, v_pos))
+                    ),
+                    self.and_op(
+                        self.and_op(
+                            ge(v_neu, v_neg),
+                            self.not_op(eq(v_neu, v_neg))
+                        ),
+                        ge(v_neu, v_unk)
+                    )
+                )
+            )
+        )
+        
+        # Unknown: unk > pos AND unk > neg AND unk > neu
+        is_unknown =  self.forall_op(
+            ltn.diag(v_pos, v_neu, v_unk, v_neg, l),
+            self.equiv_op(
+                is_class(l, class_targets[3]),
+                self.and_op(
+                    self.and_op(
+                        ge(v_unk, v_pos),
+                        self.not_op(eq(v_unk, v_pos))
+                    ),
+                    self.and_op(
+                        self.and_op(
+                            ge(v_unk, v_neg),
+                            self.not_op(eq(v_unk, v_neg))
+                        ),
+                        self.and_op(
+                            ge(v_unk, v_neu),
+                            self.not_op(eq(v_unk, v_neu))
+                        )
+                    )
+                )
+            )
+        )
+
+        sat_agg = self.sat_agg_op(is_conflict, is_positive, is_negative, is_neutral, is_unknown)
+
+        return 1.0 - sat_agg

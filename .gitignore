@@ -30,3 +30,5 @@ CONF*
 *.png
 
 viva.py
+viva_2.py
+.vscode

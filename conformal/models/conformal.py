@@ -21,7 +21,6 @@ class ConformalPredictor:
         multiconcepts=False,
         multilabel=False,
         bonferroni=False,
-        kernelize=False,
     ):
         """
         model: PyTorch model returning (label_pred, concept_pred)
@@ -41,7 +40,6 @@ class ConformalPredictor:
         self.per_concept_thresholds = None
         self.label_threshold = None
         self.bonferroni = bonferroni
-        self.kernelize = kernelize
         self.permutation = None
         self.EMPTY_TOKEN = -1
 
@@ -342,7 +340,7 @@ class ConformalPredictor:
             # Get marginals first
             batch_marginal_sets = self._build_concept_sets_for_batch(conc_pred)
 
-            # Convert to tuples immediately
+            # Convert to tuples immediately if we can
             for sample_marginal in batch_marginal_sets:
                 tuples = self._generate_combinations(sample_marginal)
                 all_tuple_sets.append(tuples)
@@ -625,10 +623,11 @@ class ConformalPredictor:
             batch_marginal = self._build_concept_sets_for_batch(conc_pred)
 
             batch_tuples = []
+
+            # do the kernel later only when required
             for sample_m in batch_marginal:
                 sample_tuples = self._generate_combinations(sample_m)
                 batch_tuples.append(sample_tuples)
-
             all_concept_tuples.extend(batch_tuples)
 
             # Build Label Sets

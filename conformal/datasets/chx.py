@@ -20,7 +20,7 @@ def configure_global_arguments(parser):
         "--chx-multi-class",
         action="store_true",
         default=False,
-        help="Divide the Abnormal/Healthy into 4 classes",
+        help="Divide the Abnormal/Healthy into 5 classes",
     )
 
 
@@ -65,6 +65,7 @@ class CHXLoader:
         self.label_weights = []
         self.concepts_weights = []
         self.chx_multi_class = chx_multi_class
+        self.concept_dim = 4
 
     def _download_and_extract_needed(self, needed_filenames):
         """Downloads NIH tarballs only to extract specific annotated images."""
@@ -232,14 +233,14 @@ class CHXLoader:
         if not self.chx_multi_class:
             logic = HardLogic(
                 lambda x: (np.sum(x, axis=1) == 0).astype(np.int64),
-                n_concepts=1,
-                concept_dim=4,
+                n_concepts=self.concept_dim,
+                concept_dim=2,
             )
         else:
             logic = HardLogic(
                 lambda x: np.sum(x, axis=1).astype(np.int64),
-                n_concepts=1,
-                concept_dim=4,
+                n_concepts=self.concept_dim,
+                concept_dim=2,
             )
 
         return (
@@ -247,7 +248,7 @@ class CHXLoader:
             CHXDataset(x_val, c_val, y_val, transform),
             CHXDataset(x_test, c_test, y_test, transform),
             (3, 224, 224),
-            4,
+            self.concept_dim,
             n_classes,
             1,
             class_names,

@@ -25,7 +25,7 @@ class NeSyModel(nn.Module):
 
     def get_concepts(self, x):
         """Common logic for extracting concepts from the encoder."""
-        if self.dataset in ["boia", "chx", "derma"]:
+        if self.dataset in ["boia", "chx", "derma", "cifar", "rival"]:
             # Independent binary concepts
             c = torch.sigmoid(self.encoder(x))
             c = torch.stack([1 - c, c], dim=-1)
@@ -42,10 +42,12 @@ class NeSyModel(nn.Module):
 
             return y, concepts, extra
         else:
-
-            xs = torch.chunk(x, self.n_images, dim=-1)
-            concepts = [self.get_concepts(xi) for xi in xs]
-            concepts = torch.stack(concepts, dim=1)
+            if self.dataset == "cebab":
+                concepts = self.get_concepts(x)
+            else:
+                xs = torch.chunk(x, self.n_images, dim=-1)
+                concepts = [self.get_concepts(xi) for xi in xs]
+                concepts = torch.stack(concepts, dim=1)
 
             # inference
             y, extra = self.inference(concepts, eval=eval)

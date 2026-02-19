@@ -8,44 +8,44 @@ CS := 0.0 1.0
 run_mnist:
 	@for seed in $(SEEDS); do \
 		# Run mnistadd (digit=2) \
-		echo "Running seed=$$seed, epochs=5, digit=2 (mnistadd)"; \
-		python -m conformal --seed $$seed CONF_MNIST train \
+		echo "Running seed=$$seed, epochs=3, digit=2 (mnistadd)"; \
+		python -m conformal --seed $$seed CONF_MNIST_3_EP train \
 			--concept-sup 0.0 \
-			--epochs 4 \
+			--epochs 3 \
 			mnistadd \
 			lenet dpl; \
-		python -m conformal --seed $$seed CONF_MNIST test \
+		python -m conformal --seed $$seed CONF_MNIST_3_EP test \
 			--concept-sup 0.0 \
-			--epochs 4 \
+			--epochs 3 \
 			mnistadd \
 			lenet dpl; \
 		\
 		# Run mnistaddn for multiple digits \
 		for digit in $(DIGITS); do \
-			echo "Running seed=$$seed, epochs=5, digit=$$digit (mnistaddn)"; \
-			python -m conformal --seed $$seed CONF_MNIST train \
+			echo "Running seed=$$seed, epochs=3, digit=$$digit (mnistaddn)"; \
+			python -m conformal --seed $$seed CONF_MNIST_3_EP train \
 				--concept-sup 0.0 \
-				--epochs 4 \
+				--epochs 3 \
 				mnistaddn --n-digits $$digit \
 				lenet dpl; \
-			python -m conformal --seed $$seed CONF_MNIST test \
+			python -m conformal --seed $$seed CONF_MNIST_3_EP test \
 				--concept-sup 0.0 \
-				--epochs 4 \
+				--epochs 3 \
 				mnistaddn --n-digits $$digit \
 				lenet dpl; \
 		done; \
 	done; \
 	echo "Running analyze (mnistaddn)"; \
-	python -m conformal CONF_MNIST analyze \
+	python -m conformal CONF_MNIST_3_EP analyze \
 		--concept-sup 0.0 \
-		--epochs 4 \
+		--epochs 3 \
 		mnistadd \
 		lenet dpl; \
 	for digit in $(DIGITS); do \
-		echo "Running analyze epochs=5, digit=$$digit (mnistaddn)"; \
-		python -m conformal CONF_MNIST analyze \
+		echo "Running analyze epochs=3, digit=$$digit (mnistaddn)"; \
+		python -m conformal CONF_MNIST_3_EP analyze \
 			--concept-sup 0.0 \
-			--epochs 4 \
+			--epochs 3 \
 			mnistaddn --n-digits $$digit \
 			lenet dpl; \
 	done;
@@ -53,16 +53,16 @@ run_mnist:
 
 run_mnist_analysis_only:
 	echo "Running analyze (mnistaddn)"; \
-	python -m conformal CONF_MNIST analyze \
+	python -m conformal CONF_MNIST_3_EP analyze \
 		--concept-sup 0.0 \
-		--epochs 5 \
+		--epochs 3 \
 		mnistadd \
 		lenet dpl; \
 	for digit in $(DIGITS); do \
-		echo "Running analyze epochs=5, digit=$$digit (mnistaddn)"; \
-		python -m conformal CONF_MNIST analyze \
+		echo "Running analyze epochs=3, digit=$$digit (mnistaddn)"; \
+		python -m conformal CONF_MNIST_3_EP analyze \
 			--concept-sup 0.0 \
-			--epochs 5 \
+			--epochs 3 \
 			mnistaddn --n-digits $$digit \
 			lenet dpl; \
 	done;
@@ -76,12 +76,12 @@ run_chx:
 				--concept-sup $$cs \
 				--epochs 20 \
 				chx --chx-multi-class \
-				resnet18 dpl; \
+				resnet18 --pretrained dpl; \
 			python -m conformal --seed $$seed CONF_CHX test \
 				--concept-sup $$cs \
 				--epochs 20 \
 				chx --chx-multi-class \
-				resnet18 dpl; \
+				resnet18 --pretrained dpl; \
 		done; \
 	done; \
 	\
@@ -91,7 +91,7 @@ run_chx:
 			--concept-sup $$cs \
 			--epochs 20 \
 			chx --chx-multi-class \
-			resnet18 dpl; \
+			resnet18 --pretrained dpl; \
 	done;
 
 run_chx_analysis_only:
@@ -101,5 +101,5 @@ run_chx_analysis_only:
 			--concept-sup $$cs \
 			--epochs 20 \
 			chx --chx-multi-class \
-			resnet18 dpl; \
+			resnet18 --pretrained dpl; \
 	done;
