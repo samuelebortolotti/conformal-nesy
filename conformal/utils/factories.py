@@ -14,6 +14,7 @@ from conformal.datasets.cifar import CIFAR10Loader
 from conformal.datasets.cebab import CeBaBLoader
 from conformal.models.bert import Bert
 from conformal.models.lama import Lama
+from conformal.models.mpnet import MPNetSentence
 from conformal.models.dpl import DPL
 from conformal.models.ltn import LTN
 from conformal.models.linear_predictor import LinearPredictor
@@ -48,6 +49,8 @@ class NetworkFactory:
             return Bert(num_concepts=n_images, num_concept_dim=output_dim)
         elif name.lower() == "lama":
             return Lama(num_concepts=n_images, num_concept_dim=output_dim)
+        elif name.lower() == "mpnet":
+            return MPNetSentence(num_concepts=n_images, num_concept_dim=output_dim)
         else:
             raise ValueError(f"Unknown network type: {name}")
 
@@ -79,6 +82,8 @@ class DatasetFactory:
                 tokenizer = "bert-base-uncased"
             elif args.model == "lama":
                 tokenizer = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+            elif args.model == "mpnet":
+                tokenizer = "sentence-transformers/all-mpnet-base-v2"
             else:
                 raise ValueError(f"Unknown tokenizer for CeBaB instantiation: {args.model} chosen")
             return CeBaBLoader(tokenizer_name=tokenizer, **kwargs).load()

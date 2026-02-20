@@ -29,7 +29,7 @@ MODELS_RIVAL=("resnet18")
 
 # CEBAB
 DATASETS_CEBAB=("cebab")
-MODELS_CEBAB=("bert" "lama")
+MODELS_CEBAB=("bert" "lama" "mpnet")
 
 NESY_VARIANTS=("dpl" "ltn")
 CONCEPT_SUPS=("0.0" "1.0")
@@ -78,7 +78,7 @@ run_job() {
     "${CMD[@]}" > "${OUTPUT_DIR}/log.txt" 2>&1
 
     local STATUS=$?
-    if [ -ne 0 ]; then
+    if [ "STATUS" -ne 0 ]; then
         echo "Run FAILED: $RUN_NAME (see ${OUTPUT_DIR}/log.txt)"
         if [ "$STOP_ON_FAILURE" = true ]; then
             echo "Stopping script due to failure."

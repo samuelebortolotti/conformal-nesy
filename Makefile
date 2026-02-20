@@ -8,44 +8,44 @@ CS := 0.0 1.0
 run_mnist:
 	@for seed in $(SEEDS); do \
 		# Run mnistadd (digit=2) \
-		echo "Running seed=$$seed, epochs=3, digit=2 (mnistadd)"; \
-		python -m conformal --seed $$seed CONF_MNIST_3_EP train \
+		echo "Running seed=$$seed, epochs=4, digit=2 (mnistadd)"; \
+		python -m conformal --seed $$seed CONF_MNIST_4_EP train \
 			--concept-sup 0.0 \
-			--epochs 3 \
+			--epochs 4 \
 			mnistadd \
 			lenet dpl; \
-		python -m conformal --seed $$seed CONF_MNIST_3_EP test \
+		python -m conformal --seed $$seed CONF_MNIST_4_EP test \
 			--concept-sup 0.0 \
-			--epochs 3 \
+			--epochs 4 \
 			mnistadd \
 			lenet dpl; \
 		\
 		# Run mnistaddn for multiple digits \
 		for digit in $(DIGITS); do \
-			echo "Running seed=$$seed, epochs=3, digit=$$digit (mnistaddn)"; \
-			python -m conformal --seed $$seed CONF_MNIST_3_EP train \
+			echo "Running seed=$$seed, epochs=4, digit=$$digit (mnistaddn)"; \
+			python -m conformal --seed $$seed CONF_MNIST_4_EP train \
 				--concept-sup 0.0 \
-				--epochs 3 \
+				--epochs 4 \
 				mnistaddn --n-digits $$digit \
 				lenet dpl; \
-			python -m conformal --seed $$seed CONF_MNIST_3_EP test \
+			python -m conformal --seed $$seed CONF_MNIST_4_EP test \
 				--concept-sup 0.0 \
-				--epochs 3 \
+				--epochs 4 \
 				mnistaddn --n-digits $$digit \
 				lenet dpl; \
 		done; \
 	done; \
 	echo "Running analyze (mnistaddn)"; \
-	python -m conformal CONF_MNIST_3_EP analyze \
+	python -m conformal CONF_MNIST_4_EP analyze \
 		--concept-sup 0.0 \
-		--epochs 3 \
+		--epochs 4 \
 		mnistadd \
 		lenet dpl; \
 	for digit in $(DIGITS); do \
-		echo "Running analyze epochs=3, digit=$$digit (mnistaddn)"; \
-		python -m conformal CONF_MNIST_3_EP analyze \
+		echo "Running analyze epochs=4, digit=$$digit (mnistaddn)"; \
+		python -m conformal CONF_MNIST_4_EP analyze \
 			--concept-sup 0.0 \
-			--epochs 3 \
+			--epochs 4 \
 			mnistaddn --n-digits $$digit \
 			lenet dpl; \
 	done;
@@ -53,16 +53,16 @@ run_mnist:
 
 run_mnist_analysis_only:
 	echo "Running analyze (mnistaddn)"; \
-	python -m conformal CONF_MNIST_3_EP analyze \
+	python -m conformal CONF_MNIST_4_EP analyze \
 		--concept-sup 0.0 \
-		--epochs 3 \
+		--epochs 4 \
 		mnistadd \
 		lenet dpl; \
 	for digit in $(DIGITS); do \
-		echo "Running analyze epochs=3, digit=$$digit (mnistaddn)"; \
-		python -m conformal CONF_MNIST_3_EP analyze \
+		echo "Running analyze epochs=4, digit=$$digit (mnistaddn)"; \
+		python -m conformal CONF_MNIST_4_EP analyze \
 			--concept-sup 0.0 \
-			--epochs 3 \
+			--epochs 4 \
 			mnistaddn --n-digits $$digit \
 			lenet dpl; \
 	done;
@@ -101,5 +101,79 @@ run_chx_analysis_only:
 			--concept-sup $$cs \
 			--epochs 20 \
 			chx --chx-multi-class \
+			resnet18 --pretrained dpl; \
+	done;
+
+
+run_rival:
+	@for seed in $(SEEDS); do \
+		for cs in $(CS); do \
+			echo "Running seed=$$seed, epochs=20, cs=$$cs"; \
+			python -m conformal --seed $$seed CONF_RIVAL train \
+				--concept-sup $$cs \
+				--epochs 20 \
+				rival \
+				resnet18 dpl; \
+			python -m conformal --seed $$seed CONF_RIVAL test \
+				--concept-sup $$cs \
+				--epochs 20 \
+				rival \
+				resnet18 dpl; \
+		done; \
+	done; \
+	\
+	for cs in $(CS); do \
+		echo "Running analyze epochs=20, cs=$$cs"; \
+		python -m conformal CONF_RIVAL analyze \
+			--concept-sup $$cs \
+			--epochs 20 \
+			rival \
+			resnet18 dpl; \
+	done;
+
+run_rival_analysis_only:
+	for cs in $(CS); do \
+		echo "Running analyze epochs=20, cs=$$cs"; \
+		python -m conformal CONF_RIVAL analyze \
+			--concept-sup $$cs \
+			--epochs 20 \
+			rival \
+			resnet18 dpl; \
+	done;
+
+
+run_cifar:
+	@for seed in $(SEEDS); do \
+		for cs in $(CS); do \
+			echo "Running seed=$$seed, epochs=20, cs=$$cs"; \
+			python -m conformal --seed $$seed CONF_CIFAR train \
+				--concept-sup $$cs \
+				--epochs 20 \
+				cifar \
+				resnet18 --pretrained dpl; \
+			python -m conformal --seed $$seed CONF_CIFAR test \
+				--concept-sup $$cs \
+				--epochs 20 \
+				cifar \
+				resnet18 --pretrained dpl; \
+		done; \
+	done; \
+	\
+	for cs in $(CS); do \
+		echo "Running analyze epochs=20, cs=$$cs"; \
+		python -m conformal CONF_CIFAR analyze \
+			--concept-sup $$cs \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained dpl; \
+	done;
+
+run_cifar_analysis_only:
+	for cs in $(CS); do \
+		echo "Running analyze epochs=20, cs=$$cs"; \
+		python -m conformal CONF_CIFAR analyze \
+			--concept-sup $$cs \
+			--epochs 20 \
+			cifar \
 			resnet18 --pretrained dpl; \
 	done;

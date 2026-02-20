@@ -11,7 +11,7 @@ class Bert(BaseLM):
         self,
         num_concept_dim=4,
         num_concepts=5,
-        freeze_encoder=False,
+        freeze_encoder=True,
     ):
         super().__init__(
             model_name="bert-base-uncased",

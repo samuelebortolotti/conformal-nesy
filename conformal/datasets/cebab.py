@@ -8,7 +8,7 @@ from transformers import AutoTokenizer
 from torch.utils.data import Dataset
 
 from conformal.utils.logic import HardLogic
-from conformal.models import bert, lama
+from conformal.models import bert, lama, mpnet
 
 
 def configure_global_arguments(parser):
@@ -230,3 +230,4 @@ def configure_subparsers(subparsers):
     sub = cebab_parser.add_subparsers(dest="model")
     bert.configure_subparsers(sub)
     lama.configure_subparsers(sub)
+    mpnet.configure_subparsers(sub)

@@ -11,7 +11,7 @@ class Lama(BaseLM):
         self,
         num_concept_dim=4,
         num_concepts=5,
-        freeze_encoder=False,
+        freeze_encoder=True,
     ):
         super().__init__(
             model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
