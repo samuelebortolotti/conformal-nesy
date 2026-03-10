@@ -527,9 +527,47 @@ class ConformalPredictor:
             cursor += count
 
         return batch_label_sets
+    
+    @torch.no_grad()
+    def predict_labels(self, dl, batch_tuples=None, use_hard_logic=False):
+        """
+        Predict conformal label sets for all samples in a dataloader.
+
+        Returns:
+            all_label_sets[sample] = array/list of included labels
+        """
+
+        self.model.eval()
+        all_label_sets = []
+        tuple_idx = 0
+
+        for data, _, _ in dl:
+            data = data.to(self.device)
+
+            # forward pass
+            label_pred, _, _ = self.model(data, eval=True)
+
+            if use_hard_logic:
+                if batch_tuples is None:
+                    raise ValueError("batch_tuples required when use_hard_logic=True")
+
+                current_batch_tuples = batch_tuples[tuple_idx: tuple_idx + data.size(0)]
+                batch_label_sets = self.predict_label_set(
+                    label_pred=None,
+                    batch_tuples=current_batch_tuples,
+                    use_hard_logic=True
+                )
+                tuple_idx += data.size(0)
+            else:
+                batch_label_sets = self.predict_label_set(label_pred)
+
+            all_label_sets.extend(batch_label_sets)
+
+        return all_label_sets
+
 
     @torch.no_grad()
-    def predict_labels(self, label_pred, batch_tuples=None, use_hard_logic=False):
+    def predict_label_set(self, label_pred, batch_tuples=None, use_hard_logic=False):
         """
         Builds conformal label prediction sets.
         """
@@ -635,7 +673,7 @@ class ConformalPredictor:
             all_concept_tuples.extend(batch_tuples)
 
             # Build Label Sets
-            batch_label_sets = self.predict_labels(
+            batch_label_sets = self.predict_label_set(
                 label_pred, batch_tuples=batch_tuples, use_hard_logic=use_hard_logic
             )
             all_label_sets.extend(batch_label_sets)

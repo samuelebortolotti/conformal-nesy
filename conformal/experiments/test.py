@@ -364,10 +364,9 @@ def conformal_evaluation(
     log("Calibrating concept thresholds...", "INFO")
     cp.calibrate_per_concept(val_dl, alpha=alpha_concepts)
 
-    log("Predicting conformal sets on the test set...", "INFO")
+    log("Predicting concept conformal sets on the test set...", "INFO")
     concept_sets = cp.predict_concepts(test_dl)
 
-    # Same as for NeSy standard
     log(f"[Conformal Concepts Only] Label Coverage: {label_coverage:.4f}", "INFO")
     log(f"[Conformal Concepts Only] Label Set Size: {label_size:.4f}", "INFO")
 
@@ -401,10 +400,67 @@ def conformal_evaluation(
         is_image=is_image,
     )
 
-    log("=== 3. Conformal (Calibrating both concepts and labels) ===", "INFO")
+    log("=== 3. Conformal (Calibrating labels) ===", "INFO")
 
     log("Calibrating label thresholds...", "INFO")
     cp.calibrate_labels(val_dl, alpha=alpha_label)
+
+    log("Predicting label conformal sets on the test set...", "INFO")
+    label_sets = cp.predict_labels(
+        test_dl, use_hard_logic=False
+    )
+
+    label_coverage, label_size = conformal_metrics(
+        label_sets, np.expand_dims(all_labels, axis=1)
+    )
+
+    concept_coverage, concept_set_size = conformal_metrics(
+        np.expand_dims(all_c, axis=1), all_g
+    )
+
+    log(
+        f"[Conformal only Labels] Label Coverage: {label_coverage:.4f}",
+        "INFO",
+    )
+    log(
+        f"[Conformal only Labels] Label Set Size: {label_size:.4f}", "INFO"
+    )
+    log(
+        f"[Conformal only Labels] Concept Coverage: {concept_coverage:.4f}",
+        "INFO",
+    )
+    log(
+        f"[Conformal only Labels] Concept Set Size: {concept_set_size:.4f}", "INFO"
+    )
+
+    concept_consistency, label_consistency = prediction_consistency(
+        np.expand_dims(all_c, axis=1), label_sets, logic
+    )
+
+    log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
+    log(f"Label Consistency: {label_consistency:.4f}", "INFO")
+
+    results_storage["Conformal only Labels"] = {
+        "coverage_concepts": concept_coverage,
+        "concept_size": concept_set_size,
+        "coverage_labels": label_coverage,
+        "label_size": label_size,
+        "concept_consistency": concept_consistency,
+        "label_consistency": label_consistency,
+    }
+
+    save_visual_examples(
+        test_dl.dataset,
+        np.expand_dims(all_c, axis=1),
+        label_sets,
+        "Conformal only Labels",
+        args.output_dir_path,
+        is_image=is_image,
+    )
+
+    log("=== 4. Conformal (Calibrating both concepts and labels) ===", "INFO")
+
+    log("Predicting conformal sets on the test set...", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=False, concept_refinement=False, label_refinement=False
@@ -413,6 +469,7 @@ def conformal_evaluation(
     label_coverage, label_size = conformal_metrics(
         label_sets, np.expand_dims(all_labels, axis=1)
     )
+    concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
 
     log(
         f"[Conformal both Concepts and Labels] Label Coverage: {label_coverage:.4f}",
@@ -447,7 +504,7 @@ def conformal_evaluation(
         is_image=is_image,
     )
 
-    log("=== 4. Conformal (Hard Logic) ===", "INFO")
+    log("=== 5. Conformal (Hard Logic) ===", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=True, concept_refinement=False, label_refinement=False
@@ -485,7 +542,7 @@ def conformal_evaluation(
         is_image=is_image,
     )
 
-    log("=== 5. Conformal with Abduction ===", "INFO")
+    log("=== 6. Conformal with Abduction ===", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl,
@@ -532,7 +589,7 @@ def conformal_evaluation(
         is_image=is_image,
     )
 
-    log("=== 6. Conformal with Concept Refinement ===", "INFO")
+    log("=== 7. Conformal with Concept Refinement ===", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=False, concept_refinement=True, label_refinement=False
@@ -585,7 +642,7 @@ def conformal_evaluation(
         "label_consistency": label_consistency,
     }
 
-    log("=== 7. Conformal with Label Refinement ===", "INFO")
+    log("=== 8. Conformal with Label Refinement ===", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=False, concept_refinement=False, label_refinement=True
@@ -638,7 +695,7 @@ def conformal_evaluation(
         "label_consistency": label_consistency,
     }
 
-    log("=== 8. Conformal with Concept and Label Refinement ===", "INFO")
+    log("=== 9. Conformal with Concept and Label Refinement ===", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=False, concept_refinement=True, label_refinement=True

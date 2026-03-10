@@ -203,13 +203,14 @@ def flatten_results(seed, results_dict):
 def beautify_method_names(table_df, nesy_method):
     row_map = {
         "No Conformal": nesy_method.upper(),
-        "Conformal Concepts Only": "CC",
-        "Conformal Hard Logic": "CH",
-        "Conformal both Concepts and Labels": "CCL",
-        "Conformal with Abduction": "CAB",
-        "Conformal both Concepts and Labels with Concept Refinement": "CCLRefC",
-        "Conformal both Concepts and Labels with Label Refinement": "CCLRefL",
-        "Conformal both Concepts and Labels with Concept and Label Refinement": "CCLRefBoth",
+        "Conformal Concepts Only": "CO",
+        "Conformal Hard Logic": "CC",
+        "Conformal both Concepts and Labels": "CL",
+        "Conformal with Abduction": "TC",
+        "Conformal only Labels": "LO",
+        "Conformal both Concepts and Labels with Concept Refinement": "JCC",
+        "Conformal both Concepts and Labels with Label Refinement": "JCL",
+        "Conformal both Concepts and Labels with Concept and Label Refinement": "JC",
     }
 
     return table_df.rename(index=row_map)
@@ -262,10 +263,10 @@ def generate_latex_table(rows, nesy_method):
 
     desired_order = [
         nesy_name, # "CC",
-        "CH",
-        "CAB",
-        "CCL", #"CCLRefC", #"CCLRefL",
-        "CCLRefBoth",
+        "TC",
+        "CC",
+        "CL", #"CCLRefC", #"CCLRefL",
+        "JC",
     ]
 
     table_df = table_df.reindex(desired_order)
