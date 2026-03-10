@@ -34,9 +34,10 @@ from conformal.datasets import (
     mnisthalf,
     mnistsump,
     mnistaddn,
+    mnistevenodd,
     cifar,
     rival,
-    cebab
+    cebab,
 )
 
 
@@ -90,6 +91,7 @@ def test_parser(parser):
     cifar.configure_subparsers(subparsers)
     rival.configure_subparsers(subparsers)
     cebab.configure_subparsers(subparsers)
+    mnistevenodd.configure_subparsers(subparsers)
 
 
 def configure_subparsers(subparsers):
@@ -269,15 +271,23 @@ def conformal_evaluation(
     log(f"Test YECE: {test_yece:.4f}", "INFO")
     log(f"Test CECE: {test_cece:.4f}", "INFO")
 
-    all_labels, all_preds, all_g, all_c, _, _, _ = collect_predictions(
+    all_labels, all_preds, all_g, all_c, _, all_raw_out_pred, all_conc_pred = collect_predictions(
         model,
         args.dataset,
         test_dl,
         device,
+        args.nesy,
         multiclass=True,  # To get the separated G
         multilabel=multilabel,
         permutation=permutation,
     )
+
+    # print(all_c[3447], all_g[3447], all_labels[3447], all_conc_pred[3447], all_raw_out_pred[3447])
+    # a = np.matmul(np.expand_dims(all_conc_pred[3447][0], axis=1), np.expand_dims(all_conc_pred[3447][1], axis=0))
+    # a = a.reshape(-1)
+    # print(np.argmax(a), np.max(a), np.sort(a)[-5:], np.argsort(a)[-3:][::-1])            
+    # print(np.sort(all_raw_out_pred[3447])[-5:], np.argsort(all_raw_out_pred[3447])[-3:][::-1])   
+    # quit()
 
     if args.concept_supervision == 0.0 and args.nesy not in ["dpl", "ltn"]:
         log("> Concept confusion matrix after permutation...", "INFO")
@@ -475,7 +485,54 @@ def conformal_evaluation(
         is_image=is_image,
     )
 
-    log("=== 5. Conformal with Concept Refinement ===", "INFO")
+    log("=== 5. Conformal with Abduction ===", "INFO")
+
+    concept_sets, label_sets = cp.predict_concepts_and_labels(
+        test_dl,
+        use_hard_logic=False,
+        concept_refinement=False,
+        label_refinement=False,
+        abduction=True,
+    )
+
+    label_coverage, label_size = conformal_metrics(
+        label_sets, np.expand_dims(all_labels, axis=1)
+    )
+
+    concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
+
+    log(f"[Conformal with Abduction] Label Coverage: {label_coverage:.4f}", "INFO")
+    log(f"[Conformal with Abduction] Label Set Size: {label_size:.4f}", "INFO")
+
+    log(f"[Conformal with Abduction] Concept Coverage: {concept_coverage:.4f}", "INFO")
+    log(f"[Conformal with Abduction] Concept Set Size: {concept_set_size:.4f}", "INFO")
+
+    concept_consistency, label_consistency = prediction_consistency(
+        concept_sets, label_sets, logic
+    )
+
+    log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
+    log(f"Label Consistency: {label_consistency:.4f}", "INFO")
+
+    results_storage["Conformal with Abduction"] = {
+        "coverage_concepts": concept_coverage,
+        "concept_size": concept_set_size,
+        "coverage_labels": label_coverage,
+        "label_size": label_size,
+        "concept_consistency": concept_consistency,
+        "label_consistency": label_consistency,
+    }
+
+    save_visual_examples(
+        test_dl.dataset,
+        concept_sets,
+        label_sets,
+        "Conformal with Abduction",
+        args.output_dir_path,
+        is_image=is_image,
+    )
+
+    log("=== 6. Conformal with Concept Refinement ===", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=False, concept_refinement=True, label_refinement=False
@@ -528,7 +585,7 @@ def conformal_evaluation(
         "label_consistency": label_consistency,
     }
 
-    log("=== 6. Conformal with Label Refinement ===", "INFO")
+    log("=== 7. Conformal with Label Refinement ===", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=False, concept_refinement=False, label_refinement=True
@@ -581,7 +638,7 @@ def conformal_evaluation(
         "label_consistency": label_consistency,
     }
 
-    log("=== 7. Conformal with Concept and Label Refinement ===", "INFO")
+    log("=== 8. Conformal with Concept and Label Refinement ===", "INFO")
 
     concept_sets, label_sets = cp.predict_concepts_and_labels(
         test_dl, use_hard_logic=False, concept_refinement=True, label_refinement=True
@@ -665,7 +722,9 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
 
     log("Loading the model", "INFO")
 
-    model = NetworkFactory.get_network(args.model, input_dim, concept_dim, args, n_images)
+    model = NetworkFactory.get_network(
+        args.model, input_dim, concept_dim, args, n_images
+    )
     model = NeSyFactory.get_nesy_model(
         args.nesy, n_images, model, concept_dim, output_dim, device, logic, args
     )

@@ -5,175 +5,1553 @@ CS := 0.0 1.0
 
 .PHONY: run_mnist run_chx
 
+# MNIST
+
 run_mnist:
 	@for seed in $(SEEDS); do \
 		# Run mnistadd (digit=2) \
-		echo "Running seed=$$seed, epochs=4, digit=2 (mnistadd)"; \
-		python -m conformal --seed $$seed CONF_MNIST_4_EP train \
+		echo "Running seed=$$seed, epochs=20, digit=2 (mnistadd)"; \
+		python -m conformal --seed $$seed CONF_MNIST_20_EP train \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 4 \
+			--epochs 20 \
 			mnistadd \
 			lenet dpl; \
-		python -m conformal --seed $$seed CONF_MNIST_4_EP test \
+		python -m conformal --seed $$seed CONF_MNIST_20_EP train \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 4 \
+			--epochs 20 \
+			mnistadd \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+		python -m conformal --seed $$seed CONF_MNIST_20_EP test \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
 			mnistadd \
 			lenet dpl; \
+		python -m conformal --seed $$seed CONF_MNIST_20_EP test \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistadd \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
 		\
 		# Run mnistaddn for multiple digits \
 		for digit in $(DIGITS); do \
-			echo "Running seed=$$seed, epochs=4, digit=$$digit (mnistaddn)"; \
-			python -m conformal --seed $$seed CONF_MNIST_4_EP train \
+			echo "Running seed=$$seed, epochs=20, digit=$$digit (mnistaddn)"; \
+			python -m conformal --seed $$seed CONF_MNIST_20_EP train \
+				--learning-rate 0.1 \
+				--momentum 0.1 \
+				--batch-size 32 \
+				--opt sgd \
 				--concept-sup 0.0 \
-				--epochs 4 \
+				--epochs 20 \
 				mnistaddn --n-digits $$digit \
 				lenet dpl; \
-			python -m conformal --seed $$seed CONF_MNIST_4_EP test \
+			python -m conformal --seed $$seed CONF_MNIST_20_EP test \
+				--learning-rate 0.1 \
+				--momentum 0.1 \
+				--batch-size 32 \
+				--opt sgd \
 				--concept-sup 0.0 \
-				--epochs 4 \
+				--epochs 20 \
 				mnistaddn --n-digits $$digit \
 				lenet dpl; \
+			python -m conformal --seed $$seed CONF_MNIST_20_EP test \
+				--learning-rate 0.1 \
+				--momentum 1e-05 \
+				--batch-size 64 \
+				--opt sgd \
+				--concept-sup 0.0 \
+				--epochs 20 \
+				mnistaddn --n-digits $$digit \
+				lenet ltn \
+				--and_op prod \
+				--or_op prod \
+				--imp_op prod \
+				--p 8; \
 		done; \
 	done; \
 	echo "Running analyze (mnistaddn)"; \
-	python -m conformal CONF_MNIST_4_EP analyze \
+	python -m conformal CONF_MNIST_20_EP analyze \
+		--learning-rate 0.1 \
+		--momentum 0.1 \
+		--batch-size 32 \
+		--opt sgd \
 		--concept-sup 0.0 \
-		--epochs 4 \
+		--epochs 20 \
 		mnistadd \
 		lenet dpl; \
+	python -m conformal CONF_MNIST_20_EP analyze \
+		--learning-rate 0.1 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistadd \
+		lenet ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 8; \
 	for digit in $(DIGITS); do \
-		echo "Running analyze epochs=4, digit=$$digit (mnistaddn)"; \
-		python -m conformal CONF_MNIST_4_EP analyze \
+		echo "Running analyze epochs=20, digit=$$digit (mnistaddn)"; \
+		python -m conformal CONF_MNIST_20_EP analyze \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 4 \
+			--epochs 20 \
 			mnistaddn --n-digits $$digit \
 			lenet dpl; \
+		python -m conformal CONF_MNIST_20_EP analyze \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistaddn --n-digits $$digit \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+	done;
+
+run_mnist_test:
+	@for seed in $(SEEDS); do \
+		# Run mnistadd (digit=2) \
+		echo "Running seed=$$seed, epochs=20, digit=2 (mnistadd)"; \
+		python -m conformal --seed $$seed CONF_MNIST_20_EP test \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistadd \
+			lenet dpl; \
+		\
+		python -m conformal --seed $$seed CONF_MNIST_20_EP test \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistadd \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+		\
+		# Run mnistaddn for multiple digits \
+		for digit in $(DIGITS); do \
+			echo "Running seed=$$seed, epochs=20, digit=$$digit (mnistaddn)"; \
+			python -m conformal --seed $$seed CONF_MNIST_20_EP test \
+				--learning-rate 0.1 \
+				--momentum 1e-05 \
+				--batch-size 64 \
+				--opt sgd \
+				--concept-sup 0.0 \
+				--epochs 20 \
+				mnistaddn --n-digits $$digit \
+				lenet dpl; \
+			python -m conformal --seed $$seed CONF_MNIST_20_EP test \
+				--learning-rate 0.1 \
+				--momentum 1e-05 \
+				--batch-size 64 \
+				--opt sgd \
+				--concept-sup 0.0 \
+				--epochs 20 \
+				mnistaddn --n-digits $$digit \
+				lenet ltn \
+				--and_op prod \
+				--or_op prod \
+				--imp_op prod \
+				--p 8; \
+		done; \
+	done; \
+	echo "Running analyze (mnistaddn)"; \
+	python -m conformal CONF_MNIST_20_EP analyze \
+		--learning-rate 0.1 \
+		--momentum 0.1 \
+		--batch-size 32 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistadd \
+		lenet dpl; \
+	python -m conformal CONF_MNIST_20_EP analyze \
+		--learning-rate 0.1 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistadd \
+		lenet ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 8; \
+	for digit in $(DIGITS); do \
+		echo "Running analyze epochs=20, digit=$$digit (mnistaddn)"; \
+		python -m conformal CONF_MNIST_20_EP analyze \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistaddn --n-digits $$digit \
+			lenet dpl; \
+		python -m conformal CONF_MNIST_20_EP analyze \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistaddn --n-digits $$digit \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
 	done;
 
 
 run_mnist_analysis_only:
 	echo "Running analyze (mnistaddn)"; \
-	python -m conformal CONF_MNIST_4_EP analyze \
+	python -m conformal CONF_MNIST_20_EP analyze \
+		--learning-rate 0.1 \
+		--momentum 0.1 \
+		--batch-size 32 \
+		--opt sgd \
 		--concept-sup 0.0 \
-		--epochs 4 \
+		--epochs 20 \
 		mnistadd \
 		lenet dpl; \
+	python -m conformal CONF_MNIST_20_EP analyze \
+		--learning-rate 0.1 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistadd \
+		lenet ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 8; \
 	for digit in $(DIGITS); do \
-		echo "Running analyze epochs=4, digit=$$digit (mnistaddn)"; \
-		python -m conformal CONF_MNIST_4_EP analyze \
+		echo "Running analyze epochs=20, digit=$$digit (mnistaddn)"; \
+		python -m conformal CONF_MNIST_20_EP analyze \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 4 \
+			--epochs 20 \
 			mnistaddn --n-digits $$digit \
 			lenet dpl; \
+		python -m conformal CONF_MNIST_20_EP analyze \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistaddn --n-digits $$digit \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
 	done;
 
+# CHX
 
 run_chx:
 	@for seed in $(SEEDS); do \
-		for cs in $(CS); do \
-			echo "Running seed=$$seed, epochs=20, cs=$$cs"; \
-			python -m conformal --seed $$seed CONF_CHX train \
-				--concept-sup $$cs \
-				--epochs 20 \
-				chx --chx-multi-class \
-				resnet18 --pretrained dpl; \
-			python -m conformal --seed $$seed CONF_CHX test \
-				--concept-sup $$cs \
-				--epochs 20 \
-				chx --chx-multi-class \
-				resnet18 --pretrained dpl; \
-		done; \
-	done; \
-	\
-	for cs in $(CS); do \
-		echo "Running analyze epochs=20, cs=$$cs"; \
-		python -m conformal CONF_CHX analyze \
-			--concept-sup $$cs \
+		echo "Running seed=$$seed, epochs=20"; \
+		python -m conformal --seed $$seed CONF_CHX train \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
 			--epochs 20 \
 			chx --chx-multi-class \
 			resnet18 --pretrained dpl; \
+		python -m conformal --seed $$seed CONF_CHX test \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained dpl; \
+		python -m conformal --seed $$seed CONF_CHX train \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained dpl; \
+		python -m conformal --seed $$seed CONF_CHX test \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained dpl; \
+		python -m conformal --seed $$seed CONF_CHX train \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained ltn \
+			--and_op luk \
+			--or_op luk \
+			--imp_op luk \
+			--p 7; \
+		python -m conformal --seed $$seed CONF_CHX test \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained ltn \
+			--and_op luk \
+			--or_op luk \
+			--imp_op luk \
+			--p 7; \
+		python -m conformal --seed $$seed CONF_CHX train \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
+		python -m conformal --seed $$seed CONF_CHX test \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
+	done; \
+	\
+	python -m conformal CONF_CHX analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		chx --chx-multi-class \
+		resnet18 --pretrained dpl; \
+	python -m conformal CONF_CHX analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		chx --chx-multi-class \
+		resnet18 --pretrained dpl; \
+	python -m conformal CONF_CHX analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		chx --chx-multi-class \
+		resnet18 --pretrained ltn \
+		--and_op luk \
+		--or_op luk \
+		--imp_op luk \
+		--p 7; \
+	python -m conformal CONF_CHX analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		chx --chx-multi-class \
+		resnet18 --pretrained ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 3;
+
+run_chx_test:
+	@for seed in $(SEEDS); do \
+		echo "Running seed=$$seed, epochs=20"; \
+		python -m conformal --seed $$seed CONF_CHX test \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained dpl; \
+		python -m conformal --seed $$seed CONF_CHX test \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained dpl; \
+		python -m conformal --seed $$seed CONF_CHX test \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained ltn \
+			--and_op luk \
+			--or_op luk \
+			--imp_op luk \
+			--p 7; \
+		python -m conformal --seed $$seed CONF_CHX test \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			chx --chx-multi-class \
+			resnet18 --pretrained ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
 	done;
 
 run_chx_analysis_only:
-	for cs in $(CS); do \
-		echo "Running analyze epochs=20, cs=$$cs"; \
-		python -m conformal CONF_CHX analyze \
-			--concept-sup $$cs \
-			--epochs 20 \
-			chx --chx-multi-class \
-			resnet18 --pretrained dpl; \
-	done;
+	python -m conformal CONF_CHX analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		chx --chx-multi-class \
+		resnet18 --pretrained dpl; \
+	python -m conformal CONF_CHX analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		chx --chx-multi-class \
+		resnet18 --pretrained dpl; \
+	python -m conformal CONF_CHX analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		chx --chx-multi-class \
+		resnet18 --pretrained ltn \
+		--and_op luk \
+		--or_op luk \
+		--imp_op luk \
+		--p 7; \
+	python -m conformal CONF_CHX analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		chx --chx-multi-class \
+		resnet18 --pretrained ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 3;
 
+# RIVAL AND CIFAR
 
 run_rival:
 	@for seed in $(SEEDS); do \
-		for cs in $(CS); do \
-			echo "Running seed=$$seed, epochs=20, cs=$$cs"; \
-			python -m conformal --seed $$seed CONF_RIVAL train \
-				--concept-sup $$cs \
-				--epochs 20 \
-				rival \
-				resnet18 dpl; \
-			python -m conformal --seed $$seed CONF_RIVAL test \
-				--concept-sup $$cs \
-				--epochs 20 \
-				rival \
-				resnet18 dpl; \
-		done; \
+		echo "Running seed=$$seed, epochs=20"; \
+		python -m conformal --seed $$seed CONF_RIVAL train \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			rival \
+			resnet18 dpl; \
+		python -m conformal --seed $$seed CONF_RIVAL test \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			rival \
+			resnet18 dpl; \
+		python -m conformal --seed $$seed CONF_RIVAL train \
+			--learning-rate 0.001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt sgd \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			rival \
+			resnet18 dpl; \
+		python -m conformal --seed $$seed CONF_RIVAL test \
+			--learning-rate 0.001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt sgd \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			rival \
+			resnet18 dpl; \
+		python -m conformal --seed $$seed CONF_RIVAL train \
+			--learning-rate 1e-5 \
+			--momentum 0.0001 \
+			--batch-size 32 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			rival \
+			resnet18 ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 6; \
+		python -m conformal --seed $$seed CONF_RIVAL test \
+			--learning-rate 1e-5 \
+			--momentum 0.0001 \
+			--batch-size 32 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			rival \
+			resnet18 ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 6; \
 	done; \
 	\
-	for cs in $(CS); do \
-		echo "Running analyze epochs=20, cs=$$cs"; \
-		python -m conformal CONF_RIVAL analyze \
-			--concept-sup $$cs \
+	echo "Running analyze epochs=20"; \
+	python -m conformal CONF_RIVAL analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		rival \
+		resnet18 dpl; \
+	python -m conformal CONF_RIVAL analyze \
+		--learning-rate 0.001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt sgd \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		rival \
+		resnet18 dpl; \
+	python -m conformal CONF_RIVAL analyze \
+		--learning-rate 1e-5 \
+		--momentum 0.0001 \
+		--batch-size 32 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		rival \
+		resnet18 ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 6; \
+	python -m conformal CONF_RIVAL analyze \
+		--learning-rate 1e-5 \
+		--momentum 0.0001 \
+		--batch-size 32 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		rival \
+		resnet18 ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 6;
+
+
+run_rival_test:
+	@for seed in $(SEEDS); do \
+		echo "Running seed=$$seed, epochs=20"; \
+		python -m conformal --seed $$seed CONF_RIVAL test \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
 			--epochs 20 \
 			rival \
 			resnet18 dpl; \
-	done;
+		python -m conformal --seed $$seed CONF_RIVAL test \
+			--learning-rate 0.001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt sgd \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			rival \
+			resnet18 dpl; \
+		python -m conformal --seed $$seed CONF_RIVAL test \
+			--learning-rate 1e-5 \
+			--momentum 0.0001 \
+			--batch-size 32 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			rival \
+			resnet18 ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 6; \
+	done; \
+
 
 run_rival_analysis_only:
-	for cs in $(CS); do \
-		echo "Running analyze epochs=20, cs=$$cs"; \
-		python -m conformal CONF_RIVAL analyze \
-			--concept-sup $$cs \
-			--epochs 20 \
-			rival \
-			resnet18 dpl; \
-	done;
+	echo "Running analyze epochs=20"; \
+	python -m conformal CONF_RIVAL analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		rival \
+		resnet18 dpl; \
+	python -m conformal CONF_RIVAL analyze \
+		--learning-rate 0.001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt sgd \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		rival \
+		resnet18 dpl; \
+	python -m conformal CONF_RIVAL analyze \
+		--learning-rate 1e-5 \
+		--momentum 0.0001 \
+		--batch-size 32 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		rival \
+		resnet18 ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 6; \
+	python -m conformal CONF_RIVAL analyze \
+		--learning-rate 1e-5 \
+		--momentum 0.0001 \
+		--batch-size 32 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		rival \
+		resnet18 ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 6;
 
 
 run_cifar:
 	@for seed in $(SEEDS); do \
-		for cs in $(CS); do \
-			echo "Running seed=$$seed, epochs=20, cs=$$cs"; \
-			python -m conformal --seed $$seed CONF_CIFAR train \
-				--concept-sup $$cs \
-				--epochs 20 \
-				cifar \
-				resnet18 --pretrained dpl; \
-			python -m conformal --seed $$seed CONF_CIFAR test \
-				--concept-sup $$cs \
-				--epochs 20 \
-				cifar \
-				resnet18 --pretrained dpl; \
-		done; \
+		echo "Running seed=$$seed, epochs=20"; \
+		python -m conformal --seed $$seed CONF_CIFAR train \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained dpl; \
+		python -m conformal --seed $$seed CONF_CIFAR test \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained dpl; \
+		\
+		python -m conformal --seed $$seed CONF_CIFAR train \
+			--learning-rate 0.001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt sgd \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained dpl; \
+		python -m conformal --seed $$seed CONF_CIFAR test \
+			--learning-rate 0.001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt sgd \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained dpl; \
+		\
+		python -m conformal --seed $$seed CONF_CIFAR train \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
+		python -m conformal --seed $$seed CONF_CIFAR test \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
+		\
+		python -m conformal --seed $$seed CONF_CIFAR train \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
+		python -m conformal --seed $$seed CONF_CIFAR test \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
 	done; \
 	\
-	for cs in $(CS); do \
-		echo "Running analyze epochs=20, cs=$$cs"; \
-		python -m conformal CONF_CIFAR analyze \
-			--concept-sup $$cs \
+	python -m conformal CONF_CIFAR analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		cifar \
+		resnet18 --pretrained dpl; \
+	python -m conformal CONF_CIFAR analyze \
+		--learning-rate 0.001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt sgd \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		cifar \
+		resnet18 --pretrained dpl; \
+	python -m conformal CONF_CIFAR analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		cifar \
+		resnet18 --pretrained ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 3; \
+	python -m conformal CONF_CIFAR analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		cifar \
+		resnet18 --pretrained ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 3;
+
+run_cifar_test:
+	@for seed in $(SEEDS); do \
+		echo "Running seed=$$seed, epochs=20"; \
+		python -m conformal --seed $$seed CONF_CIFAR test \
+			--learning-rate 0.0001 \
+			--momentum 0.01 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
 			--epochs 20 \
 			cifar \
 			resnet18 --pretrained dpl; \
-	done;
+		\
+		python -m conformal --seed $$seed CONF_CIFAR test \
+			--learning-rate 0.001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt sgd \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained dpl; \
+		\
+		python -m conformal --seed $$seed CONF_CIFAR test \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
+		\
+		python -m conformal --seed $$seed CONF_CIFAR test \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 20 \
+			cifar \
+			resnet18 --pretrained ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
+	done; \
 
 run_cifar_analysis_only:
-	for cs in $(CS); do \
-		echo "Running analyze epochs=20, cs=$$cs"; \
 		python -m conformal CONF_CIFAR analyze \
-			--concept-sup $$cs \
-			--epochs 20 \
-			cifar \
-			resnet18 --pretrained dpl; \
+		--learning-rate 0.0001 \
+		--momentum 0.01 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		cifar \
+		resnet18 --pretrained dpl; \
+	python -m conformal CONF_CIFAR analyze \
+		--learning-rate 0.001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt sgd \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		cifar \
+		resnet18 --pretrained dpl; \
+	python -m conformal CONF_CIFAR analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		cifar \
+		resnet18 --pretrained ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 3; \
+	python -m conformal CONF_CIFAR analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 20 \
+		cifar \
+		resnet18 --pretrained ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 3;
+
+# CEBAB
+
+run_cebab:
+	@for seed in $(SEEDS); do \
+		echo "Running seed=$$seed, epochs=200"; \
+		python -m conformal --seed $$seed CONF_CEBAB train \
+			--learning-rate 0.01 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 200 \
+			cebab \
+			bert dpl; \
+		python -m conformal --seed $$seed CONF_CEBAB test \
+			--learning-rate 0.01 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 200 \
+			cebab \
+			bert dpl; \
+		python -m conformal --seed $$seed CONF_CEBAB train \
+			--learning-rate 0.01 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 200 \
+			cebab \
+			bert dpl; \
+		python -m conformal --seed $$seed CONF_CEBAB test \
+			--learning-rate 0.01 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 200 \
+			cebab \
+			bert dpl; \
+		python -m conformal --seed $$seed CONF_CEBAB train \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 200 \
+			cebab \
+			bert ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
+		python -m conformal --seed $$seed CONF_CEBAB test \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 200 \
+			cebab \
+			bert ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
+		python -m conformal --seed $$seed CONF_CEBAB train \
+			--learning-rate 0.01 \
+			--momentum 0.001 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 200 \
+			cebab \
+			bert ltn \
+			--and_op godel \
+			--or_op godel \
+			--imp_op godel \
+			--p 8; \
+		python -m conformal --seed $$seed CONF_CEBAB test \
+			--learning-rate 0.01 \
+			--momentum 0.001 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 200 \
+			cebab \
+			bert ltn \
+			--and_op godel \
+			--or_op godel \
+			--imp_op godel \
+			--p 8; \
+	done; \
+	\
+	echo "Running analyze epochs=200"; \
+	python -m conformal CONF_CEBAB analyze \
+		--learning-rate 0.01 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 200 \
+		cebab \
+		bert dpl; \
+	python -m conformal CONF_CEBAB analyze \
+		--learning-rate 0.01 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 200 \
+		cebab \
+		bert dpl; \
+	python -m conformal CONF_CEBAB analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 200 \
+		cebab \
+		bert ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 3; \
+	python -m conformal CONF_CEBAB analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 200 \
+		cebab \
+		bert ltn \
+		--and_op godel \
+		--or_op godel \
+		--imp_op godel \
+		--p 8;
+
+run_cebab_test:
+	@for seed in $(SEEDS); do \
+		echo "Running seed=$$seed, epochs=200"; \
+		python -m conformal --seed $$seed CONF_CEBAB test \
+			--learning-rate 0.01 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 200 \
+			cebab \
+			bert dpl; \
+		python -m conformal --seed $$seed CONF_CEBAB test \
+			--learning-rate 0.01 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 200 \
+			cebab \
+			bert dpl; \
+		python -m conformal --seed $$seed CONF_CEBAB test \
+			--learning-rate 0.0001 \
+			--momentum 0.99 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 200 \
+			cebab \
+			bert ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 3; \
+		python -m conformal --seed $$seed CONF_CEBAB test \
+			--learning-rate 0.01 \
+			--momentum 0.001 \
+			--batch-size 128 \
+			--opt adam \
+			--concept-sup 1.0 \
+			--epochs 200 \
+			cebab \
+			bert ltn \
+			--and_op godel \
+			--or_op godel \
+			--imp_op godel \
+			--p 8; \
 	done;
+
+
+run_cebab_analysis_only:
+	python -m conformal CONF_CEBAB analyze \
+		--learning-rate 0.01 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 200 \
+		cebab \
+		bert dpl; \
+	python -m conformal CONF_CEBAB analyze \
+		--learning-rate 0.01 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 200 \
+		cebab \
+		bert dpl; \
+	python -m conformal CONF_CEBAB analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 0.0 \
+		--epochs 200 \
+		cebab \
+		bert ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 3; \
+	python -m conformal CONF_CEBAB analyze \
+		--learning-rate 0.0001 \
+		--momentum 0.99 \
+		--batch-size 128 \
+		--opt adam \
+		--concept-sup 1.0 \
+		--epochs 200 \
+		cebab \
+		bert ltn \
+		--and_op godel \
+		--or_op godel \
+		--imp_op godel \
+		--p 8;
+
+# RSs
+
+run_rss:
+	@for seed in $(SEEDS); do \
+		echo "Running seed=$$seed, epochs=20"; \
+		python -m conformal --seed $$seed CONF_RSs train \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnisthalf \
+			lenet dpl; \
+		python -m conformal --seed $$seed CONF_RSs train \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnisthalf \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+		python -m conformal --seed $$seed CONF_RSs train \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistsump \
+			lenet dpl; \
+		python -m conformal --seed $$seed CONF_RSs train \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistsump \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+		python -m conformal --seed $$seed CONF_RSs train \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistevenodd \
+			lenet dpl; \
+		python -m conformal --seed $$seed CONF_RSs train \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistevenodd \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnisthalf \
+			lenet dpl; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnisthalf \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistsump \
+			lenet dpl; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistsump \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistevenodd \
+			lenet dpl; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistevenodd \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+	done; \
+	\
+	echo "Running analyze epochs=20"; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 0.1 \
+		--batch-size 32 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnisthalf \
+		lenet dpl; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnisthalf \
+		lenet ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 8; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 0.1 \
+		--batch-size 32 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistsump \
+		lenet dpl; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistsump \
+		lenet ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 8; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 0.1 \
+		--batch-size 32 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistevenodd \
+		lenet dpl; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistevenodd \
+		lenet ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 8;
+
+run_rss_test:
+	@for seed in $(SEEDS); do \
+		echo "Running seed=$$seed, epochs=20"; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnisthalf \
+			lenet dpl; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnisthalf \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistsump \
+			lenet dpl; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistsump \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 0.1 \
+			--batch-size 32 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistevenodd \
+			lenet dpl; \
+		python -m conformal --seed $$seed CONF_RSs test \
+			--learning-rate 0.1 \
+			--momentum 1e-05 \
+			--batch-size 64 \
+			--opt sgd \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			mnistevenodd \
+			lenet ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 8; \
+	done; \
+
+
+run_rss_analysis_only:
+	echo "Running analyze epochs=20"; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 0.1 \
+		--batch-size 32 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnisthalf \
+		lenet dpl; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnisthalf \
+		lenet ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 8; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 0.1 \
+		--batch-size 32 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistsump \
+		lenet dpl; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistsump \
+		lenet ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 8; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 0.1 \
+		--batch-size 32 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistevenodd \
+		lenet dpl; \
+	python -m conformal CONF_RSs analyze \
+		--learning-rate 0.1 \
+		--momentum 1e-05 \
+		--batch-size 64 \
+		--opt sgd \
+		--concept-sup 0.0 \
+		--epochs 20 \
+		mnistevenodd \
+		lenet ltn \
+		--and_op prod \
+		--or_op prod \
+		--imp_op prod \
+		--p 8;

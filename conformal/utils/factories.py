@@ -5,6 +5,7 @@ from conformal.models.linear import Linear
 from conformal.datasets.mnistadd import MNISTAdditionLoader
 from conformal.datasets.mnistsump import MNISTSumParityLoader
 from conformal.datasets.mnisthalf import MNISTHalfLoader
+from conformal.datasets.mnistevenodd import MNISTEvenOddLoader
 from conformal.datasets.mnistaddn import MNISTAdditionNLoader
 from conformal.datasets.derma import DERMALoader
 from conformal.datasets.boia import BOIALoader
@@ -38,7 +39,9 @@ class OptimizerFactory:
 
 class NetworkFactory:
     @staticmethod
-    def get_network(name: str, input_shape=(1, 28, 28), output_dim=10, args=None, n_images=2):
+    def get_network(
+        name: str, input_shape=(1, 28, 28), output_dim=10, args=None, n_images=2
+    ):
         if name.lower() == "resnet18":
             return ResNet18(input_shape=input_shape, num_classes=output_dim)
         elif name.lower() == "lenet":
@@ -67,6 +70,8 @@ class DatasetFactory:
             return MNISTHalfLoader(**kwargs).load()
         elif name == "mnistaddn":
             return MNISTAdditionNLoader(n_digits=args.n_digits, **kwargs).load()
+        elif name == "mnistevenodd":
+            return MNISTEvenOddLoader(**kwargs).load()
         elif name == "boia":
             return BOIALoader(**kwargs).load()
         elif name == "chx":
@@ -85,7 +90,9 @@ class DatasetFactory:
             elif args.model == "mpnet":
                 tokenizer = "sentence-transformers/all-mpnet-base-v2"
             else:
-                raise ValueError(f"Unknown tokenizer for CeBaB instantiation: {args.model} chosen")
+                raise ValueError(
+                    f"Unknown tokenizer for CeBaB instantiation: {args.model} chosen"
+                )
             return CeBaBLoader(tokenizer_name=tokenizer, **kwargs).load()
         else:
             raise ValueError(f"Unknown dataset: {name}")

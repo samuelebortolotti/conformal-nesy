@@ -2,10 +2,47 @@ import numpy as np
 import torch
 import copy
 
-from sklearn.metrics import f1_score
+from conformal.utils.other import outer_product
 from conformal.models.dpl import DPL
 from conformal.utils.factories import NetworkFactory
 from conformal.utils.alignment import align_knowledge_input
+
+
+def indices_to_concepts(indices, n_concepts, concept_dim):
+    batch = indices.shape[0]
+    concepts = np.zeros((batch, n_concepts), dtype=np.int64)
+
+    for i in range(n_concepts - 1, -1, -1):
+        concepts[:, i] = indices % concept_dim
+        indices = indices // concept_dim
+
+    return concepts
+
+
+def dpl_argmax_world(all_conc_pred):
+    """
+    all_conc_pred: (batch, n_concepts, concept_dim)
+    returns:
+        concept_assignments: (batch, n_concepts)
+    """
+
+    if all_conc_pred.ndim == 3:
+        _, n_concepts, concept_dim = all_conc_pred.shape
+    elif all_conc_pred.ndim == 4:
+        _, _, n_concepts, concept_dim = all_conc_pred.shape
+        all_conc_pred = all_conc_pred.squeeze(1)
+
+    worlds = outer_product(torch.tensor(all_conc_pred))
+
+    best_world_idx = torch.argmax(worlds, dim=1).cpu().numpy()
+
+    best_concepts = indices_to_concepts(
+        best_world_idx,
+        n_concepts,
+        concept_dim
+    )
+
+    return best_concepts
 
 
 def collect_predictions(
@@ -13,6 +50,7 @@ def collect_predictions(
     dataset,
     data_loader,
     device,
+    nesy_model,
     multiclass=False,
     multilabel=False,
     permutation=None,
@@ -61,12 +99,15 @@ def collect_predictions(
     all_g = np.concatenate(all_g)
     all_output_raw = np.concatenate(all_output_raw)
 
-    if all_conc_pred.ndim == 2:
-        all_c = all_conc_pred.argmax(axis=1)
-    elif all_conc_pred.ndim == 3:
-        all_c = all_conc_pred.argmax(axis=2)
+    if nesy_model != "dpl":
+        if all_conc_pred.ndim == 2:
+            all_c = all_conc_pred.argmax(axis=1)
+        elif all_conc_pred.ndim == 3:
+            all_c = all_conc_pred.argmax(axis=2)
+        else:
+            all_c = all_conc_pred.argmax(axis=3).squeeze(1)
     else:
-        all_c = all_conc_pred.argmax(axis=3).squeeze(1)
+        all_c = dpl_argmax_world(all_conc_pred)
 
     return (
         all_labels,

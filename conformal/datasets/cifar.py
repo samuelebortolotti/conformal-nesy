@@ -86,7 +86,7 @@ class CIFAR10Loader(RIVAL10Loader):
         ).to(self.device)
 
         # Concept weights (BCEWithLogitsLoss or specific concept loss)
-        for i in range(self.n_concepts):
+        for i in range(self.concept_dim):
             c_counts = np.bincount(train_concepts[:, i].astype(int), minlength=2)
             if c_counts[0] == 0 or c_counts[1] == 0:
                 weights = [1.0, 1.0]
@@ -98,8 +98,9 @@ class CIFAR10Loader(RIVAL10Loader):
 
         logic = HardLogic(
             self._return_cifar_logic(),
-            n_concepts=1,
-            concept_dim=self.n_concepts,
+            n_concepts=self.concept_dim,
+            concept_dim=2,
+            multi_set_logic=self._return_multi_set_cifar_logic(),
         )
 
         return (
@@ -107,7 +108,7 @@ class CIFAR10Loader(RIVAL10Loader):
             val_ds,
             test_ds,
             (3, 32, 32),
-            self.n_concepts,
+            self.concept_dim,
             self.n_labels,
             1,
             CIFAR_CLASS_NAMES,

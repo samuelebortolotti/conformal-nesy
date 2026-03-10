@@ -42,7 +42,9 @@ class CeBaBDataset(Dataset):
         self.attention_mask = tokenized["attention_mask"]
 
         self.tokenized_samples = []
-        for input_ids, attention_mask in zip(tokenized["input_ids"], tokenized["attention_mask"]):
+        for input_ids, attention_mask in zip(
+            tokenized["input_ids"], tokenized["attention_mask"]
+        ):
             merged_input = torch.stack([input_ids, attention_mask], axis=1)
             self.tokenized_samples.append(merged_input)
 
@@ -58,10 +60,12 @@ class CeBaBDataset(Dataset):
 
 
 class CeBaBLoader:
-    def __init__(self, tokenizer_name="bert-base-uncased", data_dir="data/cebab", device="cuda"):
+    def __init__(
+        self, tokenizer_name="bert-base-uncased", data_dir="data/cebab", device="cuda"
+    ):
         self.data_dir = data_dir
         self.device = device
-        self.tokenizer_name=tokenizer_name
+        self.tokenizer_name = tokenizer_name
 
         # Aspects and states
         self.aspects = ["food", "service", "noise", "ambiance"]
@@ -175,20 +179,26 @@ class CeBaBLoader:
             [
                 len(y_train) / (self.n_labels * count) if count > 0 else 1.0
                 for count in y_counts
-            ], 
-            dtype=torch.float
+            ],
+            dtype=torch.float,
         ).to(self.device)
 
         for i in range(self.n_concepts):
-            concept_counts = np.bincount(C_train[:, i].astype(int), minlength=self.concept_dim)
-            self.concepts_weights.append(torch.tensor(
-                [
-                    len(C_train) / (self.concept_dim * count) if count > 0 else 1.0
-                    for count in concept_counts
-                ],
-                dtype=torch.float32,
-            ))
-        self.concepts_weights = torch.stack(self.concepts_weights, dim=0).to(self.device)
+            concept_counts = np.bincount(
+                C_train[:, i].astype(int), minlength=self.concept_dim
+            )
+            self.concepts_weights.append(
+                torch.tensor(
+                    [
+                        len(C_train) / (self.concept_dim * count) if count > 0 else 1.0
+                        for count in concept_counts
+                    ],
+                    dtype=torch.float32,
+                )
+            )
+        self.concepts_weights = torch.stack(self.concepts_weights, dim=0).to(
+            self.device
+        )
 
         # logic
         logic = HardLogic(
@@ -198,9 +208,13 @@ class CeBaBLoader:
         )
 
         # Wrap in Dataset
-        train_ds = CeBaBDataset(X_train, C_train, y_train, tokenizer_name=self.tokenizer_name)
+        train_ds = CeBaBDataset(
+            X_train, C_train, y_train, tokenizer_name=self.tokenizer_name
+        )
         dev_ds = CeBaBDataset(X_dev, C_dev, y_dev, tokenizer_name=self.tokenizer_name)
-        test_ds = CeBaBDataset(X_test, C_test, y_test, tokenizer_name=self.tokenizer_name)
+        test_ds = CeBaBDataset(
+            X_test, C_test, y_test, tokenizer_name=self.tokenizer_name
+        )
 
         return (
             train_ds,

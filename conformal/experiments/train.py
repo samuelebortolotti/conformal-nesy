@@ -26,9 +26,10 @@ from conformal.datasets import (
     mnisthalf,
     mnistsump,
     mnistaddn,
+    mnistevenodd,
     rival,
     cifar,
-    cebab
+    cebab,
 )
 
 
@@ -83,6 +84,7 @@ def train_parser(parser):
     cifar.configure_subparsers(subparsers)
     rival.configure_subparsers(subparsers)
     cebab.configure_subparsers(subparsers)
+    mnistevenodd.configure_subparsers(subparsers)
 
 
 def configure_subparsers(subparsers):
@@ -146,7 +148,9 @@ def train_epoch(
                     concept_loss += torch.nn.functional.nll_loss(
                         conc_pred[:, i, :].log(),
                         concepts[:, i].long(),
-                        weight=concept_weights[i] if concept_weights is not None else None,
+                        weight=(
+                            concept_weights[i] if concept_weights is not None else None
+                        ),
                     )
             concept_loss /= concepts.size(1)
             concept_loss = args.concept_supervision * concept_loss
@@ -320,6 +324,7 @@ def evaluate_and_log_model(
                 args.dataset,
                 test_dl,
                 device,
+                args.nesy,
                 multiclass=(
                     False
                     if args.dataset not in ["boia", "chx", "derma", "rival", "cifar"]
@@ -405,9 +410,16 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         train_ds, val_ds, test_ds, batch_size=args.batch_size
     )
 
+    log(f"Dataset {args.dataset} loaded.", "INFO")
+    log(f"Number of training samples: {len(train_ds)}", "INFO")
+    log(f"Number of validation samples: {len(val_ds)}", "INFO")
+    log(f"Number of test samples: {len(test_ds)}", "INFO")
+
     log("Training model", "INFO")
 
-    model = NetworkFactory.get_network(args.model, input_dim, concept_dim, args, n_images=n_images)
+    model = NetworkFactory.get_network(
+        args.model, input_dim, concept_dim, args, n_images=n_images
+    )
     model = NeSyFactory.get_nesy_model(
         args.nesy, n_images, model, concept_dim, output_dim, device, logic, args
     )

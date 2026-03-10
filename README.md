@@ -12,5 +12,5 @@
     python -m conformal CONF test mnistadd --epochs 20 lenet
 ```
 
-TODO: Fix BOIA
+TODO: Per concept / per label coverage and size
 TODO: Calibration metrics?

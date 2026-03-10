@@ -17,13 +17,16 @@ DATASETS_MNIST_2=("mnistaddn")
 DATASETS_MNIST_FLAGS=("3" "4" "5")
 MODELS_MNIST=("lenet")
 
+# RSS
+RSS_DATASETS=("mnistsump" "mnistevenodd" "mnisthalf")
+
 # CHX
 DATASETS_IMG=("chx")
-MODELS_IMG=("resnet18 --pretrained")
+MODELS_IMG=("resnet18")
 
 # RIVAL and CIFAR
 DATASETS_CIFAR=("cifar")
-MODELS_CIFAR=("resnet18 --pretrained")
+MODELS_CIFAR=("resnet18")
 DATASETS_RIVAL=("rival")
 MODELS_RIVAL=("resnet18")
 
@@ -70,7 +73,14 @@ run_job() {
     if [ -n "$prefix" ]; then CMD+=("$prefix"); fi
     if [ -n "$extra_args" ]; then CMD+=("$extra_args"); fi
 
-    CMD+=("$model" "$nesy")
+    CMD+=("$model")
+
+    # Add --pretrained for cifar, chx and derma
+    if [ "$dataset" = "cifar" ] || [ "$dataset" = "chx" ] || [ "$dataset" = "derma" ]; then
+        CMD+=("--pretrained")
+    fi
+
+    CMD+=("$nesy")
 
     echo "Executing command:"
     echo "${CMD[*]}"
@@ -90,103 +100,117 @@ run_job() {
     fi
 }
 
-echo "[INFO] Starting jobs..."
-echo "[INFO] Starting MNIST..."
+# echo "[INFO] Starting jobs..."
+# echo "[INFO] Starting MNIST..."
 
-# MNIST
-for dataset in "${DATASETS_MNIST[@]}"; do
+# # MNIST
+# for dataset in "${DATASETS_MNIST[@]}"; do
+#     for model in "${MODELS_MNIST[@]}"; do
+#         for nesy in "${NESY_VARIANTS[@]}"; do
+#             for cs in "${CONCEPT_SUPS[@]}"; do
+#                 run_job "$dataset" "$model" "$nesy" "$cs" "" ""
+#             done
+#         done
+#     done
+# done
+
+# echo "[INFO] MNIST done!"
+# echo "[INFO] Starting MNIST-ADDN..."
+
+# # MNIST-ADDN
+# for dataset in "${DATASETS_MNIST_2[@]}"; do
+#     for model in "${MODELS_MNIST[@]}"; do
+#         for nesy in "${NESY_VARIANTS[@]}"; do
+#             for cs in "${CONCEPT_SUPS[@]}"; do
+#                 for nd in "${DATASETS_MNIST_FLAGS[@]}"; do
+#                     run_job "$dataset" "$model" "$nesy" "$cs" "--n-digits" "$nd"
+#                 done
+#             done
+#         done
+#     done
+# done
+
+
+
+# echo "[INFO] MNIST-ADDN done!"
+echo "[INFO] Starting RSS..."
+
+for dataset in "${RSS_DATASETS[@]}"; do
     for model in "${MODELS_MNIST[@]}"; do
-        for nesy in "${NESY_VARIANTS[@]}"; do
-            for cs in "${CONCEPT_SUPS[@]}"; do
-                run_job "$dataset" "$model" "$nesy" "$cs" "" ""
-            done
-        done
+        # for nesy in "${NESY_VARIANTS[@]}"; do
+        #    run_job "$dataset" "$model" "$nesy" "0.0" "" ""
+        run_job "$dataset" "$model" "ltn" "0.0" "" ""
+        # done
     done
 done
 
-echo "[INFO] MNIST done!"
-echo "[INFO] Starting MNIST-ADDN..."
+echo "[INFO] RSS done!"
+# echo "[INFO] Starting CHX..."
 
-# MNIST-ADDN
-for dataset in "${DATASETS_MNIST_2[@]}"; do
-    for model in "${MODELS_MNIST[@]}"; do
-        for nesy in "${NESY_VARIANTS[@]}"; do
-            for cs in "${CONCEPT_SUPS[@]}"; do
-                for nd in "${DATASETS_MNIST_FLAGS[@]}"; do
-                    run_job "$dataset" "$model" "$nesy" "$cs" "--n-digits" "$nd"
-                done
-            done
-        done
-    done
-done
+# # CHX
+# for dataset in "${DATASETS_IMG[@]}"; do
+#     for model in "${MODELS_IMG[@]}"; do
+#         for nesy in "${NESY_VARIANTS[@]}"; do
+#             for cs in "${CONCEPT_SUPS[@]}"; do
+#                 run_job "$dataset" "$model" "$nesy" "$cs" "--chx-multi-class" ""
+#             done
+#         done
+#     done
+# done
 
-echo "[INFO] MNIST-ADDN done!"
-echo "[INFO] Starting CHX..."
+# echo "[INFO] CHX done!"
+# echo "[INFO] Starting CIFAR..."
 
-# CHX
-for dataset in "${DATASETS_IMG[@]}"; do
-    for model in "${MODELS_IMG[@]}"; do
-        for nesy in "${NESY_VARIANTS[@]}"; do
-            for cs in "${CONCEPT_SUPS[@]}"; do
-                run_job "$dataset" "$model" "$nesy" "$cs" "--chx-multi-class" ""
-            done
-        done
-    done
-done
+# # CIFAR
+# for dataset in "${DATASETS_CIFAR[@]}"; do
+#     for model in "${MODELS_CIFAR[@]}"; do
+#         for nesy in "${NESY_VARIANTS[@]}"; do
+#             for cs in "${CONCEPT_SUPS[@]}"; do
+#                 run_job "$dataset" "$model" "$nesy" "$cs" "" ""
+#             done
+#         done
+#     done
+# done
 
-echo "[INFO] CHX done!"
-echo "[INFO] Starting CIFAR..."
+# echo "[INFO] CIFAR done!"
+# echo "[INFO] Starting RIVAL..."
 
-# CIFAR
-for dataset in "${DATASETS_CIFAR[@]}"; do
-    for model in "${MODELS_CIFAR[@]}"; do
-        for nesy in "${NESY_VARIANTS[@]}"; do
-            for cs in "${CONCEPT_SUPS[@]}"; do
-                run_job "$dataset" "$model" "$nesy" "$cs" "" ""
-            done
-        done
-    done
-done
+# # RIVAL
+# for dataset in "${DATASETS_RIVAL[@]}"; do
+#     for model in "${MODELS_RIVAL[@]}"; do
+#         for nesy in "${NESY_VARIANTS[@]}"; do
+#             for cs in "${CONCEPT_SUPS[@]}"; do
+#                 run_job "$dataset" "$model" "$nesy" "$cs" "" ""
+#             done
+#         done
+#     done
+# done
 
-echo "[INFO] CIFAR done!"
-echo "[INFO] Starting RIVAL..."
+# echo "[INFO] RIVAL done!"
+# echo "[INFO] Starting CEBAB..."
 
-# RIVAL
-for dataset in "${DATASETS_RIVAL[@]}"; do
-    for model in "${MODELS_RIVAL[@]}"; do
-        for nesy in "${NESY_VARIANTS[@]}"; do
-            for cs in "${CONCEPT_SUPS[@]}"; do
-                run_job "$dataset" "$model" "$nesy" "$cs" "" ""
-            done
-        done
-    done
-done
+# # CEBAB
+# for dataset in "${DATASETS_CEBAB[@]}"; do
+#     for model in "${MODELS_CEBAB[@]}"; do
+#         for nesy in "${NESY_VARIANTS[@]}"; do
+#             for cs in "${CONCEPT_SUPS[@]}"; do
+#                 run_job "$dataset" "$model" "$nesy" "$cs" "" ""
+#             done
+#         done
+#     done
+# done
 
-echo "[INFO] RIVAL done!"
-echo "[INFO] Starting CEBAB..."
+# echo "[INFO] CEBAB done!"
+# echo "[INFO] Starting DERMA..."
 
-# CEBAB
-for dataset in "${DATASETS_CEBAB[@]}"; do
-    for model in "${MODELS_CEBAB[@]}"; do
-        for nesy in "${NESY_VARIANTS[@]}"; do
-            for cs in "${CONCEPT_SUPS[@]}"; do
-                run_job "$dataset" "$model" "$nesy" "$cs" "" ""
-            done
-        done
-    done
-done
+# # DERMA
+# for model in "${MODELS_IMG[@]}"; do
+#     for nesy in "${NESY_VARIANTS[@]}"; do
+#         for cs in "${CONCEPT_SUPS[@]}"; do
+#             run_job "derma" "$model" "$nesy" "$cs" "" ""
+#         done
+#     done
+# done
 
-echo "[INFO] CEBAB done!"
-echo "[INFO] Starting DERMA..."
-
-# DERMA
-for model in "${MODELS_IMG[@]}"; do
-    for nesy in "${NESY_VARIANTS[@]}"; do
-        for cs in "${CONCEPT_SUPS[@]}"; do
-            run_job "derma" "$model" "$nesy" "$cs" "" ""
-        done
-    done
-done
-
-echo "[INFO] DERMA done!"
-echo "All runs completed."
+# echo "[INFO] DERMA done!"
+# echo "All runs completed."

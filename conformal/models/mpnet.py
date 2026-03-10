@@ -40,6 +40,7 @@ class MPNetSentence(BaseLM):
         last_token = outputs.last_hidden_state[:, -1, :]
         return last_token
 
+
 def configure_subparsers(subparsers):
     """Configure subparsers."""
     # Subparser for Bert

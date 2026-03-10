@@ -61,7 +61,7 @@ class BaseLM(nn.Module):
 
         logits = logits.view(x.shape[0], self.num_concepts, self.num_concept_dim)
         return logits
-    
+
     def train(self, mode: bool = True):
         super().train(mode)
         if self.freeze_encoder:
@@ -70,7 +70,6 @@ class BaseLM(nn.Module):
             self.encoder.train(mode)
         self.classifier.train(mode)
         return self
-
 
     def eval(self):
         super().eval()

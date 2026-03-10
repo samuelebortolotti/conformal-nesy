@@ -74,7 +74,7 @@ class RIVAL10Loader:
         self.data_dir = data_dir
         self.device = device
         self.val_split = val_split
-        self.n_concepts = len(CIFAR_CONCEPT_LIST)
+        self.concept_dim = len(CIFAR_CONCEPT_LIST)
         self.n_labels = len(CIFAR_CLASS_NAMES)
         self.label_weights = []
         self.concepts_weights = []
@@ -140,8 +140,76 @@ class RIVAL10Loader:
                     preds[i, :] = 1.0 / 10
 
             return np.argmax(preds, axis=1)
-
         return logic
+
+
+    def _return_multi_set_cifar_logic(self):
+        def logic(x):
+            """
+            Logic function for RIVAL10.
+            """
+            wheels = x[:, 0]
+            metallic = x[:, 1]
+            wings = x[:, 2]
+            animal = x[:, 3]
+            hairy = x[:, 4]
+            horns = x[:, 5]
+            long_snout = x[:, 6]
+
+            # Pre-calculate common logical conditions
+            is_vehicle = (
+                metallic * (1 - animal) * (1 - hairy) * (1 - horns) * (1 - long_snout)
+            )
+            is_living = animal * (1 - metallic) * (1 - wheels)
+
+            truck = is_vehicle * wheels * (1 - wings)
+            car = is_vehicle * wheels * (1 - wings)
+            plane = is_vehicle * wings
+            ship = is_vehicle * (1 - wheels) * (1 - wings)
+            bird = is_living * wings * (1 - hairy) * (1 - horns) * (1 - long_snout)
+            frog = (
+                is_living * (1 - wings) * (1 - hairy) * (1 - horns) * (1 - long_snout)
+            )
+            deer = is_living * (1 - wings) * hairy * horns * long_snout
+            cat = is_living * (1 - wings) * hairy * (1 - horns) * (1 - long_snout)
+            dog = is_living * (1 - wings) * hairy * (1 - horns) * long_snout
+            equine = is_living * (1 - wings) * hairy * (1 - horns) * long_snout
+
+            preds = np.stack(
+                [plane, car, bird, cat, deer, dog, frog, equine, ship, truck], axis=1
+            )
+
+            # --------------------------------------------------
+            # fallback rules when all zeros
+            # --------------------------------------------------
+
+            zero_mask = preds.sum(axis=1) == 0
+
+            for i in np.where(zero_mask)[0]:
+
+                if metallic[i]:
+                    preds[i, [0, 1, 9, 8]] = 0.25
+
+                elif wings[i]:
+                    preds[i, 0] = 1
+                    preds[i, 2] = 1
+
+                elif hairy[i]:
+                    preds[i, [3, 4, 5, 7]] = 0.25
+
+                elif long_snout[i]:
+                    preds[i, [4, 5, 7]] = 1.0 / 3
+
+                else:
+                    preds[i, :] = 1.0 / 10
+
+            max_vals = preds.max(axis=1, keepdims=True)
+            mask = preds == max_vals
+
+            indices_per_row = np.array([np.where(row)[0] for row in mask]).squeeze(0)
+            return indices_per_row
+        return logic
+
 
     def process_files(self, files, wnid_to_class, label_mappings):
         paths, concepts, targets = [], [], []
@@ -220,8 +288,9 @@ class RIVAL10Loader:
 
         logic = HardLogic(
             self._return_cifar_logic(),
-            n_concepts=1,
-            concept_dim=self.n_concepts,
+            n_concepts=self.concept_dim,
+            concept_dim=2,
+            multi_set_logic=self._return_multi_set_cifar_logic(),
         )
 
         return (
@@ -229,7 +298,7 @@ class RIVAL10Loader:
             RIVAL10Dataset(x_val, c_val, y_val, transform),
             RIVAL10Dataset(x_test, c_test, y_test, transform),
             (3, 224, 224),
-            self.n_concepts,
+            self.concept_dim,
             self.n_labels,
             1,
             CIFAR_CLASS_NAMES,

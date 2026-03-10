@@ -6,7 +6,7 @@ from conformal.models.operators import (
     chx_ltn_loss,
     derma_ltn_loss,
     cifar_ltn_loss,
-    cebab_ltn_loss
+    cebab_ltn_loss,
 )
 from conformal.models.nesy import NeSyModel
 import torch
@@ -135,7 +135,7 @@ class LTN(NeSyModel):
         return ltn.Connective(self._select_imp_operator(imp_op))
 
     def _get_ltn_loss(self, concept_dim, output_dim, n_images, dataset, extra):
-        if dataset in ["mnistadd", "mnisthalf", "mnistaddn"]:
+        if dataset in ["mnistadd", "mnisthalf", "mnistaddn", "mnistevenodd"]:
             return mnist_add_ltn_loss(
                 n_images=n_images,
                 and_op=self.and_op,
@@ -186,7 +186,7 @@ class LTN(NeSyModel):
                 not_op=self.not_op,
                 and_op=self.and_op,
                 sat_agg_op=self.sat_agg_op,
-                or_op=self.or_op
+                or_op=self.or_op,
             )
         elif dataset == "cebab":
             return cebab_ltn_loss(
@@ -195,7 +195,7 @@ class LTN(NeSyModel):
                 not_op=self.not_op,
                 and_op=self.and_op,
                 sat_agg_op=self.sat_agg_op,
-                or_op=self.or_op
+                or_op=self.or_op,
             )
 
         raise NotImplementedError(

@@ -770,10 +770,7 @@ class cifar_ltn_loss(torch.nn.Module):
 
         c = ltn.Variable("c", pred_concepts[:, 0, :, 1])
         l = ltn.Variable("l", labels)
-        class_targets = {
-            i: ltn.Constant(torch.tensor([i]))
-            for i in range(10)
-        }
+        class_targets = {i: ltn.Constant(torch.tensor([i])) for i in range(10)}
 
         is_present = ltn.Predicate(func=lambda c, idx: torch.gather(c, 1, idx.long()))
         is_class = ltn.Predicate(
@@ -791,29 +788,31 @@ class cifar_ltn_loss(torch.nn.Module):
                 is_class(l, class_targets[0]),
                 self.and_op(
                     self.and_op(
-                        is_present(c, idx["met"]), # met
-                        self.not_op(is_present(c, idx["ani"])) # not ani
-                    ), 
-                    is_present(c, idx["wng"]) # wing
-                )
-            )
+                        is_present(c, idx["met"]),  # met
+                        self.not_op(is_present(c, idx["ani"])),  # not ani
+                    ),
+                    is_present(c, idx["wng"]),  # wing
+                ),
+            ),
         )
 
         car_truck = self.forall_op(
             ltn.diag(c, l),
             self.equiv_op(
-                self.or_op(is_class(l, class_targets[1]), is_class(l, class_targets[9])),
+                self.or_op(
+                    is_class(l, class_targets[1]), is_class(l, class_targets[9])
+                ),
                 self.and_op(
                     self.and_op(
                         self.and_op(
-                            is_present(c, idx["whl"]), # wheels
-                            self.not_op(is_present(c, idx["wng"])) # not wing
+                            is_present(c, idx["whl"]),  # wheels
+                            self.not_op(is_present(c, idx["wng"])),  # not wing
                         ),
-                        is_present(c, idx["met"]) # metallic
-                    ), 
-                    self.not_op(is_present(c, idx["ani"])) # not animal
-                )
-            )
+                        is_present(c, idx["met"]),  # metallic
+                    ),
+                    self.not_op(is_present(c, idx["ani"])),  # not animal
+                ),
+            ),
         )
 
         bird = self.forall_op(
@@ -822,12 +821,12 @@ class cifar_ltn_loss(torch.nn.Module):
                 is_class(l, class_targets[2]),
                 self.and_op(
                     self.and_op(
-                        is_present(c, idx["ani"]), # ani
-                        self.not_op(is_present(c, idx["met"])) # not met
-                    ), 
-                    is_present(c, idx["wng"]) # wings
-                )
-            )
+                        is_present(c, idx["ani"]),  # ani
+                        self.not_op(is_present(c, idx["met"])),  # not met
+                    ),
+                    is_present(c, idx["wng"]),  # wings
+                ),
+            ),
         )
 
         frog = self.forall_op(
@@ -836,12 +835,12 @@ class cifar_ltn_loss(torch.nn.Module):
                 is_class(l, class_targets[6]),
                 self.and_op(
                     self.and_op(
-                        is_present(c, idx["ani"]), # ani
-                        self.not_op(is_present(c, idx["met"])) # not met
-                    ), 
-                    self.not_op(is_present(c, idx["hai"])) # not hairy
-                )
-            )
+                        is_present(c, idx["ani"]),  # ani
+                        self.not_op(is_present(c, idx["met"])),  # not met
+                    ),
+                    self.not_op(is_present(c, idx["hai"])),  # not hairy
+                ),
+            ),
         )
 
         deer = self.forall_op(
@@ -850,41 +849,43 @@ class cifar_ltn_loss(torch.nn.Module):
                 is_class(l, class_targets[4]),
                 self.and_op(
                     self.and_op(
-                        is_present(c, idx["ani"]), # ani
-                        self.not_op(is_present(c, idx["met"])) # not metal
+                        is_present(c, idx["ani"]),  # ani
+                        self.not_op(is_present(c, idx["met"])),  # not metal
                     ),
                     self.and_op(
-                        self.not_op(is_present(c, idx["wng"])), # not wing
+                        self.not_op(is_present(c, idx["wng"])),  # not wing
                         self.and_op(
-                            is_present(c, idx["hai"]), # hairy
-                            is_present(c, idx["hrn"]) # horn
-                        )
-                    )
-                )
-            )
+                            is_present(c, idx["hai"]),  # hairy
+                            is_present(c, idx["hrn"]),  # horn
+                        ),
+                    ),
+                ),
+            ),
         )
 
         dog_equine = self.forall_op(
             ltn.diag(c, l),
             self.equiv_op(
-                self.or_op(is_class(l, class_targets[5]), is_class(l, class_targets[7])),
+                self.or_op(
+                    is_class(l, class_targets[5]), is_class(l, class_targets[7])
+                ),
                 self.and_op(
                     self.and_op(
-                        is_present(c, idx["ani"]), # ani
-                        self.not_op(is_present(c, idx["met"])) # not metal
+                        is_present(c, idx["ani"]),  # ani
+                        self.not_op(is_present(c, idx["met"])),  # not metal
                     ),
                     self.and_op(
-                        self.not_op(is_present(c, idx["wng"])), # not wing
+                        self.not_op(is_present(c, idx["wng"])),  # not wing
                         self.and_op(
-                            is_present(c, idx["hai"]), # hairy
+                            is_present(c, idx["hai"]),  # hairy
                             self.and_op(
-                                self.not_op(is_present(c, idx["hrn"])), # not horns
-                                is_present(c, idx["snt"]) # long snout
-                            )
-                        )
-                    )
-                )
-            )
+                                self.not_op(is_present(c, idx["hrn"])),  # not horns
+                                is_present(c, idx["snt"]),  # long snout
+                            ),
+                        ),
+                    ),
+                ),
+            ),
         )
 
         ship = self.forall_op(
@@ -893,20 +894,21 @@ class cifar_ltn_loss(torch.nn.Module):
                 is_class(l, class_targets[8]),
                 self.and_op(
                     self.and_op(
-                        is_present(c, idx["met"]), # metal
-                        self.not_op(is_present(c, idx["ani"])) # not animal
+                        is_present(c, idx["met"]),  # metal
+                        self.not_op(is_present(c, idx["ani"])),  # not animal
                     ),
                     self.and_op(
-                        self.not_op(is_present(c, idx["whl"])), # not wheels
-                        self.not_op(is_present(c, idx["wng"])) # not wings
-                    )
-                )
-            )
+                        self.not_op(is_present(c, idx["whl"])),  # not wheels
+                        self.not_op(is_present(c, idx["wng"])),  # not wings
+                    ),
+                ),
+            ),
         )
 
         sat_agg = self.sat_agg_op(plane, car_truck, bird, frog, deer, dog_equine, ship)
 
         return 1 - sat_agg
+
 
 #
 # CEBAB
@@ -922,7 +924,6 @@ def cebab_circuit():
     n_queries = 5  # "positive", "negative", "neutral", "unknown", "conflict"
     look_up = {i: c for i, c in zip(range(n_worlds), possible_worlds)}
     w_q = torch.zeros(n_worlds, n_queries)
-
 
     for w in range(n_worlds):
         food, service, noice, ambiance, rating = look_up[w]
@@ -962,7 +963,7 @@ class cebab_ltn_loss(torch.nn.Module):
 
     def forward(self, pred_concepts, labels):
         # sums
-        n_pos = pred_concepts[..., 0].sum(dim=1) 
+        n_pos = pred_concepts[..., 0].sum(dim=1)
         n_neg = pred_concepts[..., 1].sum(dim=1)
         n_neu = pred_concepts[..., 2].sum(dim=1)
         n_unk = pred_concepts[..., 3].sum(dim=1)
@@ -973,22 +974,15 @@ class cebab_ltn_loss(torch.nn.Module):
         v_unk = ltn.Variable("unk", n_unk)
         l = ltn.Variable("l", labels)
 
-        class_targets = {
-            i: ltn.Constant(torch.tensor([i]))
-            for i in range(5)
-        }
+        class_targets = {i: ltn.Constant(torch.tensor([i])) for i in range(5)}
 
         is_class = ltn.Predicate(
             func=lambda l_val, target: (l_val == target).float().unsqueeze(-1)
         )
 
-        ge = ltn.Predicate(
-            func=lambda a, b: torch.sigmoid((a - b))
-        )
-        
-        eq = ltn.Predicate(
-            func=lambda a, b: torch.exp(-torch.abs(a - b))
-        )
+        ge = ltn.Predicate(func=lambda a, b: torch.sigmoid((a - b)))
+
+        eq = ltn.Predicate(func=lambda a, b: torch.exp(-torch.abs(a - b)))
 
         # Conflict: pos >= neu AND pos >= unk AND pos == neg
         is_conflict = self.forall_op(
@@ -996,13 +990,9 @@ class cebab_ltn_loss(torch.nn.Module):
             self.equiv_op(
                 is_class(l, class_targets[4]),
                 self.and_op(
-                    ge(v_pos, v_neu),
-                    self.and_op(
-                        ge(v_pos, v_unk),
-                        eq(v_pos, v_neg)
-                    )
-                )
-            )
+                    ge(v_pos, v_neu), self.and_op(ge(v_pos, v_unk), eq(v_pos, v_neg))
+                ),
+            ),
         )
 
         # Positive: pos > neg AND pos >= neu AND pos >= unk
@@ -1011,81 +1001,56 @@ class cebab_ltn_loss(torch.nn.Module):
             self.equiv_op(
                 is_class(l, class_targets[0]),
                 self.and_op(
-                    self.and_op(
-                        ge(v_pos, v_neg),
-                        self.not_op(eq(v_pos, v_neg))
-                    ),
-                    self.and_op(
-                        ge(v_pos, v_neu),
-                        ge(v_pos, v_unk)
-                    )
-                )
-            )
+                    self.and_op(ge(v_pos, v_neg), self.not_op(eq(v_pos, v_neg))),
+                    self.and_op(ge(v_pos, v_neu), ge(v_pos, v_unk)),
+                ),
+            ),
         )
-        
+
         # Negative: neg > pos AND neg >= neu AND neg >= unk
         is_negative = self.forall_op(
             ltn.diag(v_pos, v_neu, v_unk, v_neg, l),
             self.equiv_op(
                 is_class(l, class_targets[1]),
                 self.and_op(
-                    self.and_op(
-                        ge(v_neg, v_pos),
-                        self.not_op(eq(v_neg, v_pos))
-                    ),
-                    self.and_op(
-                        ge(v_neg, v_neu),
-                        ge(v_neg, v_unk)
-                    )
-                )
-            )
+                    self.and_op(ge(v_neg, v_pos), self.not_op(eq(v_neg, v_pos))),
+                    self.and_op(ge(v_neg, v_neu), ge(v_neg, v_unk)),
+                ),
+            ),
         )
-        
+
         # Neutral: neu > pos AND neu > neg AND neu >= unk
         is_neutral = self.forall_op(
             ltn.diag(v_pos, v_neu, v_unk, v_neg, l),
             self.equiv_op(
                 is_class(l, class_targets[2]),
                 self.and_op(
+                    self.and_op(ge(v_neu, v_pos), self.not_op(eq(v_neu, v_pos))),
                     self.and_op(
-                        ge(v_neu, v_pos),
-                        self.not_op(eq(v_neu, v_pos))
+                        self.and_op(ge(v_neu, v_neg), self.not_op(eq(v_neu, v_neg))),
+                        ge(v_neu, v_unk),
                     ),
-                    self.and_op(
-                        self.and_op(
-                            ge(v_neu, v_neg),
-                            self.not_op(eq(v_neu, v_neg))
-                        ),
-                        ge(v_neu, v_unk)
-                    )
-                )
-            )
+                ),
+            ),
         )
-        
+
         # Unknown: unk > pos AND unk > neg AND unk > neu
-        is_unknown =  self.forall_op(
+        is_unknown = self.forall_op(
             ltn.diag(v_pos, v_neu, v_unk, v_neg, l),
             self.equiv_op(
                 is_class(l, class_targets[3]),
                 self.and_op(
+                    self.and_op(ge(v_unk, v_pos), self.not_op(eq(v_unk, v_pos))),
                     self.and_op(
-                        ge(v_unk, v_pos),
-                        self.not_op(eq(v_unk, v_pos))
+                        self.and_op(ge(v_unk, v_neg), self.not_op(eq(v_unk, v_neg))),
+                        self.and_op(ge(v_unk, v_neu), self.not_op(eq(v_unk, v_neu))),
                     ),
-                    self.and_op(
-                        self.and_op(
-                            ge(v_unk, v_neg),
-                            self.not_op(eq(v_unk, v_neg))
-                        ),
-                        self.and_op(
-                            ge(v_unk, v_neu),
-                            self.not_op(eq(v_unk, v_neu))
-                        )
-                    )
-                )
-            )
+                ),
+            ),
         )
 
-        sat_agg = self.sat_agg_op(is_conflict, is_positive, is_negative, is_neutral, is_unknown)
+        sat_agg = self.sat_agg_op(
+            is_conflict, is_positive, is_negative, is_neutral, is_unknown
+        )
 
         return 1.0 - sat_agg

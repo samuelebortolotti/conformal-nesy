@@ -46,7 +46,7 @@ class DPL(NeSyModel):
             self.circuit = self.circuit_data.to(self.device)
 
     def _build_circuit(self, concept_dim, output_dim, n_images, dataset, extra):
-        if dataset in ["mnistadd", "mnisthalf", "mnistaddn"]:
+        if dataset in ["mnistadd", "mnisthalf", "mnistaddn", "mnistevenodd"]:
             return mnist_circuit(
                 sequence_len=n_images, n_digits=concept_dim, output_dim=output_dim
             )

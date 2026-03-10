@@ -336,7 +336,6 @@ class ConformalPredictor:
             data = data.to(self.device)
             _, conc_pred, _ = self.model(data, eval=True)
 
-            # TODO: unless the concept outcome is entangled
             # Get marginals first
             batch_marginal_sets = self._build_concept_sets_for_batch(conc_pred)
 
@@ -577,7 +576,12 @@ class ConformalPredictor:
 
     @torch.no_grad()
     def predict_concepts_and_labels(
-        self, dl, use_hard_logic=False, concept_refinement=True, label_refinement=False
+        self,
+        dl,
+        use_hard_logic=False,
+        concept_refinement=True,
+        label_refinement=False,
+        abduction=False,
     ):
         """
         Predicts both concept sets and label sets in a single pass.
@@ -647,5 +651,9 @@ class ConformalPredictor:
             all_label_sets = self._refine_label_prediction_set(
                 all_label_sets, all_concept_tuples
             )
+
+        if abduction:
+            # For each sample, determine which concepts could produce the predicted label
+            all_concept_tuples = self.logic.abductive_concept_sets(all_label_sets)
 
         return all_concept_tuples, all_label_sets

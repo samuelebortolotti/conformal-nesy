@@ -11,6 +11,10 @@ from conformal.datasets import (
     mnisthalf,
     mnistsump,
     mnistaddn,
+    mnistevenodd,
+    rival,
+    cifar,
+    cebab,
 )
 
 
@@ -61,6 +65,10 @@ def test_parser(parser):
     derma.configure_subparsers(subparsers)
     chx.configure_subparsers(subparsers)
     boia.configure_subparsers(subparsers)
+    rival.configure_subparsers(subparsers)
+    cifar.configure_subparsers(subparsers)
+    cebab.configure_subparsers(subparsers)
+    mnistevenodd.configure_subparsers(subparsers)
 
 
 def configure_subparsers(subparsers):
@@ -192,48 +200,22 @@ def flatten_results(seed, results_dict):
     return rows
 
 
-def beautify_table(table_df):
-    # Format the numbers
-    def latex_pm_format(x):
-        if isinstance(x, str) and "±" in x:
-            mean, std = [v.strip() for v in x.split("±")]
-            mean = f"{float(mean):.3g}"
-            std = f"{float(std):.3g}"
-            return f"${mean} \\pm {std}$"
-        return x
-
-    table_df = table_df.map(latex_pm_format)
-
-    # Escape _
-    table_df.index = [str(i).replace("_", r"\_") for i in table_df.index]
-
-    # Reduce Names
-    col_map = {
+def beautify_method_names(table_df, nesy_method):
+    row_map = {
+        "No Conformal": nesy_method.upper(),
         "Conformal Concepts Only": "CC",
         "Conformal Hard Logic": "CH",
         "Conformal both Concepts and Labels": "CCL",
+        "Conformal with Abduction": "CAB",
         "Conformal both Concepts and Labels with Concept Refinement": "CCLRefC",
         "Conformal both Concepts and Labels with Label Refinement": "CCLRefL",
         "Conformal both Concepts and Labels with Concept and Label Refinement": "CCLRefBoth",
-        "No Conformal": "NeSy",
     }
-    table_df = table_df.rename(columns=col_map)
 
-    # Reorder columns so that CCLRefBoth is last (except NeSy column which is separate)
-    all_cols = list(table_df.columns)
-    if "NeSy" in all_cols:
-        all_cols.remove("NeSy")
-        all_cols = ["NeSy"] + all_cols
-    if "CCLRefBoth" in all_cols:
-        all_cols.remove("CCLRefBoth")
-        all_cols.append("CCLRefBoth")
-    table_df = table_df[all_cols]
-
-    return table_df
+    return table_df.rename(index=row_map)
 
 
 def split_table(table_df):
-    # --- Table 1: H_c, cece, test* metrics → NeSy only ---
     nesy_metrics = [
         m
         for m in table_df.index
@@ -246,7 +228,6 @@ def split_table(table_df):
         column_format="l" + "c",
     )
 
-    # --- Table 2: all other metrics → all columns except NeSy ---
     other_metrics = [m for m in table_df.index if m not in nesy_metrics]
     conformal_table_df = table_df.loc[other_metrics]
     conformal_table_latex = conformal_table_df.to_latex(
@@ -258,32 +239,91 @@ def split_table(table_df):
     return conformal_table_latex, nesy_table_latex
 
 
-def generate_latex_table(rows):
-    """
-    Generate LaTeX table with mean \pm std per metric across seeds and settings.
-    Args:
-        rows: list of dicts, each with keys: 'seed', 'setting', 'metric', 'value'
-        caption: caption for LaTeX table
-    Returns:
-        str: LaTeX table code
-    """
+def generate_latex_table(rows, nesy_method):
+
     df = pd.DataFrame(rows)
     df["seed"] = df["seed"].astype(int)
 
     agg_df = (
-        df.groupby(["setting", "metric"])["value"].agg(["mean", "std"]).reset_index()
+        df.groupby(["setting", "metric"])["value"]
+        .agg(["mean", "std"])
+        .reset_index()
     )
+
     agg_df["mean_std"] = agg_df.apply(
-        lambda x: f"{x['mean']:.4f} ± {x['std']:.4f}", axis=1
+        lambda x: f"${x['mean']:5.3f} \\pm {x['std']:5.3f}$", axis=1
     )
-    table_df = agg_df.pivot(index="metric", columns="setting", values="mean_std")
-    table_df = table_df.sort_index()
 
-    # bautify table
-    table_df = beautify_table(table_df)
+    table_df = agg_df.pivot(index="setting", columns="metric", values="mean_std")
 
-    # return splitted tables
-    return split_table(table_df)
+    table_df = beautify_method_names(table_df, nesy_method)
+
+    nesy_name = nesy_method.upper()
+
+    desired_order = [
+        nesy_name, # "CC",
+        "CH",
+        "CAB",
+        "CCL", #"CCLRefC", #"CCLRefL",
+        "CCLRefBoth",
+    ]
+
+    table_df = table_df.reindex(desired_order)
+
+    concept_metrics = [
+        "concept_consistency",
+        "concept_size",
+        "coverage_concepts",
+    ]
+
+    label_metrics = [
+        "label_consistency",
+        "label_size",
+        "coverage_labels",
+    ]
+
+    combined = table_df[concept_metrics + label_metrics]
+
+    combined.columns = pd.MultiIndex.from_tuples(
+        [
+            ("Concepts", "Consistency"),
+            ("Concepts", "Size"),
+            ("Concepts", "Coverage"),
+            ("Labels", "Consistency"),
+            ("Labels", "Size"),
+            ("Labels", "Coverage"),
+        ]
+    )
+
+    latex_df = combined.copy()
+
+    latex_index = []
+    for name in latex_df.index:
+        if name == nesy_name:
+            latex_index.append(f"\\{nesy_name}")
+        else:
+            latex_index.append(f"\\{nesy_name} + {name}")
+
+    latex_df.index = latex_index
+    
+    conformal_latex = latex_df.to_latex(
+        escape=False,
+        na_rep="-",
+        column_format="lcccccc",
+        multicolumn=True,
+        multicolumn_format="c",
+    )
+
+    nesy_table = table_df.loc[[nesy_name]].copy()
+    nesy_table = nesy_table.rename(index={nesy_name: f"\\{nesy_name}"})
+
+    nesy_latex = nesy_table.to_latex(
+        escape=False,
+        na_rep="-",
+        column_format="l" + "c" * len(nesy_table.columns),
+    )
+
+    return conformal_latex, nesy_latex
 
 
 def main(experiment_name, results_output_h, stats_output_h, args, device):
@@ -292,10 +332,17 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     seed_position = get_seed_position(args)
     loaded = load_results(files, str(args.output_dir_path), seed_position)
 
+    if len(loaded) == 0:
+        log("No results found to analyze. Exiting.", "WARNING")
+        return
+
     all_rows = []
     for seed, data in loaded:
         all_rows.extend(flatten_results(seed, data))
-    conformal_table, nesy_table = generate_latex_table(all_rows)
+
+    conformal_table, nesy_table = generate_latex_table(
+        all_rows, args.nesy
+    )
 
     # Change the name with the number of seeds analyzed
     splitted_path, _ = extract_seed(
@@ -304,7 +351,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     splitted_path[seed_position] = f"{len(loaded)}_seeds"
     splitted_path = "_".join(splitted_path)
     splitted_path = Path(args.output_dir_path, splitted_path)
-    conformal_results_stats_path = splitted_path.with_name(
+    conforma_results_stats_path = splitted_path.with_name(
         f"{splitted_path.stem}_conformal.tex"
     )
     nesy_results_stats_path = splitted_path.with_name(f"{splitted_path.stem}_nesy.tex")
@@ -312,12 +359,16 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     log(f"CONFORMAL:\n{conformal_table}", "INFO")
     log(f"NESY:\n{nesy_table}", "INFO")
 
-    log(f"Writing table of results to {conformal_results_stats_path}...", "INFO")
-    with open(conformal_results_stats_path, "w") as f:
+    log(
+        f"Writing table of results to {conforma_results_stats_path}...", "INFO"
+    )
+    with open(conforma_results_stats_path, "w") as f:
         f.write(f"{conformal_table}")
+
     log(f"Writing table of results to {nesy_results_stats_path}...", "INFO")
     with open(nesy_results_stats_path, "w") as f:
         f.write(f"{nesy_table}")
+
     log("Results written successfully.", "INFO")
 
 
