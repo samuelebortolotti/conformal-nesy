@@ -203,14 +203,14 @@ def flatten_results(seed, results_dict):
 def beautify_method_names(table_df, nesy_method):
     row_map = {
         "No Conformal": nesy_method.upper(),
-        "Conformal Concepts Only": "CO",
-        "Conformal Hard Logic": "CC",
+        "Conformal Concepts Only": "ConceptsOnly",
+        "Conformal Hard Logic": "ConceptsPlusDeduction",
         "Conformal both Concepts and Labels": "CL",
-        "Conformal with Abduction": "TC",
-        "Conformal only Labels": "LO",
+        "Conformal with Abduction": "TaskPlusAbduction",
+        "Conformal only Labels": "TaskOnly",
         "Conformal both Concepts and Labels with Concept Refinement": "JCC",
         "Conformal both Concepts and Labels with Label Refinement": "JCL",
-        "Conformal both Concepts and Labels with Concept and Label Refinement": "JC",
+        "Conformal both Concepts and Labels with Concept and Label Refinement": "method",
     }
 
     return table_df.rename(index=row_map)
@@ -262,11 +262,12 @@ def generate_latex_table(rows, nesy_method):
     nesy_name = nesy_method.upper()
 
     desired_order = [
-        nesy_name, # "CC",
-        "TC",
-        "CC",
-        "CL", #"CCLRefC", #"CCLRefL",
-        "JC",
+        nesy_name,
+        "TaskOnly",
+        "TaskPlusAbduction",
+        "ConceptsOnly",
+        "ConceptsPlusDeduction",
+        "method"
     ]
 
     table_df = table_df.reindex(desired_order)
@@ -287,12 +288,12 @@ def generate_latex_table(rows, nesy_method):
 
     combined.columns = pd.MultiIndex.from_tuples(
         [
-            ("Concepts", "Consistency"),
-            ("Concepts", "Size"),
-            ("Concepts", "Coverage"),
-            ("Labels", "Consistency"),
-            ("Labels", "Size"),
-            ("Labels", "Coverage"),
+            ("{\\sc Concepts}", "\\cmidrule(lr){2-4} \\cmidrule(lr){5-7} {\\sc Method} & {\\sc Consistency}"),
+            ("{\\sc Concepts}", "{\\sc Size}"),
+            ("{\\sc Concepts}", "{\\sc Coverage}"),
+            ("{\\sc Labels}", "{\\sc Consistency}"),
+            ("{\\sc Labels}", "{\\sc Size}"),
+            ("{\\sc Labels}", "{\\sc Coverage}"),
         ]
     )
 
@@ -303,7 +304,7 @@ def generate_latex_table(rows, nesy_method):
         if name == nesy_name:
             latex_index.append(f"\\{nesy_name}")
         else:
-            latex_index.append(f"\\{nesy_name} + {name}")
+            latex_index.append(f"\\{nesy_name} + \\{name}")
 
     latex_df.index = latex_index
     
@@ -313,6 +314,21 @@ def generate_latex_table(rows, nesy_method):
         column_format="lcccccc",
         multicolumn=True,
         multicolumn_format="c",
+    )
+
+    conformal_latex = conformal_latex.replace(
+        "\\begin{tabular}",
+        "\\scalebox{0.8}{\n\\begin{tabular}"
+    )
+
+    conformal_latex = conformal_latex.replace(
+        "\\end{tabular}",
+        "\\end{tabular}\n}"
+    )
+
+    conformal_latex = conformal_latex.replace(
+        "& \\cmidrule(lr){2-4}",
+        "\\cmidrule(lr){2-4}"
     )
 
     nesy_table = table_df.loc[[nesy_name]].copy()
