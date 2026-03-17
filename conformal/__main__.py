@@ -11,7 +11,7 @@ import logging
 from typing import Optional
 
 import conformal.general_utils as utils
-from conformal.experiments import train, optimize, test, analyze
+from conformal.experiments import train, optimize, test, analyze, etest
 
 
 def compressor_7z(file_path: str):
@@ -94,6 +94,7 @@ def get_args():
     optimize.configure_subparsers(subparsers)
     test.configure_subparsers(subparsers)
     analyze.configure_subparsers(subparsers)
+    etest.configure_subparsers(subparsers)
 
     parsed_args = parser.parse_args()
     if "func" not in parsed_args:

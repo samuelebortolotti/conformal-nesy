@@ -598,6 +598,32 @@ run_rival:
 			--or_op prod \
 			--imp_op prod \
 			--p 6; \
+		python -m conformal --seed $$seed CONF_RIVAL train \
+			--learning-rate 1e-5 \
+			--momentum 0.0001 \
+			--batch-size 32 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			rival \
+			resnet18 ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 6; \
+		python -m conformal --seed $$seed CONF_RIVAL test \
+			--learning-rate 1e-5 \
+			--momentum 0.0001 \
+			--batch-size 32 \
+			--opt adam \
+			--concept-sup 0.0 \
+			--epochs 20 \
+			rival \
+			resnet18 ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 6; \
 	done; \
 	\
 	echo "Running analyze epochs=20"; \
@@ -637,7 +663,7 @@ run_rival:
 		--momentum 0.0001 \
 		--batch-size 32 \
 		--opt adam \
-		--concept-sup 1.0 \
+		--concept-sup 0.0 \
 		--epochs 20 \
 		rival \
 		resnet18 ltn \
@@ -674,6 +700,19 @@ run_rival_test:
 			--batch-size 32 \
 			--opt adam \
 			--concept-sup 1.0 \
+			--epochs 20 \
+			rival \
+			resnet18 ltn \
+			--and_op prod \
+			--or_op prod \
+			--imp_op prod \
+			--p 6; \
+		python -m conformal --seed $$seed CONF_RIVAL test \
+			--learning-rate 1e-5 \
+			--momentum 0.0001 \
+			--batch-size 32 \
+			--opt adam \
+			--concept-sup 0.0 \
 			--epochs 20 \
 			rival \
 			resnet18 ltn \
@@ -722,7 +761,7 @@ run_rival_analysis_only:
 		--momentum 0.0001 \
 		--batch-size 32 \
 		--opt adam \
-		--concept-sup 1.0 \
+		--concept-sup 0.0 \
 		--epochs 20 \
 		rival \
 		resnet18 ltn \
