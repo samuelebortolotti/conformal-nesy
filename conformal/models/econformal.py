@@ -244,10 +244,7 @@ class ConformalEPredictor(ConformalPredictor):
             if len(active) == 0:
                 batch_sets.append(np.expand_dims(np.array([self.EMPTY_TOKEN for _ in range(n_concepts)]), axis=0))
             else:
-                print(active)
                 decoded = self._decode_indices(active, n_concepts, n_classes)
-                print(decoded)
-                quit()
                 batch_sets.append(np.array(decoded))
 
         return batch_sets

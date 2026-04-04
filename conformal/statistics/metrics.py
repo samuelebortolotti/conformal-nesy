@@ -317,8 +317,12 @@ def prediction_consistency(concept_tuples, label_sets, logic, EMPTY_TOKEN=-1):
 
         # Concept consistency: fraction of tuples producing at least one label in predicted label set
         for t in valid_tuples:
-            derived_label = logic.forward(t.reshape(1, -1))
-            derived_label = np.array(derived_label).ravel()
+            if logic.multi_set_logic is None:
+                derived_label = logic.forward(t.reshape(1, -1))
+                derived_label = np.array(derived_label).ravel()
+            else:
+                derived_label = logic.forward_multi_set(t.reshape(1, -1))
+                derived_label = np.unique(np.concatenate(derived_label))
             total_concepts += 1
             if np.any(np.isin(derived_label, labels_i)):
                 consistent_concepts += 1
@@ -362,3 +366,42 @@ def prediction_consistency(concept_tuples, label_sets, logic, EMPTY_TOKEN=-1):
     label_consistency = covered_labels / total_labels if total_labels > 0 else 1.0
 
     return concept_consistency, label_consistency
+
+
+def conditional_conformal_metrics(
+    concept_tuples, label_sets, true_concepts, true_labels
+):
+    """
+    delta_ab = P(c* in Gamma | y* in Upsilon)
+    delta_de = P(y* in Upsilon | c* in Gamma)
+    """
+    N = len(concept_tuples)
+
+    ab_numerator, ab_denominator = 0, 0
+    de_numerator, de_denominator = 0, 0
+
+    for i in range(N):
+        tuples_i = concept_tuples[i]   # (K, n_concepts)
+        labels_i = label_sets[i]        # (M, 1) or (M,)
+        c_star   = true_concepts[i]     # (n_concepts,)
+        y_star   = true_labels[i]
+
+        flat_labels = labels_i.ravel()
+
+        y_covered = np.isin(y_star, flat_labels)
+        c_covered = np.any(np.all(tuples_i == c_star, axis=1))
+
+        if y_covered:
+            ab_denominator += 1
+            if c_covered:
+                ab_numerator += 1
+
+        if c_covered:
+            de_denominator += 1
+            if y_covered:
+                de_numerator += 1
+
+    delta_ab = ab_numerator / ab_denominator if ab_denominator > 0 else float("nan")
+    delta_de = de_numerator / de_denominator if de_denominator > 0 else float("nan")
+
+    return delta_ab, delta_de

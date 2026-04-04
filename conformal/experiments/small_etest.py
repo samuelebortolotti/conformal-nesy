@@ -1,4 +1,4 @@
-"""Test the Conformal Sets on the datasets."""
+"""Small Test the Conformal Sets on the datasets."""
 
 import numpy as np
 import torch
@@ -92,7 +92,7 @@ def test_parser(parser):
 def configure_subparsers(subparsers):
     """Configure the subparsers."""
     parser = subparsers.add_parser(
-        "e-test",
+        "small-e-test",
         help="Evaluate conformal predictions on a dataset with a trained model",
     )
     test_parser(parser)
@@ -286,8 +286,8 @@ def conformal_e_evaluation(
 
     results_storage = {}
 
-    alphas = np.arange(0.01,0.21,0.01) # 0.31
-    betas = np.arange(0.01,0.21,0.01) # 0.31
+    alphas = np.array([0.01, 0.05, 0.1, 0.15, 0.2])
+    betas  = np.array([0.01, 0.05, 0.1, 0.15, 0.2])
     max_concept_size = 3
     max_label_size = 2
     alpha_mins, beta_mins, alpha_beta_mins = [], [], []
@@ -460,7 +460,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
 
     alpha_concepts = 0.1
     alpha_label = 0.1
-    n_iterations = 20
+    n_iterations = 3
 
     result_storage = conformal_e_evaluation(
         model,

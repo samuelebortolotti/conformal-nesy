@@ -385,11 +385,19 @@ class ConformalPredictor:
 
             # Filter them
             filtered_tuples = tuples[~empty_mask]
-            derived_labels = self.logic.forward(filtered_tuples)
-
-            # Keep tuples that result in an allowed label
-            valid_tuples = filtered_tuples[np.isin(derived_labels, labels)]
-            refined_batch_tuples.append(valid_tuples)
+            if self.logic.multi_set_logic is None:
+                derived_labels = self.logic.forward(filtered_tuples)
+                # Keep tuples that result in an allowed label
+                valid_tuples = filtered_tuples[np.isin(derived_labels, labels)]
+                refined_batch_tuples.append(valid_tuples)
+            else:
+                derived_labels = self.logic.forward_multi_set(filtered_tuples)
+                valid_mask = np.array([
+                    len(np.intersect1d(row_labels, labels)) > 0
+                    for row_labels in derived_labels
+                ], dtype=bool)
+                valid_tuples = filtered_tuples[valid_mask]
+                refined_batch_tuples.append(valid_tuples)
 
         return refined_batch_tuples
 

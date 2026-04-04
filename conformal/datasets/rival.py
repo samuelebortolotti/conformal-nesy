@@ -206,7 +206,7 @@ class RIVAL10Loader:
             max_vals = preds.max(axis=1, keepdims=True)
             mask = preds == max_vals
 
-            indices_per_row = np.array([np.where(row)[0] for row in mask]).squeeze(0)
+            indices_per_row = [np.where(row)[0] for row in mask]
             return indices_per_row
         return logic
 

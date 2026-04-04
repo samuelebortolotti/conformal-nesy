@@ -18,6 +18,7 @@ from conformal.statistics.metrics import (
     compute_statistics,
     conformal_metrics,
     prediction_consistency,
+    conditional_conformal_metrics,
 )
 from conformal.models.conformal import ConformalPredictor
 from conformal.utils.visualization import (
@@ -282,13 +283,6 @@ def conformal_evaluation(
         permutation=permutation,
     )
 
-    # print(all_c[3447], all_g[3447], all_labels[3447], all_conc_pred[3447], all_raw_out_pred[3447])
-    # a = np.matmul(np.expand_dims(all_conc_pred[3447][0], axis=1), np.expand_dims(all_conc_pred[3447][1], axis=0))
-    # a = a.reshape(-1)
-    # print(np.argmax(a), np.max(a), np.sort(a)[-5:], np.argsort(a)[-3:][::-1])            
-    # print(np.sort(all_raw_out_pred[3447])[-5:], np.argsort(all_raw_out_pred[3447])[-3:][::-1])   
-    # quit()
-
     if args.concept_supervision == 0.0 and args.nesy not in ["dpl", "ltn"]:
         log("> Concept confusion matrix after permutation...", "INFO")
         plot_confusion_matrix(
@@ -446,7 +440,7 @@ def conformal_evaluation(
         "coverage_labels": label_coverage,
         "label_size": label_size,
         "concept_consistency": concept_consistency,
-        "label_consistency": label_consistency,
+        "label_consistency": label_consistency
     }
 
     save_visual_examples(
@@ -524,6 +518,15 @@ def conformal_evaluation(
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
 
+    _, delta_de = conditional_conformal_metrics(
+        concept_sets,
+        label_sets,
+        all_g,
+        np.expand_dims(all_labels, axis=1) if not multilabel else all_labels,
+    )
+
+    log(f"[Conformal Hard Logic] delta_de (P(y*∈Υ_de|c*∈Γ_beta)): {delta_de:.4f}", "INFO")
+
     results_storage["Conformal Hard Logic"] = {
         "coverage_concepts": concept_coverage,
         "concept_size": concept_set_size,
@@ -531,6 +534,7 @@ def conformal_evaluation(
         "label_size": label_size,
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
+        "delta_de": delta_de
     }
 
     save_visual_examples(
@@ -571,6 +575,15 @@ def conformal_evaluation(
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
 
+    delta_ab, _ = conditional_conformal_metrics(
+        concept_sets,
+        label_sets,
+        all_g,
+        np.expand_dims(all_labels, axis=1) if not multilabel else all_labels,
+    )
+
+    log(f"[Conformal with Abduction] delta_ab (P(c*∈Γab|y*∈Υ_alpha)): {delta_ab:.4f}", "INFO")
+
     results_storage["Conformal with Abduction"] = {
         "coverage_concepts": concept_coverage,
         "concept_size": concept_set_size,
@@ -578,6 +591,7 @@ def conformal_evaluation(
         "label_size": label_size,
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
+        "delta_ab": delta_ab,
     }
 
     save_visual_examples(

@@ -63,6 +63,12 @@ class HardLogic(BaseLogic):
 
     def forward(self, x):
         return self.logic(x)
+    
+    def forward_multi_set(self, x):
+        if self.multi_set_logic is not None:
+            return self.multi_set_logic(x)
+        else:
+            return self.logic(x)
 
     def _build_label_to_world_dict(self):
         if self.is_too_big:
@@ -78,7 +84,8 @@ class HardLogic(BaseLogic):
             world_array = np.expand_dims(np.array(world), axis=0)
             # wrong logic case
             if self.multi_set_logic is not None:
-                label = self.multi_set_logic(world_array)
+                derived = self.multi_set_logic(world_array)
+                label = np.unique(np.concatenate(derived))
             else:
                 label = self.logic(world_array)
 
