@@ -140,8 +140,8 @@ class RIVAL10Loader:
                     preds[i, :] = 1.0 / 10
 
             return np.argmax(preds, axis=1)
-        return logic
 
+        return logic
 
     def _return_multi_set_cifar_logic(self):
         def logic(x):
@@ -208,8 +208,8 @@ class RIVAL10Loader:
 
             indices_per_row = [np.where(row)[0] for row in mask]
             return indices_per_row
-        return logic
 
+        return logic
 
     def process_files(self, files, wnid_to_class, label_mappings):
         paths, concepts, targets = [], [], []

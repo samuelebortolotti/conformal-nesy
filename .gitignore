@@ -35,3 +35,5 @@ viva_2.py
 a.sh
 b.sh
 c.sh
+*.pdf
+*.ipynb

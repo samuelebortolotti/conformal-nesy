@@ -234,7 +234,6 @@ def conformal_evaluation(
     results_storage = {}
 
     log("=== 1. Baseline (Standard Argmax) ===", "INFO")
-
     (
         test_loss,
         test_f1,
@@ -258,6 +257,7 @@ def conformal_evaluation(
         multiclass=multiconcept,
         multilabel=multilabel,
         permutation=permutation,
+        is_dpl=(args.nesy == "dpl"),
     )
 
     log("Metrics on the test set (no conformal):", "INFO")
@@ -272,15 +272,18 @@ def conformal_evaluation(
     log(f"Test YECE: {test_yece:.4f}", "INFO")
     log(f"Test CECE: {test_cece:.4f}", "INFO")
 
-    all_labels, all_preds, all_g, all_c, _, all_raw_out_pred, all_conc_pred = collect_predictions(
-        model,
-        args.dataset,
-        test_dl,
-        device,
-        args.nesy,
-        multiclass=True,  # To get the separated G
-        multilabel=multilabel,
-        permutation=permutation,
+    all_labels, all_preds, all_g, all_c, _, all_raw_out_pred, all_conc_pred = (
+        collect_predictions(
+            model,
+            args.dataset,
+            test_dl,
+            device,
+            args.nesy,
+            multiclass=True,  # To get the separated G
+            multilabel=multilabel,
+            permutation=permutation,
+            is_dpl=(args.nesy == "dpl"),
+        )
     )
 
     if args.concept_supervision == 0.0 and args.nesy not in ["dpl", "ltn"]:
@@ -313,6 +316,21 @@ def conformal_evaluation(
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
+
+    if (args.nesy == "dpl" or args.nesy == "ltn") and args.dataset not in [
+        "cifar",
+        "rival",
+    ]:
+        log(
+            "Using a NeSy method, for this dataset we expect perfect consistency.",
+            "INFO",
+        )
+        assert (
+            concept_consistency == 1.0
+        ), "For DPL and LTN, concept consistency should be 1.0."
+        assert (
+            label_consistency == 1.0
+        ), "For DPL and LTN, label consistency should be 1.0."
 
     concept_coverage, concept_set_size = conformal_metrics(
         np.expand_dims(all_c, axis=1), all_g
@@ -400,9 +418,7 @@ def conformal_evaluation(
     cp.calibrate_labels(val_dl, alpha=alpha_label)
 
     log("Predicting label conformal sets on the test set...", "INFO")
-    label_sets = cp.predict_labels(
-        test_dl, use_hard_logic=False
-    )
+    label_sets = cp.predict_labels(test_dl, use_hard_logic=False)
 
     label_coverage, label_size = conformal_metrics(
         label_sets, np.expand_dims(all_labels, axis=1)
@@ -416,16 +432,12 @@ def conformal_evaluation(
         f"[Conformal only Labels] Label Coverage: {label_coverage:.4f}",
         "INFO",
     )
-    log(
-        f"[Conformal only Labels] Label Set Size: {label_size:.4f}", "INFO"
-    )
+    log(f"[Conformal only Labels] Label Set Size: {label_size:.4f}", "INFO")
     log(
         f"[Conformal only Labels] Concept Coverage: {concept_coverage:.4f}",
         "INFO",
     )
-    log(
-        f"[Conformal only Labels] Concept Set Size: {concept_set_size:.4f}", "INFO"
-    )
+    log(f"[Conformal only Labels] Concept Set Size: {concept_set_size:.4f}", "INFO")
 
     concept_consistency, label_consistency = prediction_consistency(
         np.expand_dims(all_c, axis=1), label_sets, logic
@@ -440,7 +452,7 @@ def conformal_evaluation(
         "coverage_labels": label_coverage,
         "label_size": label_size,
         "concept_consistency": concept_consistency,
-        "label_consistency": label_consistency
+        "label_consistency": label_consistency,
     }
 
     save_visual_examples(
@@ -525,7 +537,10 @@ def conformal_evaluation(
         np.expand_dims(all_labels, axis=1) if not multilabel else all_labels,
     )
 
-    log(f"[Conformal Hard Logic] delta_de (P(y*∈Υ_de|c*∈Γ_beta)): {delta_de:.4f}", "INFO")
+    log(
+        f"[Conformal Hard Logic] delta_de (P(y*∈Υ_de|c*∈Γ_beta)): {delta_de:.4f}",
+        "INFO",
+    )
 
     results_storage["Conformal Hard Logic"] = {
         "coverage_concepts": concept_coverage,
@@ -534,7 +549,7 @@ def conformal_evaluation(
         "label_size": label_size,
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
-        "delta_de": delta_de
+        "delta_de": delta_de,
     }
 
     save_visual_examples(
@@ -582,7 +597,10 @@ def conformal_evaluation(
         np.expand_dims(all_labels, axis=1) if not multilabel else all_labels,
     )
 
-    log(f"[Conformal with Abduction] delta_ab (P(c*∈Γab|y*∈Υ_alpha)): {delta_ab:.4f}", "INFO")
+    log(
+        f"[Conformal with Abduction] delta_ab (P(c*∈Γab|y*∈Υ_alpha)): {delta_ab:.4f}",
+        "INFO",
+    )
 
     results_storage["Conformal with Abduction"] = {
         "coverage_concepts": concept_coverage,

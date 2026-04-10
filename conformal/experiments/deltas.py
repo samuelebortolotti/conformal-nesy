@@ -22,7 +22,7 @@ from conformal.experiments.analyze import (
     get_seed_position,
     load_results,
     flatten_results,
-    extract_seed
+    extract_seed,
 )
 
 
@@ -89,7 +89,6 @@ def configure_subparsers(subparsers):
     parser.set_defaults(func=main)
 
 
-
 def main(experiment_name, results_output_h, stats_output_h, args, device):
     """Main function that parses the arguments and writes the output."""
     files = collect_result_files(args.output_dir_path, build_seed_regex(args))
@@ -118,7 +117,10 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     for delta_name, values in average_deltas.items():
         average_value = sum(values) / len(values)
         average_deltas[delta_name] = average_value
-        log(f"Average {delta_name}: {average_value:.4f} with {len(values)} samples", "INFO")
+        log(
+            f"Average {delta_name}: {average_value:.4f} with {len(values)} samples",
+            "INFO",
+        )
 
     # Change the name with the number of seeds analyzed
     splitted_path, _ = extract_seed(
@@ -127,19 +129,15 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     splitted_path[seed_position] = f"{len(loaded)}_seeds"
     splitted_path = "_".join(splitted_path)
     splitted_path = Path(args.output_dir_path, splitted_path)
-    delta_path = splitted_path.with_name(
-        f"{splitted_path.stem}_deltas.csv"
-    )
+    delta_path = splitted_path.with_name(f"{splitted_path.stem}_deltas.csv")
 
-    log(
-        f"Writing table of results to {delta_path}...", "INFO"
-    )
+    log(f"Writing table of results to {delta_path}...", "INFO")
 
     with open(delta_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(average_deltas.keys())
         writer.writerow(average_deltas.values())
-    
+
     log("Results written successfully.", "INFO")
 
 

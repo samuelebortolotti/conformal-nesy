@@ -7,6 +7,7 @@ import numpy as np
 from sklearn.metrics import f1_score, accuracy_score, recall_score, confusion_matrix
 from conformal.utils.alignment import align_knowledge_input
 from conformal.general_utils import log
+from conformal.utils.other import outer_product
 
 
 def compute_ece(probs, labels, n_bins=15):
@@ -40,6 +41,7 @@ def compute_statistics(
     multiclass=False,
     multilabel=False,
     permutation=None,
+    is_dpl=False,
 ):
     """
     Compute loss and F1 score for the dataset (train or validation).
@@ -51,6 +53,7 @@ def compute_statistics(
     all_g = []
     all_conc_pred = []
     all_probs = []
+    circuit = None
 
     for data, concepts, target in data_loader:
         data = data.to(device)
@@ -90,6 +93,9 @@ def compute_statistics(
 
         running_loss += loss.item()
 
+        if is_dpl and circuit is None:
+            circuit = extra.clone().detach().cpu()
+
         all_preds.append(output.argmax(dim=-1).cpu().numpy())
         all_labels.append(target.cpu().numpy())
         all_probs.append(probs)
@@ -107,13 +113,50 @@ def compute_statistics(
     present_labels = np.unique(all_labels)
     present_concepts = np.unique(all_g)
 
-    # find predicted concept and probability distribution
-    if all_conc_pred.ndim == 2:
-        all_c = all_conc_pred.argmax(axis=1)
-    elif all_conc_pred.ndim == 3:
-        all_c = all_conc_pred.argmax(axis=2)
-    elif all_conc_pred.ndim == 4:
-        all_c = all_conc_pred.argmax(axis=3).squeeze(1)
+    if is_dpl:
+        # Consistent y and c given by argmax (c, y) p(c, y | x)
+        worlds = (
+            outer_product(torch.tensor(all_conc_pred).squeeze(1))
+            if dataset in ["chx", "derma", "rival", "cifar"]
+            else outer_product(torch.tensor(all_conc_pred))
+        )  # p(c | x)
+
+        # p(y, c | x) = p(y | c) * p(c | x)
+        joint = worlds.unsqueeze(2) * circuit.unsqueeze(0)
+        B, C, Y = (
+            joint.shape
+        )  # B: batch size, C: number of concepts, Y: number of labels
+        joint_flat = joint.view(B, -1)  # shape (B, C*Y)
+        idx = joint_flat.argmax(dim=1)  # (876,)
+
+        c_idx = idx // Y  # integer division to get concept index
+        y_idx = idx % Y  # modulus to get label index
+
+        # to numpy
+        c_idx = c_idx.cpu().numpy()
+        y_idx = y_idx.cpu().numpy()
+
+        # override all_preds and all_c with the consistent predictions
+        all_preds = y_idx
+        all_c = c_idx
+
+        num_concepts = (
+            all_conc_pred.shape[2]
+            if dataset in ["chx", "derma", "rival", "cifar"]
+            else all_conc_pred.shape[1]
+        )
+        all_c = (
+            c_idx[:, None] >> np.arange(num_concepts - 1, -1, -1)
+        ) & 1  # convert back to binary concept vector
+
+    else:
+        # find predicted concept and probability distribution: argmax p(c|x) e.g. ltn
+        if all_conc_pred.ndim == 2:
+            all_c = all_conc_pred.argmax(axis=1)
+        elif all_conc_pred.ndim == 3:
+            all_c = all_conc_pred.argmax(axis=2)
+        elif all_conc_pred.ndim == 4:
+            all_c = all_conc_pred.argmax(axis=3).squeeze(1)
 
     if multilabel:
         f1, acc, rec = 0.0, 0.0, 0.0
@@ -381,10 +424,10 @@ def conditional_conformal_metrics(
     de_numerator, de_denominator = 0, 0
 
     for i in range(N):
-        tuples_i = concept_tuples[i]   # (K, n_concepts)
-        labels_i = label_sets[i]        # (M, 1) or (M,)
-        c_star   = true_concepts[i]     # (n_concepts,)
-        y_star   = true_labels[i]
+        tuples_i = concept_tuples[i]  # (K, n_concepts)
+        labels_i = label_sets[i]  # (M, 1) or (M,)
+        c_star = true_concepts[i]  # (n_concepts,)
+        y_star = true_labels[i]
 
         flat_labels = labels_i.ravel()
 

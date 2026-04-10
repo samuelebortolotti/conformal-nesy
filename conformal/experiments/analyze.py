@@ -209,7 +209,7 @@ def beautify_method_names(table_df, nesy_method):
         "Conformal with Abduction": "TaskPlusAbduction",
         "Conformal only Labels": "TaskOnly",
         "Conformal both Concepts and Labels with Concept Refinement": "JCC",
-        "Conformal both Concepts and Labels with Label Refinement": "JCL",
+        "Conformal both Concepts and Labels with Label Refinement": "bastani",
         "Conformal both Concepts and Labels with Concept and Label Refinement": "method",
     }
 
@@ -267,6 +267,7 @@ def generate_latex_table(rows, nesy_method):
         "TaskPlusAbduction",
         "ConceptsOnly",
         "ConceptsPlusDeduction",
+        "bastani",
         "method"
     ]
 

@@ -78,7 +78,7 @@ class DPL(NeSyModel):
             else outer_product(concepts)
         )
         query_prob = torch.matmul(worlds, self.circuit)
-        return self._normalize(query_prob), None
+        return self._normalize(query_prob), (self.circuit)
 
     def _boia_inference(self, pCs):
         """Factored ProbLog inference for BOIA task"""
@@ -116,7 +116,7 @@ class DPL(NeSyModel):
         pred = torch.cat([labels_FS, labels_L, labels_R], dim=1)
         # avoid overflow
         pred = (pred + 1e-5) / (1 + 2 * 1e-5)
-        return pred
+        return pred, (w_FS, w_L, w_R)
 
     def _compute_worlds(self, concept_probs):
         """Computes joint probability of worlds using outer products"""

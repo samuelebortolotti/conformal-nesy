@@ -258,6 +258,7 @@ def train(
                     else True
                 ),
                 multilabel=False if args.dataset not in ["boia"] else True,
+                is_dpl=args.nesy == "dpl",
             )
         )
         statistics.log(
@@ -310,6 +311,7 @@ def evaluate_and_log_model(
                 else True
             ),
             multilabel=False if args.dataset not in ["boia"] else True,
+            is_dpl=args.nesy == "dpl",
         )
     )
     log(
@@ -331,6 +333,7 @@ def evaluate_and_log_model(
                     else True
                 ),
                 multilabel=False if args.dataset not in ["boia"] else True,
+                is_dpl=args.nesy == "dpl",
             )
         )
         log("> Predictions collected.", "INFO")

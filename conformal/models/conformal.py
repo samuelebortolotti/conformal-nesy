@@ -200,25 +200,25 @@ class ConformalPredictor:
         )
 
         # SANITY CHECK
-        import matplotlib.pyplot as plt
+        # import matplotlib.pyplot as plt
 
-        for i in range(k):
-            concept_scores = scores[:, i]
-            q = self.per_concept_thresholds[i]
+        # for i in range(k):
+        #     concept_scores = scores[:, i]
+        #     q = self.per_concept_thresholds[i]
 
-            plt.figure()
+        #     plt.figure()
 
-            # Histogram of scores
-            plt.hist(concept_scores, bins=50)
+        #     # Histogram of scores
+        #     plt.hist(concept_scores, bins=50)
 
-            # Quantile line
-            plt.axvline(q)
+        #     # Quantile line
+        #     plt.axvline(q)
 
-            plt.title(f"Concept {i} score distribution")
-            plt.xlabel("Nonconformity score")
-            plt.ylabel("Frequency")
-            plt.savefig(f"{self.experiment_name}_concept_{i}_scores.pdf")
-            plt.close()
+        #     plt.title(f"Concept {i} score distribution")
+        #     plt.xlabel("Nonconformity score")
+        #     plt.ylabel("Frequency")
+        #     plt.savefig(f"{self.experiment_name}_concept_{i}_scores.pdf")
+        #     plt.close()
 
     def calibrate_labels(self, dl, alpha=0.1):
         """
@@ -249,25 +249,25 @@ class ConformalPredictor:
 
         # SANITY CHECK
 
-        import matplotlib.pyplot as plt
+        # import matplotlib.pyplot as plt
 
-        for i in range(k):
-            label_scores = scores if len(scores.shape) == 1 else scores[:, i]
-            q = self.label_threshold
+        # for i in range(k):
+        #     label_scores = scores if len(scores.shape) == 1 else scores[:, i]
+        #     q = self.label_threshold
 
-            plt.figure()
+        #     plt.figure()
 
-            # Histogram of scores
-            plt.hist(label_scores, bins=50)
+        #     # Histogram of scores
+        #     plt.hist(label_scores, bins=50)
 
-            # Quantile line
-            plt.axvline(q)
+        #     # Quantile line
+        #     plt.axvline(q)
 
-            plt.title(f"Label {i} score distribution")
-            plt.xlabel("Nonconformity score")
-            plt.ylabel("Frequency")
-            plt.savefig(f"{self.experiment_name}_label_{i}_scores.pdf")
-            plt.close()
+        #     plt.title(f"Label {i} score distribution")
+        #     plt.xlabel("Nonconformity score")
+        #     plt.ylabel("Frequency")
+        #     plt.savefig(f"{self.experiment_name}_label_{i}_scores.pdf")
+        #     plt.close()
 
     def _build_concept_sets_for_batch(self, conc_pred):
 
@@ -392,10 +392,13 @@ class ConformalPredictor:
                 refined_batch_tuples.append(valid_tuples)
             else:
                 derived_labels = self.logic.forward_multi_set(filtered_tuples)
-                valid_mask = np.array([
-                    len(np.intersect1d(row_labels, labels)) > 0
-                    for row_labels in derived_labels
-                ], dtype=bool)
+                valid_mask = np.array(
+                    [
+                        len(np.intersect1d(row_labels, labels)) > 0
+                        for row_labels in derived_labels
+                    ],
+                    dtype=bool,
+                )
                 valid_tuples = filtered_tuples[valid_mask]
                 refined_batch_tuples.append(valid_tuples)
 
@@ -535,7 +538,7 @@ class ConformalPredictor:
             cursor += count
 
         return batch_label_sets
-    
+
     @torch.no_grad()
     def predict_labels(self, dl, batch_tuples=None, use_hard_logic=False):
         """
@@ -559,11 +562,13 @@ class ConformalPredictor:
                 if batch_tuples is None:
                     raise ValueError("batch_tuples required when use_hard_logic=True")
 
-                current_batch_tuples = batch_tuples[tuple_idx: tuple_idx + data.size(0)]
+                current_batch_tuples = batch_tuples[
+                    tuple_idx : tuple_idx + data.size(0)
+                ]
                 batch_label_sets = self.predict_label_set(
                     label_pred=None,
                     batch_tuples=current_batch_tuples,
-                    use_hard_logic=True
+                    use_hard_logic=True,
                 )
                 tuple_idx += data.size(0)
             else:
@@ -572,7 +577,6 @@ class ConformalPredictor:
             all_label_sets.extend(batch_label_sets)
 
         return all_label_sets
-
 
     @torch.no_grad()
     def predict_label_set(self, label_pred, batch_tuples=None, use_hard_logic=False):

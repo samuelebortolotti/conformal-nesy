@@ -19,11 +19,13 @@ def indices_to_concepts(indices, n_concepts, concept_dim):
     return concepts
 
 
-def dpl_argmax_world(all_conc_pred):
+def dpl_argmax_world(all_conc_pred, circuit):
     """
     all_conc_pred: (batch, n_concepts, concept_dim)
+    circuit: (batch, n_concepts, n_labels)
     returns:
         concept_assignments: (batch, n_concepts)
+        label_assignments: (batch, n_labels)
     """
 
     if all_conc_pred.ndim == 3:
@@ -34,15 +36,21 @@ def dpl_argmax_world(all_conc_pred):
 
     worlds = outer_product(torch.tensor(all_conc_pred))
 
-    best_world_idx = torch.argmax(worlds, dim=1).cpu().numpy()
+    joint = worlds.unsqueeze(2) * circuit.unsqueeze(0)
+    B, C, Y = joint.shape  # B: batch size, C: number of concepts, Y: number of labels
+    joint_flat = joint.view(B, -1)  # shape (B, C*Y)
+    idx = joint_flat.argmax(dim=1)  # (876,)
 
-    best_concepts = indices_to_concepts(
-        best_world_idx,
-        n_concepts,
-        concept_dim
-    )
+    c_idx = idx // Y  # integer division to get concept index
+    y_idx = idx % Y  # modulus to get label index
 
-    return best_concepts
+    # to numpy
+    best_world_idx = c_idx.cpu().numpy()
+    best_labels = y_idx.cpu().numpy()
+
+    best_concepts = indices_to_concepts(best_world_idx, n_concepts, concept_dim)
+
+    return best_concepts, best_labels
 
 
 def collect_predictions(
@@ -54,6 +62,7 @@ def collect_predictions(
     multiclass=False,
     multilabel=False,
     permutation=None,
+    is_dpl=False,
 ):
     """
     Compute loss and F1 score for the dataset (train or validation).
@@ -65,12 +74,13 @@ def collect_predictions(
     all_g = []
     all_conc_pred = []
     all_output_raw = []
+    circuit = None  # Only used for DPL, to compute p(y | c) from the circuit layer
 
     for data, concepts, target in data_loader:
         data = data.to(device)
         target = target.to(device)
 
-        output, conc_pred, _ = model(data, eval=True)
+        output, conc_pred, extra = model(data, eval=True)
 
         if permutation is not None:
             conc_pred = align_knowledge_input(
@@ -93,13 +103,16 @@ def collect_predictions(
         all_g.append(concepts.cpu().numpy())
         all_output_raw.append(output.detach().cpu().numpy())
 
+        if is_dpl and circuit is None:
+            circuit = extra.detach().cpu()
+
     all_labels = np.concatenate(all_labels)
     all_preds = np.concatenate(all_preds)
     all_conc_pred = np.concatenate(all_conc_pred)
     all_g = np.concatenate(all_g)
     all_output_raw = np.concatenate(all_output_raw)
 
-    if nesy_model != "dpl":
+    if not is_dpl:
         if all_conc_pred.ndim == 2:
             all_c = all_conc_pred.argmax(axis=1)
         elif all_conc_pred.ndim == 3:
@@ -107,7 +120,7 @@ def collect_predictions(
         else:
             all_c = all_conc_pred.argmax(axis=3).squeeze(1)
     else:
-        all_c = dpl_argmax_world(all_conc_pred)
+        all_c, all_preds = dpl_argmax_world(all_conc_pred, circuit)
 
     return (
         all_labels,

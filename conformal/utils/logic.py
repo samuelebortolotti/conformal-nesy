@@ -56,14 +56,21 @@ class DSLLogic(BaseLogic):
 
 
 class HardLogic(BaseLogic):
-    def __init__(self, logic_lambda, n_concepts, concept_dim, is_too_big=False, multi_set_logic=None):
+    def __init__(
+        self,
+        logic_lambda,
+        n_concepts,
+        concept_dim,
+        is_too_big=False,
+        multi_set_logic=None,
+    ):
         super().__init__(n_concepts, concept_dim, is_too_big)
         self.logic = logic_lambda
         self.multi_set_logic = multi_set_logic
 
     def forward(self, x):
         return self.logic(x)
-    
+
     def forward_multi_set(self, x):
         if self.multi_set_logic is not None:
             return self.multi_set_logic(x)
@@ -117,12 +124,16 @@ class HardLogic(BaseLogic):
 
         for pred_y in y:
             if pred_y.size == 0:
-                concept_sets.append(np.array([[self.EMPTY_TOKEN for _ in range(self.n_concepts)]]))
+                concept_sets.append(
+                    np.array([[self.EMPTY_TOKEN for _ in range(self.n_concepts)]])
+                )
             else:
                 vals = []
                 for el_y in pred_y:
                     key = el_y.item()
-                    assert key in self.label_to_world_dict, f"Missing key in label to concept dictionary for abduction: {key}"
+                    assert (
+                        key in self.label_to_world_dict
+                    ), f"Missing key in label to concept dictionary for abduction: {key}"
                     vals.append(self.label_to_world_dict[key])
                 concept_sets.append(np.vstack(vals))
         return concept_sets

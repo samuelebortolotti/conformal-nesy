@@ -6,7 +6,7 @@ from conformal.utils.alignment import (
     align_concepts,
     align_knowledge_input,
 )
-from functools import reduce
+from itertools import product
 
 
 class ConformalEPredictor(ConformalPredictor):
@@ -15,7 +15,15 @@ class ConformalEPredictor(ConformalPredictor):
     instead of p-values / quantile thresholds.
     """
 
-    def __init__(self, *args, alpha=0.1, beta=0.1, max_size_concepts=None, max_size_labels=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        alpha=0.1,
+        beta=0.1,
+        max_size_concepts=None,
+        max_size_labels=None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
 
         # Chosen alpha and beta parameters for e-value computation
@@ -37,7 +45,6 @@ class ConformalEPredictor(ConformalPredictor):
     def compute_soft_rank_evalue(self, score, score_sum, n):
         """Compute the soft-rank e-value for a given conformity score."""
         return (n + 1) * score / (score_sum + score)
-    
 
     @torch.no_grad()
     def compute_conformity_scores(self, dl):
@@ -82,7 +89,8 @@ class ConformalEPredictor(ConformalPredictor):
                         -torch.log(
                             conc_pred[:, i, j, :][
                                 range(concepts.size(0)), concepts[:, j].long()
-                            ] + 1e-12
+                            ]
+                            + 1e-12
                         )
                         for i in range(self.n_concepts)
                         for j in range(concepts.size(1))
@@ -95,7 +103,8 @@ class ConformalEPredictor(ConformalPredictor):
                         -torch.log(
                             conc_pred[:, i, :][
                                 range(concepts.size(0)), concepts[:, i].long()
-                            ] + 1e-12
+                            ]
+                            + 1e-12
                         )
                         for i in range(concepts.size(1))
                     ],
@@ -105,7 +114,6 @@ class ConformalEPredictor(ConformalPredictor):
             all_scores.append(batch_scores.cpu().numpy())
 
         return np.concatenate(all_scores, axis=0)
-
 
     @torch.no_grad()
     def compute_label_scores(self, dl):
@@ -123,21 +131,23 @@ class ConformalEPredictor(ConformalPredictor):
             if self.multilabel:
                 batch_scores = torch.stack(
                     [
-                        - torch.log(
+                        -torch.log(
                             label_pred[:, i, :][
                                 range(labels.size(0)), labels[:, i].long()
-                            ] + 1e-12
+                            ]
+                            + 1e-12
                         )
                         for i in range(labels.size(1))
                     ],
                     dim=1,
                 )
             else:
-                batch_scores = - torch.log(label_pred[range(len(labels)), labels.long()] + 1e-12)
+                batch_scores = -torch.log(
+                    label_pred[range(len(labels)), labels.long()] + 1e-12
+                )
             all_scores.append(batch_scores.cpu().numpy())
 
         return np.concatenate(all_scores)
-
 
     @torch.no_grad()
     def calibrate_per_concept(self, dl):
@@ -159,8 +169,33 @@ class ConformalEPredictor(ConformalPredictor):
         log(f"[E-CP] Concept calibration samples: {self.n_concept_cal}", "INFO")
         log(f"[E-CP] Concept score sums: {self.concept_score_sums}", "INFO")
 
+    def compute_label_evalues(self, scores):
+        """
+        scores: shape (B, n_classes) - score for each candidate class
+        computed as -log P(k|x) for each k in {0,...,n_classes-1}
+        """
+        scores = scores.squeeze(1)
+        _, n_classes = scores.shape
 
-    def compute_evalues(self, scores):
+        evalues = np.stack(
+            [
+                self.compute_soft_rank_evalue(
+                    scores[:, j].numpy(),
+                    self.label_score_sum,  # sum of calibration scores (N,)
+                    self.n_label_cal,
+                )
+                for j in range(n_classes)
+            ],
+            axis=1,
+        )  # (B, n_classes)
+
+        combos = np.arange(n_classes)  # (5,)
+
+        # self._plot_evalues(evalues, prefix="label", threshold=1/self.beta)
+
+        return evalues, combos
+
+    def compute_concept_evalues(self, scores):
         """
         scores: shape (B, n_values, n_classes)
         """
@@ -176,24 +211,49 @@ class ConformalEPredictor(ConformalPredictor):
                     self.n_concept_cal,
                 )
                 e_list.append(e)
-            per_concept_e.append(np.stack(e_list, axis=1)) # shape (B, n_classes)
-        joint_evalues = np.stack(per_concept_e, axis=1)  # shape (B, n_values, n_classes)
-        joint_evalues = np.array([
-            reduce(np.kron, joint_evalues[b])
-            for b in range(joint_evalues.shape[0])
-        ])
+            per_concept_e.append(np.stack(e_list, axis=1))  # shape (B, n_classes)
+        joint_evalues = np.stack(
+            per_concept_e, axis=1
+        )  # shape (B, n_values, n_classes)
 
-        return joint_evalues
+        # Note: joint_evalues[0, i, j] how likely it is that concept i has value j?
+        _, n_concepts, n_classes = joint_evalues.shape
+        combos = np.array(list(product(range(n_classes), repeat=n_concepts)))  # (16, 4)
 
+        # self._plot_evalues(
+        #     joint_evalues.reshape(joint_evalues.shape[0], -1),  # (B, n_concepts * n_classes)
+        #     prefix="concept",
+        #     threshold=1/self.beta
+        # )
 
-    def compute_label_evalues(self, scores):
-        """scores: shape (B,) for single-label, (B, n_labels) for multi-label"""
-        return self.compute_soft_rank_evalue(
-            scores,
-            self.label_score_sum,
-            self.n_label_cal,
-        )
+        result = np.prod(
+            joint_evalues[:, np.arange(n_concepts), combos],  # (B, 16, n_concepts)
+            axis=-1,
+        )  # (B, 16)
 
+        return result, combos
+
+    def _plot_evalues(self, evalues, prefix, threshold):
+        """evalues: (B, n_classes) or (B, n_combos)"""
+        import matplotlib.pyplot as plt
+
+        for j in range(evalues.shape[1]):
+            fig, ax = plt.subplots(figsize=(6, 4))
+            ax.hist(evalues[:, j], bins=30, edgecolor="black", alpha=0.7)
+            ax.axvline(
+                x=threshold,
+                color="red",
+                linestyle="--",
+                linewidth=2,
+                label=f"1/beta = {threshold:.2f}",
+            )
+            ax.set_xlabel("E-value", fontsize=14)
+            ax.set_ylabel("Frequency", fontsize=14)
+            ax.set_title(f"E-value distribution - {prefix} class {j}", fontsize=14)
+            ax.legend()
+            plt.tight_layout()
+            plt.savefig(f"plot_score_{j}_{prefix}_evalue.pdf")
+            plt.close()
 
     @torch.no_grad()
     def calibrate_labels(self, dl):
@@ -229,26 +289,42 @@ class ConformalEPredictor(ConformalPredictor):
             decoded.append(np.array(combo[::-1]))  # reverse to get correct order
         return decoded
 
-    def _build_sets_for_batch(self, conc_pred, beta, pad=False):
-        scores = -torch.log(conc_pred.cpu() + 1e-12)  # shape (B, n_concepts, n_classes)
-        evalues = self.compute_evalues(scores) # shape (B, n_classes)
-        mask = evalues <= 1 / beta  # shape (B, n_classes)
+    def _build_sets_for_batch(self, conc_pred, beta, is_label=False, pad=False):
+
+        scores = -torch.log(conc_pred.cpu() + 1e-12)  # (B, n_concepts, n_classes)
+
+        if is_label:
+            evalues, combos = self.compute_label_evalues(
+                scores
+            )  # (B, n_classes), (n_classes,)
+        else:
+            evalues, combos = self.compute_concept_evalues(
+                scores
+            )  # (B, 16), (16, n_concepts)
+
+        mask = evalues < 1 / beta  # (B, 16)
 
         batch_sets = []
-        n_concepts = conc_pred.shape[1]
-        n_classes = conc_pred.shape[2]
-
         for b in range(mask.shape[0]):
             active = np.where(mask[b])[0]
-
             if len(active) == 0:
-                batch_sets.append(np.expand_dims(np.array([self.EMPTY_TOKEN for _ in range(n_concepts)]), axis=0))
+                if is_label:
+                    batch_sets.append(np.array([[self.EMPTY_TOKEN]]))
+                else:
+                    n_concepts = conc_pred.shape[1]
+                    batch_sets.append(
+                        np.expand_dims(
+                            np.array([self.EMPTY_TOKEN for _ in range(n_concepts)]),
+                            axis=0,
+                        )
+                    )
             else:
-                decoded = self._decode_indices(active, n_concepts, n_classes)
-                batch_sets.append(np.array(decoded))
+                if is_label:
+                    batch_sets.append(combos[active].reshape(-1, 1))  # (n_active, 1)
+                else:
+                    batch_sets.append(combos[active])  # (n_active, n_concepts)
 
         return batch_sets
-
 
     @torch.no_grad()
     def predict_concepts_and_labels(
@@ -294,7 +370,9 @@ class ConformalEPredictor(ConformalPredictor):
                 )
 
             # Build the initial "Conformal Tuples" (Cartesian Product)
-            batch_tuples = self._build_sets_for_batch(conc_pred, beta_concepts, pad=True)
+            batch_tuples = self._build_sets_for_batch(
+                conc_pred.squeeze(1), beta_concepts, pad=True
+            )
             all_concept_tuples.extend(batch_tuples)
 
             if label_pred.ndim == 2:  # multi-label case
@@ -302,7 +380,7 @@ class ConformalEPredictor(ConformalPredictor):
 
             # Build Label Sets
             batch_label_sets = self._build_sets_for_batch(
-                label_pred, alpha_labels
+                label_pred, alpha_labels, is_label=True, pad=False
             )
             all_label_sets.extend(batch_label_sets)
 
