@@ -214,7 +214,7 @@ class ConformalEPredictor(ConformalPredictor):
             per_concept_e.append(np.stack(e_list, axis=1))  # shape (B, n_classes)
         joint_evalues = np.stack(
             per_concept_e, axis=1
-        )  # shape (B, n_values, n_classes)
+        )  # shape (B, n_values, n_classes) 128, 16, 2
 
         # Note: joint_evalues[0, i, j] how likely it is that concept i has value j?
         _, n_concepts, n_classes = joint_evalues.shape

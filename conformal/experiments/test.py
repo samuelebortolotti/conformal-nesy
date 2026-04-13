@@ -21,6 +21,7 @@ from conformal.statistics.metrics import (
     conditional_conformal_metrics,
 )
 from conformal.models.conformal import ConformalPredictor
+from conformal.models.econformal import ConformalEPredictor
 from conformal.utils.visualization import (
     plot_conformal_comparison,
     plot_model_metrics,
@@ -775,6 +776,62 @@ def conformal_evaluation(
     results_storage[
         "Conformal both Concepts and Labels with Concept and Label Refinement"
     ] = {
+        "coverage_concepts": concept_coverage,
+        "concept_size": concept_set_size,
+        "coverage_labels": label_coverage,
+        "label_size": label_size,
+        "concept_consistency": concept_consistency,
+        "label_consistency": label_consistency,
+    }
+
+    log("=== 10. Conformal with Concept and Label Refinement (E-Values) ===", "INFO")
+
+    cp_e = ConformalEPredictor(
+        model,
+        device=device,
+        logic=logic,
+        dataset=args.dataset,
+        concept_dim=model.concept_dim,
+        n_concepts=model.n_images,
+        experiment_name=str(args.output_dir_path / f"{experiment_name}"),
+        multiconcepts=multiconcept,
+        multilabel=multilabel,
+    )
+
+    cp_e.calibrate_per_concept(val_dl)
+    cp_e.calibrate_labels(val_dl)
+
+    concept_sets, label_sets = cp_e.predict_concepts_and_labels(
+        test_dl, alpha_labels=alpha_label, beta_concepts=alpha_concepts
+    )
+
+    concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
+    label_coverage, label_size = conformal_metrics(
+        label_sets, np.expand_dims(all_labels, axis=1)
+    )
+
+    log(f"[E-Value Refinement] Concept Coverage: {concept_coverage:.4f}", "INFO")
+    log(f"[E-Value Refinement] Concept Set Size: {concept_set_size:.4f}", "INFO")
+    log(f"[E-Value Refinement] Label Coverage: {label_coverage:.4f}", "INFO")
+    log(f"[E-Value Refinement] Label Set Size: {label_size:.4f}", "INFO")
+
+    concept_consistency, label_consistency = prediction_consistency(
+        concept_sets, label_sets, logic
+    )
+
+    log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
+    log(f"Label Consistency: {label_consistency:.4f}", "INFO")
+
+    save_visual_examples(
+        test_dl.dataset,
+        concept_sets,
+        label_sets,
+        "Conformal with E-Value Concept and Label Refinement",
+        args.output_dir_path,
+        is_image=is_image,
+    )
+
+    results_storage["Conformal with E-Value Concept and Label Refinement"] = {
         "coverage_concepts": concept_coverage,
         "concept_size": concept_set_size,
         "coverage_labels": label_coverage,

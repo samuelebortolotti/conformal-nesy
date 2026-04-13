@@ -211,6 +211,7 @@ def beautify_method_names(table_df, nesy_method):
         "Conformal both Concepts and Labels with Concept Refinement": "JCC",
         "Conformal both Concepts and Labels with Label Refinement": "bastani",
         "Conformal both Concepts and Labels with Concept and Label Refinement": "method",
+        "Conformal with E-Value Concept and Label Refinement": "EMethod",
     }
 
     return table_df.rename(index=row_map)
@@ -252,7 +253,7 @@ def generate_latex_table(rows, nesy_method):
     )
 
     agg_df["mean_std"] = agg_df.apply(
-        lambda x: f"${x['mean']:5.3f} \\pm {x['std']:5.3f}$", axis=1
+        lambda x: f"${x['mean']:.3g} \\pm {x['std']:.3g}$", axis=1
     )
 
     table_df = agg_df.pivot(index="setting", columns="metric", values="mean_std")
@@ -268,7 +269,8 @@ def generate_latex_table(rows, nesy_method):
         "ConceptsOnly",
         "ConceptsPlusDeduction",
         "bastani",
-        "method"
+        "method",
+        "EMethod"
     ]
 
     table_df = table_df.reindex(desired_order)

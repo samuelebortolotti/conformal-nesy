@@ -108,17 +108,17 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     average_deltas = {}
     for row in all_rows:
         if "delta_ab" in row["metric"]:
-            delta_ab = row["value"]
-            average_deltas.setdefault("delta_ab", []).append(delta_ab)
+            average_deltas.setdefault("delta_ab", []).append(row["value"])
         if "delta_de" in row["metric"]:
-            delta_de = row["value"]
-            average_deltas.setdefault("delta_de", []).append(delta_de)
+            average_deltas.setdefault("delta_de", []).append(row["value"])
 
+    summary = {}
     for delta_name, values in average_deltas.items():
-        average_value = sum(values) / len(values)
-        average_deltas[delta_name] = average_value
+        mean = sum(values) / len(values)
+        std = (sum((v - mean) ** 2 for v in values) / len(values)) ** 0.5
+        summary[delta_name] = {"mean": mean, "std": std, "n": len(values)}
         log(
-            f"Average {delta_name}: {average_value:.4f} with {len(values)} samples",
+            f"Average {delta_name}: {mean:.4f} ± {std:.4f} with {len(values)} samples",
             "INFO",
         )
 
@@ -135,8 +135,12 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
 
     with open(delta_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(average_deltas.keys())
-        writer.writerow(average_deltas.values())
+        writer.writerow(
+            [f"{name}_mean" for name in summary] + [f"{name}_std" for name in summary]
+        )
+        writer.writerow(
+            [v["mean"] for v in summary.values()] + [v["std"] for v in summary.values()]
+        )
 
     log("Results written successfully.", "INFO")
 

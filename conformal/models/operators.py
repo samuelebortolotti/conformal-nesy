@@ -520,7 +520,8 @@ class chx_ltn_loss(torch.nn.Module):
         return self.forward_healthy_malignant(pred_concepts, labels)
 
     def forward_multi_class(self, pred_concepts, labels):
-        x = ltn.Variable("x", pred_concepts[:, 0, :, 1])
+        # Apprendibili stanno in predicate or in function.
+        x = ltn.Variable("x", pred_concepts[:, 0, :, 1]) # Rete Neurale
         l = ltn.Variable("l", labels)
 
         # Symptom variables
@@ -529,7 +530,10 @@ class chx_ltn_loss(torch.nn.Module):
         ]
 
         # predicates
-        is_present = ltn.Predicate(func=lambda c, idx: torch.gather(c, 1, idx.long()))
+        is_present = ltn.Predicate(
+            func=lambda c, idx: 
+            torch.gather(c, dim=1, index=idx.long())
+        )  
 
         # label is the sum of symtom
         def condition():

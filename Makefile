@@ -10,14 +10,14 @@ CS := 0.0 1.0
 run_mnist:
 	@for seed in $(SEEDS); do \
 		# Run mnistadd (digit=2) \
-		echo "Running seed=$$seed, epochs=20, digit=2 (mnistadd)"; \
+		echo "Running seed=$$seed, epochs=200, digit=2 (mnistadd)"; \
 		python -m conformal --seed $$seed CONF_MNIST_20_EP train \
 			--learning-rate 0.1 \
 			--momentum 0.1 \
 			--batch-size 32 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistadd \
 			lenet dpl; \
 		python -m conformal --seed $$seed CONF_MNIST_20_EP train \
@@ -26,7 +26,7 @@ run_mnist:
 			--batch-size 64 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistadd \
 			lenet ltn \
 			--and_op prod \
@@ -39,7 +39,7 @@ run_mnist:
 			--batch-size 32 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistadd \
 			lenet dpl; \
 		python -m conformal --seed $$seed CONF_MNIST_20_EP test \
@@ -48,7 +48,7 @@ run_mnist:
 			--batch-size 64 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistadd \
 			lenet ltn \
 			--and_op prod \
@@ -58,14 +58,14 @@ run_mnist:
 		\
 		# Run mnistaddn for multiple digits \
 		for digit in $(DIGITS); do \
-			echo "Running seed=$$seed, epochs=20, digit=$$digit (mnistaddn)"; \
+			echo "Running seed=$$seed, epochs=200, digit=$$digit (mnistaddn)"; \
 			python -m conformal --seed $$seed CONF_MNIST_20_EP train \
 				--learning-rate 0.1 \
 				--momentum 0.1 \
 				--batch-size 32 \
 				--opt sgd \
 				--concept-sup 0.0 \
-				--epochs 20 \
+				--epochs 200\
 				mnistaddn --n-digits $$digit \
 				lenet dpl; \
 			python -m conformal --seed $$seed CONF_MNIST_20_EP test \
@@ -74,7 +74,7 @@ run_mnist:
 				--batch-size 32 \
 				--opt sgd \
 				--concept-sup 0.0 \
-				--epochs 20 \
+				--epochs 200\
 				mnistaddn --n-digits $$digit \
 				lenet dpl; \
 			python -m conformal --seed $$seed CONF_MNIST_20_EP test \
@@ -83,7 +83,7 @@ run_mnist:
 				--batch-size 64 \
 				--opt sgd \
 				--concept-sup 0.0 \
-				--epochs 20 \
+				--epochs 200\
 				mnistaddn --n-digits $$digit \
 				lenet ltn \
 				--and_op prod \
@@ -99,7 +99,7 @@ run_mnist:
 		--batch-size 32 \
 		--opt sgd \
 		--concept-sup 0.0 \
-		--epochs 20 \
+		--epochs 200\
 		mnistadd \
 		lenet dpl; \
 	python -m conformal CONF_MNIST_20_EP analyze \
@@ -108,7 +108,7 @@ run_mnist:
 		--batch-size 64 \
 		--opt sgd \
 		--concept-sup 0.0 \
-		--epochs 20 \
+		--epochs 200\
 		mnistadd \
 		lenet ltn \
 		--and_op prod \
@@ -116,14 +116,14 @@ run_mnist:
 		--imp_op prod \
 		--p 8; \
 	for digit in $(DIGITS); do \
-		echo "Running analyze epochs=20, digit=$$digit (mnistaddn)"; \
+		echo "Running analyze epochs=200, digit=$$digit (mnistaddn)"; \
 		python -m conformal CONF_MNIST_20_EP analyze \
 			--learning-rate 0.1 \
 			--momentum 0.1 \
 			--batch-size 32 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistaddn --n-digits $$digit \
 			lenet dpl; \
 		python -m conformal CONF_MNIST_20_EP analyze \
@@ -132,7 +132,7 @@ run_mnist:
 			--batch-size 64 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistaddn --n-digits $$digit \
 			lenet ltn \
 			--and_op prod \
@@ -144,14 +144,14 @@ run_mnist:
 run_mnist_test:
 	@for seed in $(SEEDS); do \
 		# Run mnistadd (digit=2) \
-		echo "Running seed=$$seed, epochs=20, digit=2 (mnistadd)"; \
+		echo "Running seed=$$seed, epochs=200, digit=2 (mnistadd)"; \
 		python -m conformal --seed $$seed CONF_MNIST_20_EP test \
 			--learning-rate 0.1 \
 			--momentum 0.1 \
 			--batch-size 32 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistadd \
 			lenet dpl; \
 		\
@@ -161,7 +161,7 @@ run_mnist_test:
 			--batch-size 64 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistadd \
 			lenet ltn \
 			--and_op prod \
@@ -171,14 +171,14 @@ run_mnist_test:
 		\
 		# Run mnistaddn for multiple digits \
 		for digit in $(DIGITS); do \
-			echo "Running seed=$$seed, epochs=20, digit=$$digit (mnistaddn)"; \
+			echo "Running seed=$$seed, epochs=200, digit=$$digit (mnistaddn)"; \
 			python -m conformal --seed $$seed CONF_MNIST_20_EP test \
 				--learning-rate 0.1 \
 				--momentum 1e-05 \
 				--batch-size 64 \
 				--opt sgd \
 				--concept-sup 0.0 \
-				--epochs 20 \
+				--epochs 200\
 				mnistaddn --n-digits $$digit \
 				lenet dpl; \
 			python -m conformal --seed $$seed CONF_MNIST_20_EP test \
@@ -187,7 +187,7 @@ run_mnist_test:
 				--batch-size 64 \
 				--opt sgd \
 				--concept-sup 0.0 \
-				--epochs 20 \
+				--epochs 200\
 				mnistaddn --n-digits $$digit \
 				lenet ltn \
 				--and_op prod \
@@ -203,7 +203,7 @@ run_mnist_test:
 		--batch-size 32 \
 		--opt sgd \
 		--concept-sup 0.0 \
-		--epochs 20 \
+		--epochs 200\
 		mnistadd \
 		lenet dpl; \
 	python -m conformal CONF_MNIST_20_EP analyze \
@@ -212,7 +212,7 @@ run_mnist_test:
 		--batch-size 64 \
 		--opt sgd \
 		--concept-sup 0.0 \
-		--epochs 20 \
+		--epochs 200\
 		mnistadd \
 		lenet ltn \
 		--and_op prod \
@@ -220,14 +220,14 @@ run_mnist_test:
 		--imp_op prod \
 		--p 8; \
 	for digit in $(DIGITS); do \
-		echo "Running analyze epochs=20, digit=$$digit (mnistaddn)"; \
+		echo "Running analyze epochs=200, digit=$$digit (mnistaddn)"; \
 		python -m conformal CONF_MNIST_20_EP analyze \
 			--learning-rate 0.1 \
 			--momentum 0.1 \
 			--batch-size 32 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistaddn --n-digits $$digit \
 			lenet dpl; \
 		python -m conformal CONF_MNIST_20_EP analyze \
@@ -236,7 +236,7 @@ run_mnist_test:
 			--batch-size 64 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistaddn --n-digits $$digit \
 			lenet ltn \
 			--and_op prod \
@@ -254,7 +254,7 @@ run_mnist_analysis_only:
 		--batch-size 32 \
 		--opt sgd \
 		--concept-sup 0.0 \
-		--epochs 20 \
+		--epochs 200\
 		mnistadd \
 		lenet dpl; \
 	python -m conformal CONF_MNIST_20_EP analyze \
@@ -263,7 +263,7 @@ run_mnist_analysis_only:
 		--batch-size 64 \
 		--opt sgd \
 		--concept-sup 0.0 \
-		--epochs 20 \
+		--epochs 200\
 		mnistadd \
 		lenet ltn \
 		--and_op prod \
@@ -271,14 +271,14 @@ run_mnist_analysis_only:
 		--imp_op prod \
 		--p 8; \
 	for digit in $(DIGITS); do \
-		echo "Running analyze epochs=20, digit=$$digit (mnistaddn)"; \
+		echo "Running analyze epochs=200, digit=$$digit (mnistaddn)"; \
 		python -m conformal CONF_MNIST_20_EP analyze \
 			--learning-rate 0.1 \
 			--momentum 0.1 \
 			--batch-size 32 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistaddn --n-digits $$digit \
 			lenet dpl; \
 		python -m conformal CONF_MNIST_20_EP analyze \
@@ -287,7 +287,7 @@ run_mnist_analysis_only:
 			--batch-size 64 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistaddn --n-digits $$digit \
 			lenet ltn \
 			--and_op prod \
@@ -305,7 +305,7 @@ run_mnist_deltas_only:
 		--batch-size 32 \
 		--opt sgd \
 		--concept-sup 0.0 \
-		--epochs 20 \
+		--epochs 200\
 		mnistadd \
 		lenet dpl; \
 	python -m conformal CONF_MNIST_20_EP deltas \
@@ -314,7 +314,7 @@ run_mnist_deltas_only:
 		--batch-size 64 \
 		--opt sgd \
 		--concept-sup 0.0 \
-		--epochs 20 \
+		--epochs 200\
 		mnistadd \
 		lenet ltn \
 		--and_op prod \
@@ -322,14 +322,14 @@ run_mnist_deltas_only:
 		--imp_op prod \
 		--p 8; \
 	for digit in $(DIGITS); do \
-		echo "Running deltas epochs=20, digit=$$digit (mnistaddn)"; \
+		echo "Running deltas epochs=200, digit=$$digit (mnistaddn)"; \
 		python -m conformal CONF_MNIST_20_EP deltas \
 			--learning-rate 0.1 \
 			--momentum 0.1 \
 			--batch-size 32 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistaddn --n-digits $$digit \
 			lenet dpl; \
 		python -m conformal CONF_MNIST_20_EP deltas \
@@ -338,7 +338,7 @@ run_mnist_deltas_only:
 			--batch-size 64 \
 			--opt sgd \
 			--concept-sup 0.0 \
-			--epochs 20 \
+			--epochs 200\
 			mnistaddn --n-digits $$digit \
 			lenet ltn \
 			--and_op prod \
@@ -490,7 +490,7 @@ run_chx:
 
 run_chx_test:
 	@for seed in $(SEEDS); do \
-		echo "Running seed=$$seed, epochs=20"; \
+		echo "Running seed=$$seed, epochs=200"; \
 		python -m conformal --seed $$seed CONF_CHX test \
 			--learning-rate 0.0001 \
 			--momentum 0.01 \
@@ -1492,7 +1492,7 @@ run_cebab_deltas_only:
 
 run_rss:
 	@for seed in $(SEEDS); do \
-		echo "Running seed=$$seed, epochs=20"; \
+		echo "Running seed=$$seed, epochs=200"; \
 		python -m conformal --seed $$seed CONF_RSs train \
 			--learning-rate 0.1 \
 			--momentum 0.1 \
@@ -1627,7 +1627,7 @@ run_rss:
 			--p 8; \
 	done; \
 	\
-	echo "Running analyze epochs=20"; \
+	echo "Running analyze epochs=200"; \
 	python -m conformal CONF_RSs analyze \
 		--learning-rate 0.1 \
 		--momentum 0.1 \
@@ -1697,7 +1697,7 @@ run_rss:
 
 run_rss_test:
 	@for seed in $(SEEDS); do \
-		echo "Running seed=$$seed, epochs=20"; \
+		echo "Running seed=$$seed, epochs=200"; \
 		python -m conformal --seed $$seed CONF_RSs test \
 			--learning-rate 0.1 \
 			--momentum 0.1 \
@@ -1768,7 +1768,7 @@ run_rss_test:
 
 
 run_rss_analysis_only:
-	echo "Running analyze epochs=20"; \
+	echo "Running analyze epochs=200"; \
 	python -m conformal CONF_RSs analyze \
 		--learning-rate 0.1 \
 		--momentum 0.1 \
@@ -1838,7 +1838,7 @@ run_rss_analysis_only:
 
 
 run_rss_deltas_only:
-	echo "Running deltas epochs=20"; \
+	echo "Running deltas epochs=200"; \
 	python -m conformal CONF_RSs deltas \
 		--learning-rate 0.1 \
 		--momentum 0.1 \
@@ -1915,7 +1915,7 @@ run_ltn_optimize:
 		--batch-size 32 \
 		--opt adam \
 		--concept-sup 1.0 \
-		--epochs 100 \
+		--epochs 200 \
 		rival \
 		resnet18 ltn \
 		--and_op prod \
@@ -1930,55 +1930,54 @@ run_ltn_optimize:
 		--batch-size 32 \
 		--opt adam \
 		--concept-sup 1.0 \
-		--epochs 100 \
+		--epochs 200 \
 		cifar \
 		resnet18 --pretrained ltn \
 		--and_op prod \
 		--or_op prod \
 		--imp_op prod \
 		--p 6; \
-	\
 	python -m conformal CONF_A optuna \
-		--n-trials 200 \
-		--learning-rate 1e-5 \
-		--momentum 0.0001 \
-		--batch-size 32 \
-		--opt adam \
-		--concept-sup 1.0 \
-		--epochs 300 \
-		cebab \
-		bert ltn \
-		--and_op prod \
-		--or_op prod \
-		--imp_op prod \
-		--p 6; \
-	\
-	python -m conformal CONF_A optuna \
-		--n-trials 200 \
-		--learning-rate 1e-5 \
-		--momentum 0.0001 \
-		--batch-size 32 \
-		--opt adam \
-		--concept-sup 1.0 \
-		--epochs 300 \
-		chx --chx-multi-class\
-		resnet --pretrained ltn \
-		--and_op prod \
-		--or_op prod \
-		--imp_op prod \
-		--p 6; \
-	\
-	python -m conformal CONF_A optuna \
-		--n-trials 200 \
-		--learning-rate 1e-5 \
-		--momentum 0.0001 \
-		--batch-size 32 \
-		--opt adam \
-		--concept-sup 0.0 \
-		--epochs 50 \
-		mnisteovenodd \
-		lenet ltn \
-		--and_op prod \
-		--or_op prod \
-		--imp_op prod \
-		--p 6; \
+ 		--n-trials 200 \
+ 		--learning-rate 1e-5 \
+ 		--momentum 0.0001 \
+ 		--batch-size 32 \
+ 		--opt adam \
+ 		--concept-sup 0.0 \
+ 		--epochs 50 \
+ 		mnisteovenodd \
+ 		lenet ltn \
+ 		--and_op prod \
+ 		--or_op prod \
+ 		--imp_op prod \
+ 		--p 6;
+# 	python -m conformal CONF_A optuna \
+# 		--n-trials 200 \
+# 		--learning-rate 1e-5 \
+# 		--momentum 0.0001 \
+# 		--batch-size 32 \
+# 		--opt adam \
+# 		--concept-sup 1.0 \
+# 		--epochs 300 \
+# 		cebab \
+# 		bert ltn \
+# 		--and_op prod \
+# 		--or_op prod \
+# 		--imp_op prod \
+# 		--p 6; \
+# 	\
+# 	python -m conformal CONF_A optuna \
+# 		--n-trials 200 \
+# 		--learning-rate 1e-5 \
+# 		--momentum 0.0001 \
+# 		--batch-size 32 \
+# 		--opt adam \
+# 		--concept-sup 1.0 \
+# 		--epochs 300 \
+# 		chx --chx-multi-class\
+# 		resnet --pretrained ltn \
+# 		--and_op prod \
+# 		--or_op prod \
+# 		--imp_op prod \
+# 		--p 6; \
+# 	\
