@@ -35,6 +35,8 @@ viva_2.py
 a.sh
 b.sh
 c.sh
+check.sh
+tuning.sh
 *.pdf
 *.ipynb
 *.txt
