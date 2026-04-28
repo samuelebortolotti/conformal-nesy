@@ -98,11 +98,15 @@ def configure_subparsers(subparsers):
 
 
 def train_epoch(
-    model, train_dl, optimizer, criterion, device, args, concept_weights, label_weights
+    model, train_dl, optimizer, criterion, device, args, concept_weights, label_weights,
+    concept_sup_weight=None,
 ):
     """
     Train model for one epoch.
     """
+    if concept_sup_weight is None:
+        concept_sup_weight = args.concept_supervision
+
     running_loss = 0.0
     all_preds = []
     all_labels = []
@@ -132,7 +136,7 @@ def train_epoch(
         )
 
         # Add concept supervision loss if specified
-        if args.concept_supervision > 0:
+        if concept_sup_weight > 0:
             concept_loss = 0.0
 
             if args.dataset in ["chx", "boia", "derma", "rival", "cifar"]:
@@ -153,7 +157,7 @@ def train_epoch(
                         ),
                     )
             concept_loss /= concepts.size(1)
-            concept_loss = args.concept_supervision * concept_loss
+            concept_loss = concept_sup_weight * concept_loss
             log(f"Concept supervision loss: {concept_loss.item():.4f}", "DEBUG")
             loss += concept_loss
 
@@ -232,7 +236,23 @@ def train(
     statistics = Statistics()
     model = model.to(device)
 
+    warmup_end = max(1, epochs // 4)
+
     for epoch in range(epochs):
+        # Concept supervision warm-up: only for LTN with full concept supervision
+        if args.nesy == "ltn" and args.concept_supervision == 1.0:
+            if epoch < warmup_end:
+                concept_sup_weight = 0.0
+            else:
+                concept_sup_weight = (epoch - warmup_end) / max(1, epochs - warmup_end)
+        else:
+            concept_sup_weight = args.concept_supervision
+
+        # p scheduler: linearly ramp from 1 to args.p over all epochs (LTN only)
+        if args.nesy == "ltn" and args.p > 1:
+            scheduled_p = round(1 + (args.p - 1) * epoch / max(1, epochs - 1))
+            model.set_p(scheduled_p)
+
         train_loss, train_f1, train_c_f1 = train_epoch(
             model,
             train_dl,
@@ -242,6 +262,7 @@ def train(
             args,
             concept_weights,
             label_weights,
+            concept_sup_weight=concept_sup_weight,
         )
 
         val_loss, val_f1, val_c_f1, H_c, H_c_per_value, yece, cece, _, _, _, _, _ = (

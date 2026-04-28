@@ -18,6 +18,9 @@ def configure_subparsers(subparsers):
         "--optuna-path", type=str, default="optuna_runs", help="Optuna path"
     )
     parser.add_argument("--n-trials", type=int, default=20, help="Trials")
+    parser.add_argument(
+        "--timeout", type=int, default=None, help="Timeout in seconds per study (None = no limit)"
+    )
     parser.set_defaults(func=main)
 
 
@@ -120,6 +123,7 @@ def run_study(
             device=device,
         ),
         n_trials=args.n_trials,
+        timeout=args.timeout,
     )
 
     print("Best trial:")

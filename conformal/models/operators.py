@@ -519,29 +519,72 @@ class chx_ltn_loss(torch.nn.Module):
             return self.forward_multi_class(pred_concepts, labels)
         return self.forward_healthy_malignant(pred_concepts, labels)
 
+    # def forward_multi_class(self, pred_concepts, labels):
+    #     # Apprendibili stanno in predicate or in function.
+    #     x = ltn.Variable("x", pred_concepts[:, 0, :, 1]) # Rete Neurale
+    #     l = ltn.Variable("l", labels)
+
+    #     # Symptom variables
+    #     symptom_vars = [
+    #         ltn.Variable(f"s{i}", torch.arange(2)) for i in range(4)  # binary: 0 or 1
+    #     ]
+
+    #     # predicates
+    #     is_present = ltn.Predicate(
+    #         func=lambda c, idx: 
+    #         torch.gather(c, dim=1, index=idx.long())
+    #     )  
+
+    #     # label is the sum of symtom
+    #     def condition():
+    #         return lambda *vars: torch.eq(
+    #             sum(v.value for v in vars[:-1]), vars[-1].value
+    #         )
+
+    #     # Sat Agg
+    #     sat_agg = self.forall_op(
+    #         ltn.diag(x, l),
+    #         self.exists_op(
+    #             symptom_vars,
+    #             self.and_op(
+    #                 self.and_op(
+    #                     self.and_op(
+    #                         is_present(x, symptom_vars[0]),
+    #                         is_present(x, symptom_vars[1]),
+    #                     ),
+    #                     is_present(x, symptom_vars[2]),
+    #                 ),
+    #                 is_present(x, symptom_vars[3]),
+    #             ),
+    #             cond_vars=[*symptom_vars, l],
+    #             cond_fn=condition(),
+    #         ),
+    #     )
+    #     log(f"LTN loss: {1 - sat_agg.value}", "DEBUG")
+    #     return 1 - sat_agg.value
+
     def forward_multi_class(self, pred_concepts, labels):
-        # Apprendibili stanno in predicate or in function.
-        x = ltn.Variable("x", pred_concepts[:, 0, :, 1]) # Rete Neurale
+        x = ltn.Variable("x", pred_concepts[:, 0, :, 1])  # [B, 4]: P(concept_j=1)
         l = ltn.Variable("l", labels)
 
-        # Symptom variables
+        # s_i ∈ {0, 1}: whether symptom i is absent or present
+        # float() required because s_i is used in arithmetic below
         symptom_vars = [
-            ltn.Variable(f"s{i}", torch.arange(2)) for i in range(4)  # binary: 0 or 1
+            ltn.Variable(f"s{i}", torch.arange(2).float()) for i in range(4)
         ]
 
-        # predicates
-        is_present = ltn.Predicate(
-            func=lambda c, idx: 
-            torch.gather(c, dim=1, index=idx.long())
-        )  
+        # Per-concept predicate: P(concept_j = s_j)
+        # c = x after LTN expansion → (..., 4) last dim; s = s_j after LTN expansion
+        concept_preds = [
+            ltn.Predicate(func=lambda c, s, j=j: s * c[..., j:j+1] + (1 - s) * (1 - c[..., j:j+1]))
+            for j in range(4)
+        ]
 
-        # label is the sum of symtom
         def condition():
             return lambda *vars: torch.eq(
                 sum(v.value for v in vars[:-1]), vars[-1].value
             )
 
-        # Sat Agg
         sat_agg = self.forall_op(
             ltn.diag(x, l),
             self.exists_op(
@@ -549,12 +592,12 @@ class chx_ltn_loss(torch.nn.Module):
                 self.and_op(
                     self.and_op(
                         self.and_op(
-                            is_present(x, symptom_vars[0]),
-                            is_present(x, symptom_vars[1]),
+                            concept_preds[0](x, symptom_vars[0]),
+                            concept_preds[1](x, symptom_vars[1]),
                         ),
-                        is_present(x, symptom_vars[2]),
+                        concept_preds[2](x, symptom_vars[2]),
                     ),
-                    is_present(x, symptom_vars[3]),
+                    concept_preds[3](x, symptom_vars[3]),
                 ),
                 cond_vars=[*symptom_vars, l],
                 cond_fn=condition(),
@@ -761,7 +804,6 @@ def cifar_circuit():
 class cifar_ltn_loss(torch.nn.Module):
     def __init__(self, equiv_op, forall_op, not_op, and_op, sat_agg_op, or_op):
         super().__init__()
-
         self.equiv_op = equiv_op
         self.forall_op = forall_op
         self.not_op = not_op
@@ -771,7 +813,6 @@ class cifar_ltn_loss(torch.nn.Module):
         self.concept_names = ["whl", "met", "wng", "ani", "hai", "hrn", "snt"]
 
     def forward(self, pred_concepts, labels):
-
         c = ltn.Variable("c", pred_concepts[:, 0, :, 1])
         l = ltn.Variable("l", labels)
         class_targets = {i: ltn.Constant(torch.tensor([i])) for i in range(10)}
@@ -785,131 +826,142 @@ class cifar_ltn_loss(torch.nn.Module):
             for i, name in enumerate(self.concept_names)
         }
 
-        # Rules
+        # helper: n-ary AND
+        def And_n(*args):
+            out = args[0]
+            for x in args[1:]:
+                out = self.and_op(out, x)
+            return out
+
+        # --------- Class labels (CIFAR-10 indices) ---------
+        # 0: airplane, 1: automobile, 2: bird, 3: cat, 4: deer,
+        # 5: dog, 6: frog, 7: horse, 8: ship, 9: truck
+
+        # plane  <->  met ∧ ¬ani ∧ wng
         plane = self.forall_op(
             ltn.diag(c, l),
             self.equiv_op(
                 is_class(l, class_targets[0]),
-                self.and_op(
-                    self.and_op(
-                        is_present(c, idx["met"]),  # met
-                        self.not_op(is_present(c, idx["ani"])),  # not ani
-                    ),
-                    is_present(c, idx["wng"]),  # wing
+                And_n(
+                    is_present(c, idx["met"]),
+                    self.not_op(is_present(c, idx["ani"])),
+                    is_present(c, idx["wng"]),
                 ),
             ),
         )
 
+        # automobile ∨ truck  <->  whl ∧ ¬wng ∧ met ∧ ¬ani
+        # (indistinguishable pair)
         car_truck = self.forall_op(
             ltn.diag(c, l),
             self.equiv_op(
                 self.or_op(
-                    is_class(l, class_targets[1]), is_class(l, class_targets[9])
+                    is_class(l, class_targets[1]),  # automobile
+                    is_class(l, class_targets[9]),  # truck
                 ),
-                self.and_op(
-                    self.and_op(
-                        self.and_op(
-                            is_present(c, idx["whl"]),  # wheels
-                            self.not_op(is_present(c, idx["wng"])),  # not wing
-                        ),
-                        is_present(c, idx["met"]),  # metallic
-                    ),
-                    self.not_op(is_present(c, idx["ani"])),  # not animal
+                And_n(
+                    is_present(c, idx["whl"]),
+                    self.not_op(is_present(c, idx["wng"])),
+                    is_present(c, idx["met"]),
+                    self.not_op(is_present(c, idx["ani"])),
                 ),
             ),
         )
 
+        # bird  <->  ani ∧ ¬met ∧ wng
         bird = self.forall_op(
             ltn.diag(c, l),
             self.equiv_op(
                 is_class(l, class_targets[2]),
-                self.and_op(
-                    self.and_op(
-                        is_present(c, idx["ani"]),  # ani
-                        self.not_op(is_present(c, idx["met"])),  # not met
-                    ),
-                    is_present(c, idx["wng"]),  # wings
+                And_n(
+                    is_present(c, idx["ani"]),
+                    self.not_op(is_present(c, idx["met"])),
+                    is_present(c, idx["wng"]),
                 ),
             ),
         )
 
+        # frog  <->  ani ∧ ¬met ∧ ¬hai
         frog = self.forall_op(
             ltn.diag(c, l),
             self.equiv_op(
                 is_class(l, class_targets[6]),
-                self.and_op(
-                    self.and_op(
-                        is_present(c, idx["ani"]),  # ani
-                        self.not_op(is_present(c, idx["met"])),  # not met
-                    ),
-                    self.not_op(is_present(c, idx["hai"])),  # not hairy
+                And_n(
+                    is_present(c, idx["ani"]),
+                    self.not_op(is_present(c, idx["met"])),
+                    self.not_op(is_present(c, idx["hai"])),
                 ),
             ),
         )
 
+        # deer  <->  ani ∧ ¬met ∧ ¬wng ∧ hai ∧ hrn
         deer = self.forall_op(
             ltn.diag(c, l),
             self.equiv_op(
                 is_class(l, class_targets[4]),
-                self.and_op(
-                    self.and_op(
-                        is_present(c, idx["ani"]),  # ani
-                        self.not_op(is_present(c, idx["met"])),  # not metal
-                    ),
-                    self.and_op(
-                        self.not_op(is_present(c, idx["wng"])),  # not wing
-                        self.and_op(
-                            is_present(c, idx["hai"]),  # hairy
-                            is_present(c, idx["hrn"]),  # horn
-                        ),
-                    ),
+                And_n(
+                    is_present(c, idx["ani"]),
+                    self.not_op(is_present(c, idx["met"])),
+                    self.not_op(is_present(c, idx["wng"])),
+                    is_present(c, idx["hai"]),
+                    is_present(c, idx["hrn"]),
                 ),
             ),
         )
 
-        dog_equine = self.forall_op(
+        # cat  <->  ani ∧ ¬met ∧ ¬wng ∧ hai ∧ ¬hrn ∧ ¬snt
+        cat = self.forall_op(
+            ltn.diag(c, l),
+            self.equiv_op(
+                is_class(l, class_targets[3]),
+                And_n(
+                    is_present(c, idx["ani"]),
+                    self.not_op(is_present(c, idx["met"])),
+                    self.not_op(is_present(c, idx["wng"])),
+                    is_present(c, idx["hai"]),
+                    self.not_op(is_present(c, idx["hrn"])),
+                    self.not_op(is_present(c, idx["snt"])),
+                ),
+            ),
+        )
+
+        # dog ∨ horse  <->  ani ∧ ¬met ∧ ¬wng ∧ hai ∧ ¬hrn ∧ snt
+        # (indistinguishable pair)
+        dog_horse = self.forall_op(
             ltn.diag(c, l),
             self.equiv_op(
                 self.or_op(
-                    is_class(l, class_targets[5]), is_class(l, class_targets[7])
+                    is_class(l, class_targets[5]),  # dog
+                    is_class(l, class_targets[7]),  # horse
                 ),
-                self.and_op(
-                    self.and_op(
-                        is_present(c, idx["ani"]),  # ani
-                        self.not_op(is_present(c, idx["met"])),  # not metal
-                    ),
-                    self.and_op(
-                        self.not_op(is_present(c, idx["wng"])),  # not wing
-                        self.and_op(
-                            is_present(c, idx["hai"]),  # hairy
-                            self.and_op(
-                                self.not_op(is_present(c, idx["hrn"])),  # not horns
-                                is_present(c, idx["snt"]),  # long snout
-                            ),
-                        ),
-                    ),
+                And_n(
+                    is_present(c, idx["ani"]),
+                    self.not_op(is_present(c, idx["met"])),
+                    self.not_op(is_present(c, idx["wng"])),
+                    is_present(c, idx["hai"]),
+                    self.not_op(is_present(c, idx["hrn"])),
+                    is_present(c, idx["snt"]),
                 ),
             ),
         )
 
+        # ship  <->  met ∧ ¬ani ∧ ¬whl ∧ ¬wng
         ship = self.forall_op(
             ltn.diag(c, l),
             self.equiv_op(
                 is_class(l, class_targets[8]),
-                self.and_op(
-                    self.and_op(
-                        is_present(c, idx["met"]),  # metal
-                        self.not_op(is_present(c, idx["ani"])),  # not animal
-                    ),
-                    self.and_op(
-                        self.not_op(is_present(c, idx["whl"])),  # not wheels
-                        self.not_op(is_present(c, idx["wng"])),  # not wings
-                    ),
+                And_n(
+                    is_present(c, idx["met"]),
+                    self.not_op(is_present(c, idx["ani"])),
+                    self.not_op(is_present(c, idx["whl"])),
+                    self.not_op(is_present(c, idx["wng"])),
                 ),
             ),
         )
 
-        sat_agg = self.sat_agg_op(plane, car_truck, bird, frog, deer, dog_equine, ship)
+        sat_agg = self.sat_agg_op(
+            plane, car_truck, bird, cat, deer, dog_horse, frog, ship
+        )
 
         return 1 - sat_agg
 

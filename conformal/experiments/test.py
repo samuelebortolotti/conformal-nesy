@@ -19,6 +19,7 @@ from conformal.statistics.metrics import (
     conformal_metrics,
     prediction_consistency,
     conditional_conformal_metrics,
+    joint_failure_metrics,
 )
 from conformal.models.conformal import ConformalPredictor
 from conformal.models.econformal import ConformalEPredictor
@@ -543,6 +544,10 @@ def conformal_evaluation(
         "INFO",
     )
 
+    # Save Γβ and Υde for joint-failure computation (Propositions A.7 and A.8)
+    gamma_beta_sets = concept_sets
+    upsilon_de_sets = label_sets
+
     results_storage["Conformal Hard Logic"] = {
         "coverage_concepts": concept_coverage,
         "concept_size": concept_set_size,
@@ -603,6 +608,28 @@ def conformal_evaluation(
         "INFO",
     )
 
+    # Save Γab and Υα for joint-failure computation, then compute joint failure terms
+    gamma_ab_sets = concept_sets
+    upsilon_alpha_sets = label_sets
+
+    joint_c_miss, joint_y_miss = joint_failure_metrics(
+        gamma_beta_sets,
+        upsilon_alpha_sets,
+        gamma_ab_sets,
+        upsilon_de_sets,
+        all_g,
+        np.expand_dims(all_labels, axis=1) if not multilabel else all_labels,
+    )
+
+    log(
+        f"[COCOCO Joint Failures] Pr(c*∉Γβ ∧ c*∉Γab): {joint_c_miss:.4f}",
+        "INFO",
+    )
+    log(
+        f"[COCOCO Joint Failures] Pr(y*∉Υα ∧ y*∉Υde): {joint_y_miss:.4f}",
+        "INFO",
+    )
+
     results_storage["Conformal with Abduction"] = {
         "coverage_concepts": concept_coverage,
         "concept_size": concept_set_size,
@@ -611,6 +638,11 @@ def conformal_evaluation(
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
         "delta_ab": delta_ab,
+    }
+
+    results_storage["COCOCO Joint Failures"] = {
+        "joint_c_miss": joint_c_miss,
+        "joint_y_miss": joint_y_miss,
     }
 
     save_visual_examples(

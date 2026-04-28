@@ -37,3 +37,9 @@ b.sh
 c.sh
 *.pdf
 *.ipynb
+*.txt
+latex_tables/
+.claude
+LMAO*
+*.tex
+CLAUDE.md

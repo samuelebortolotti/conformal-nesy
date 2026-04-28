@@ -18,8 +18,10 @@ from conformal.experiments import (
     analyze,
     etest,
     deltas,
+    joint_failures,
     small_etest,
 )
+import conformal.experiments.time as conformal_time
 
 
 def compressor_7z(file_path: str):
@@ -104,7 +106,9 @@ def get_args():
     analyze.configure_subparsers(subparsers)
     etest.configure_subparsers(subparsers)
     deltas.configure_subparsers(subparsers)
+    joint_failures.configure_subparsers(subparsers)
     small_etest.configure_subparsers(subparsers)
+    conformal_time.configure_subparsers(subparsers)
 
     parsed_args = parser.parse_args()
     if "func" not in parsed_args:

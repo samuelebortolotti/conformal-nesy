@@ -448,3 +448,60 @@ def conditional_conformal_metrics(
     delta_de = de_numerator / de_denominator if de_denominator > 0 else float("nan")
 
     return delta_ab, delta_de
+
+
+def joint_failure_metrics(
+    concept_tuples,
+    label_sets,
+    abduced_concept_tuples,
+    deduced_label_sets,
+    true_concepts,
+    true_labels,
+):
+    """
+    Empirical estimates of the joint-failure correction terms from Propositions A.7 and A.8.
+
+    joint_c_miss = Pr(c* ∉ Γβ  ∧  c* ∉ Γab)   — Prop A.7 bound correction
+    joint_y_miss = Pr(y* ∉ Υα  ∧  y* ∉ Υde)   — Prop A.8 bound correction
+
+    Args:
+        concept_tuples:          Γβ  — conformal concept sets   [N][K, n_concepts]
+        label_sets:              Υα  — conformal label sets      [N][M] or [N][M, 1]
+        abduced_concept_tuples:  Γab — abduced concept sets      [N][K', n_concepts]
+        deduced_label_sets:      Υde — deduced label sets        [N][M'] or [N][M', 1]
+        true_concepts:           c*  — ground-truth concepts     [N, n_concepts]
+        true_labels:             y*  — ground-truth labels       [N] or [N, 1]
+    """
+    N = len(concept_tuples)
+    c_miss_count = 0
+    y_miss_count = 0
+
+    for i in range(N):
+        tuples_i = concept_tuples[i]
+        labels_i = label_sets[i]
+        ab_tuples_i = abduced_concept_tuples[i]
+        de_labels_i = deduced_label_sets[i]
+        c_star = true_concepts[i]
+        y_star = true_labels[i]
+
+        c_in_beta = (
+            np.any(np.all(tuples_i == c_star, axis=1)) if len(tuples_i) > 0 else False
+        )
+        c_in_ab = (
+            np.any(np.all(ab_tuples_i == c_star, axis=1))
+            if len(ab_tuples_i) > 0
+            else False
+        )
+
+        if not c_in_beta and not c_in_ab:
+            c_miss_count += 1
+
+        y_in_alpha = np.isin(y_star, labels_i.ravel())
+        y_in_de = np.isin(y_star, de_labels_i.ravel())
+
+        if not y_in_alpha and not y_in_de:
+            y_miss_count += 1
+
+    joint_c_miss = c_miss_count / N
+    joint_y_miss = y_miss_count / N
+    return joint_c_miss, joint_y_miss

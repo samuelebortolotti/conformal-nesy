@@ -7,8 +7,10 @@ from conformal.models.operators import (
     derma_ltn_loss,
     cifar_ltn_loss,
     cebab_ltn_loss,
+    cifar_circuit,
 )
 from conformal.models.nesy import NeSyModel
+from conformal.utils.other import outer_product
 import torch
 import torch.nn.functional as F
 
@@ -73,9 +75,20 @@ class LTN(NeSyModel):
         self.equiv_op = self._build_equiv(and_op, imp_op)
 
         self.sat_agg_op = self._build_sat_agg()
+
+        self._init_concept_dim = concept_dim
+        self._init_output_dim = output_dim
+        self._init_n_images = n_images
+        self._init_dataset = dataset
+        self._init_extra = extra
+        self._current_p = p
+
         self.ltn_loss = self._get_ltn_loss(
             concept_dim, output_dim, n_images, dataset, extra
         )
+
+        if dataset in ["cifar", "rival"]:
+            self.register_buffer("soft_circuit", cifar_circuit())
 
     def _build_sat_agg(self):
         return ltn.fuzzy_ops.SatAgg()
@@ -202,6 +215,21 @@ class LTN(NeSyModel):
             f"LTN SAT-Agg loss for dataset {dataset} not implemented."
         )
 
+    def set_p(self, p: int):
+        """Rebuild quantifiers and LTN loss with a new p value (used by the p scheduler)."""
+        if p == self._current_p:
+            return
+        self._current_p = p
+        self.exists_op = self._build_exists(p)
+        self.forall_op = self._build_forall(p)
+        self.ltn_loss = self._get_ltn_loss(
+            self._init_concept_dim,
+            self._init_output_dim,
+            self._init_n_images,
+            self._init_dataset,
+            self._init_extra,
+        )
+
     def _inference_boia(self, concepts):
         logic_output = self.logic.forward(concepts)
         block_outputs = []
@@ -214,11 +242,33 @@ class LTN(NeSyModel):
 
         return torch.cat(block_outputs, dim=1).to(self.device)
 
+    def _soft_inference_cifar(self, concepts):
+        """Soft label probabilities via DPL-style circuit marginalization.
+
+        Used during eval so the conformal predictor sees continuous nonconformity
+        scores instead of binary {0,1}, restoring the coverage guarantee.
+        """
+        worlds = outer_product(concepts.squeeze(1))          # (B, 2^n_concepts)
+        query_prob = torch.matmul(worlds, self.soft_circuit)  # (B, n_classes)
+        return self._normalize(query_prob)
+
     def inference(self, concepts, eval=False):
-        """Apply the hard logic on the argmax of the concepts"""
-        concept_copy = concepts.clone().squeeze().argmax(dim=-1).cpu().numpy()
+        """Apply the hard logic on the argmax of the concepts.
+
+        When eval=True and a soft circuit is registered (cifar/rival), returns
+        soft label probabilities for well-calibrated conformal prediction.
+        """
+        c = concepts.clone()
+        # For binary concept datasets: (B, 1, concept_dim, 2) — squeeze only the
+        # n_images=1 axis, never the batch dim (timing_dl uses batch_size=1).
+        if c.dim() == 4:
+            c = c.squeeze(1)
+        concept_copy = c.argmax(dim=-1).cpu().numpy()
         if self.dataset == "boia":
             return self._inference_boia(concept_copy), None
+
+        if eval and hasattr(self, "soft_circuit"):
+            return self._soft_inference_cifar(concepts), None
 
         return (
             F.one_hot(
