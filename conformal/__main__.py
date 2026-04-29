@@ -19,7 +19,6 @@ from conformal.experiments import (
     etest,
     deltas,
     joint_failures,
-    small_etest,
 )
 import conformal.experiments.time as conformal_time
 
@@ -107,7 +106,6 @@ def get_args():
     etest.configure_subparsers(subparsers)
     deltas.configure_subparsers(subparsers)
     joint_failures.configure_subparsers(subparsers)
-    small_etest.configure_subparsers(subparsers)
     conformal_time.configure_subparsers(subparsers)
 
     parsed_args = parser.parse_args()

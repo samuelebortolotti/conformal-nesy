@@ -45,4 +45,4 @@ latex_tables/
 LMAO*
 *.tex
 CLAUDE.md
-experiments/small_etest.py
+conformal/experiments/small_etest.py
