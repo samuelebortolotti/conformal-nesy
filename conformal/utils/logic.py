@@ -24,6 +24,14 @@ class BaseLogic(abc.ABC):
         raise NotImplementedError
 
 
+def _random_argmax(out):
+    """Return argmax with uniform random tie-breaking among tied maximizers."""
+    out_np = out.detach().cpu().numpy()
+    max_vals = out_np.max(axis=-1, keepdims=True)
+    tied = out_np == max_vals
+    return np.array([np.random.choice(np.where(row)[0]) for row in tied])
+
+
 class LinearLayerLogic(BaseLogic):
 
     def __init__(self, model, n_concepts, concept_dim, is_too_big=False):
@@ -34,7 +42,7 @@ class LinearLayerLogic(BaseLogic):
         concepts = self.model._from_predictions_to_probabilities(x)
         concepts = self.model._normalize(concepts)
         out, _ = self.model.inference(concepts)
-        return torch.argmax(out, dim=-1).detach().cpu().numpy()
+        return _random_argmax(out)
 
 
 class DSLLogic(BaseLogic):
@@ -52,7 +60,7 @@ class DSLLogic(BaseLogic):
         concepts = self.model._from_predictions_to_probabilities(x)
         concepts = self.model._normalize(concepts)
         out, _ = self.model.inference(concepts, eval=True)
-        return torch.argmax(out, dim=-1).detach().cpu().numpy()
+        return _random_argmax(out)
 
 
 class HardLogic(BaseLogic):

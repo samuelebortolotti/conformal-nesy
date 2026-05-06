@@ -382,8 +382,12 @@ def prediction_consistency(concept_tuples, label_sets, logic, EMPTY_TOKEN=-1):
         for l in labels_i:
             covered = False
             for t in valid_tuples:
-                derived_label = logic.forward(t.reshape(1, -1))
-                derived_label = np.array(derived_label).ravel()
+                if logic.multi_set_logic is None:
+                    derived_label = logic.forward(t.reshape(1, -1))
+                    derived_label = np.array(derived_label).ravel()
+                else:
+                    derived_label = logic.forward_multi_set(t.reshape(1, -1))
+                    derived_label = np.unique(np.concatenate(derived_label))
                 if np.any(np.isin(l, derived_label)):
                     covered = True
                     break

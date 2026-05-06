@@ -4,8 +4,10 @@ import numpy as np
 import textwrap
 from pathlib import Path
 import matplotlib.pyplot as plt
+import torch
+from torch.utils.data import random_split
 
-from conformal.general_utils import log
+from conformal.general_utils import log, get_basename
 from conformal.utils.factories import (
     DatasetFactory,
     NetworkFactory,
@@ -77,6 +79,12 @@ def configure_global_arguments(parser):
         type=str,
         default="best_model.pth",
         help="Where to save the model.",
+    )
+    parser.add_argument(
+        "--model-dir",
+        type=Path,
+        default=None,
+        help="Directory to load the model checkpoint from (defaults to output_dir_path).",
     )
 
 
@@ -689,6 +697,10 @@ def conformal_evaluation(
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
 
+    assert concept_consistency == 1.0, (
+        f"[Section 7] Concept consistency must be 1.0 by construction, got {concept_consistency:.6f}"
+    )
+
     save_visual_examples(
         test_dl.dataset,
         concept_sets,
@@ -741,6 +753,10 @@ def conformal_evaluation(
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
+
+    assert label_consistency == 1.0, (
+        f"[Section 8] Label consistency must be 1.0 by construction, got {label_consistency:.6f}"
+    )
 
     save_visual_examples(
         test_dl.dataset,
@@ -795,6 +811,13 @@ def conformal_evaluation(
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
+
+    assert concept_consistency == 1.0, (
+        f"[Section 9] Concept consistency must be 1.0 by construction, got {concept_consistency:.6f}"
+    )
+    assert label_consistency == 1.0, (
+        f"[Section 9] Label consistency must be 1.0 by construction, got {label_consistency:.6f}"
+    )
 
     save_visual_examples(
         test_dl.dataset,
@@ -854,6 +877,13 @@ def conformal_evaluation(
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
     log(f"Label Consistency: {label_consistency:.4f}", "INFO")
 
+    assert concept_consistency == 1.0, (
+        f"[Section 10] Concept consistency must be 1.0 by construction, got {concept_consistency:.6f}"
+    )
+    assert label_consistency == 1.0, (
+        f"[Section 10] Label consistency must be 1.0 by construction, got {label_consistency:.6f}"
+    )
+
     save_visual_examples(
         test_dl.dataset,
         concept_sets,
@@ -894,8 +924,15 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         label_weights,
     ) = DatasetFactory.get_dataset(args, name=args.dataset, device=args.device)
 
-    _, val_dl, test_dl = create_dataloaders(
-        train_ds, val_ds, test_ds, batch_size=args.batch_size, shuffle_val=False
+    n_test = len(test_ds)
+    n_calib = int(0.2 * n_test)
+    n_eval = n_test - n_calib
+    calib_ds, eval_ds = random_split(
+        test_ds, [n_calib, n_eval],
+        generator=torch.Generator().manual_seed(args.seed),
+    )
+    _, calib_dl, eval_dl = create_dataloaders(
+        train_ds, calib_ds, eval_ds, batch_size=args.batch_size, shuffle_val=False
     )
 
     log("Loading the model", "INFO")
@@ -907,7 +944,16 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         args.nesy, n_images, model, concept_dim, output_dim, device, logic, args
     )
 
-    model_path = args.output_dir_path / f"{experiment_name}.{args.model_path}.pth"
+    if args.model_dir is not None:
+        checkpoint_dir = args.model_dir
+        saved_output_dir_path = args.output_dir_path
+        args.output_dir_path = checkpoint_dir
+        checkpoint_experiment_name = get_basename(args)
+        args.output_dir_path = saved_output_dir_path
+    else:
+        checkpoint_dir = args.output_dir_path
+        checkpoint_experiment_name = experiment_name
+    model_path = checkpoint_dir / f"{checkpoint_experiment_name}.{args.model_path}.pth"
     model = load_model(model, model_path, device)
     model.to(device)
 
@@ -918,8 +964,8 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     alpha_label = 0.1
     result_storage = conformal_evaluation(
         model,
-        val_dl,
-        test_dl,
+        calib_dl,
+        eval_dl,
         device,
         args,
         logic_from_model,

@@ -436,7 +436,14 @@ class ConformalPredictor:
                 tuples = np.argmax(tuples, axis=-1)
 
             filtered_tuple = tuples[~empty_mask]
-            derived_labels = self.logic.forward(filtered_tuple)
+            if len(filtered_tuple) == 0:
+                refined_label_sets.append(np.array([], dtype=int))
+                continue
+            if self.logic.multi_set_logic is None:
+                derived_labels = self.logic.forward(filtered_tuple)
+            else:
+                derived_labels_sets = self.logic.forward_multi_set(filtered_tuple)
+                derived_labels = np.unique(np.concatenate(derived_labels_sets))
 
             # Keep labels that are produced by a tuple
             valid_mask = np.isin(labels, derived_labels)

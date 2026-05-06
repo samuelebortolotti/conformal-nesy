@@ -17,6 +17,7 @@ from conformal.experiments import (
     test,
     analyze,
     etest,
+    small_etest,
     deltas,
     joint_failures,
 )
@@ -104,6 +105,7 @@ def get_args():
     test.configure_subparsers(subparsers)
     analyze.configure_subparsers(subparsers)
     etest.configure_subparsers(subparsers)
+    small_etest.configure_subparsers(subparsers)
     deltas.configure_subparsers(subparsers)
     joint_failures.configure_subparsers(subparsers)
     conformal_time.configure_subparsers(subparsers)

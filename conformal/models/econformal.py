@@ -226,7 +226,7 @@ class ConformalEPredictor(ConformalPredictor):
         #     threshold=1/self.beta
         # )
 
-        result = np.prod(
+        result = np.mean(
             joint_evalues[:, np.arange(n_concepts), combos],  # (B, 16, n_concepts)
             axis=-1,
         )  # (B, 16)

@@ -6,9 +6,9 @@ import csv
 import numpy as np
 import torch
 from pathlib import Path
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 
-from conformal.general_utils import log
+from conformal.general_utils import get_basename, log
 from conformal.utils.factories import (
     DatasetFactory,
     NetworkFactory,
@@ -66,6 +66,12 @@ def configure_global_arguments(parser):
         type=str,
         default="best_model.pth",
         help="Where to save the model.",
+    )
+    parser.add_argument(
+        "--model-dir",
+        type=Path,
+        default=None,
+        help="Directory to load the model checkpoint from (defaults to output_dir_path).",
     )
 
 
@@ -312,31 +318,43 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         label_weights,
     ) = DatasetFactory.get_dataset(args, name=args.dataset, device=args.device)
 
-    _, val_dl, _ = create_dataloaders(
-        train_ds, val_ds, test_ds, batch_size=args.batch_size, shuffle_val=False
+    n_test = len(test_ds)
+    n_calib = int(0.2 * n_test)
+    n_eval = n_test - n_calib
+    calib_ds, eval_ds = random_split(
+        test_ds, [n_calib, n_eval],
+        generator=torch.Generator().manual_seed(args.seed),
+    )
+    _, calib_dl, _ = create_dataloaders(
+        train_ds, calib_ds, eval_ds, batch_size=args.batch_size, shuffle_val=False
     )
 
     # batch_size=1 for per-example latency; num_workers=0 to exclude data-loading overhead
-    timing_dl = DataLoader(test_ds, batch_size=1, shuffle=False, num_workers=0)
+    timing_dl = DataLoader(eval_ds, batch_size=1, shuffle=False, num_workers=0)
 
     log("Loading the model...", "INFO")
     model = NetworkFactory.get_network(args.model, input_dim, concept_dim, args, n_images)
     model = NeSyFactory.get_nesy_model(
         args.nesy, n_images, model, concept_dim, output_dim, device, logic, args
     )
-    model_path = args.output_dir_path / f"{experiment_name}.{args.model_path}.pth"
-    try:
-        model = load_model(model, model_path, device)
-    except FileNotFoundError:
-        log(f"Model not found at {model_path} — skipping (run train first).", "WARNING")
-        return
+
+    if args.model_dir is not None:
+        checkpoint_dir = args.model_dir
+        saved_output_dir_path = args.output_dir_path
+        args.output_dir_path = checkpoint_dir
+        checkpoint_experiment_name = get_basename(args)
+        args.output_dir_path = saved_output_dir_path
+    else:
+        checkpoint_dir = args.output_dir_path
+        checkpoint_experiment_name = experiment_name
+    model_path = checkpoint_dir / f"{checkpoint_experiment_name}.{args.model_path}.pth"
+    model = load_model(model, model_path, device)
     model.to(device)
-    model.eval()
 
     logic_from_model = LogicFactory.get_logic(args.nesy, logic, model)
 
     results = timing_evaluation(
-        model, val_dl, timing_dl, device, args, logic_from_model, experiment_name
+        model, calib_dl, timing_dl, device, args, logic_from_model, experiment_name
     )
 
     csv_path = args.output_dir_path / f"{experiment_name}.time_results.csv"

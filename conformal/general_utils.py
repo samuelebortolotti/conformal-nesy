@@ -35,7 +35,7 @@ def set_seed(seed):
 def get_basename(args, separator="_"):
     args_str = []
     for key, value in vars(args).items():
-        if key not in ["func", "model_path"]:
+        if key not in ["func", "model_path", "model_dir"]:
             args_str.append(f"{value}")
     experiment_name = separator.join(args_str)
     return f"experiment_{experiment_name}"
