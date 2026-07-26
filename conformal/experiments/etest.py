@@ -908,7 +908,8 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     log("Loading the model", "INFO")
 
     model = NetworkFactory.get_network(
-        args.model, input_dim, concept_dim, args, n_images
+        args.model, input_dim, concept_dim, args, n_images,
+        concept_names=concept_names,
     )
     model = NeSyFactory.get_nesy_model(
         args.nesy, n_images, model, concept_dim, output_dim, device, logic, args

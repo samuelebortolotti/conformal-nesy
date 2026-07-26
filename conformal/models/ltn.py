@@ -291,7 +291,14 @@ class LTN(NeSyModel):
         label_weights,
         extra,
     ):
-        """Return the LTN loss"""
+        """Return the LTN axiom satisfaction loss.
+
+        LTN's BOIA output is a hard one-hot tensor from the logic circuit (argmax
+        of concept probs → deterministic binary labels). Direct NLL on hard one-hot
+        is not meaningful (gradient is zero or undefined), so we rely solely on the
+        LTN axiom loss to train concept representations and let labels emerge from
+        the symbolic circuit.
+        """
         return self.ltn_loss(conc_pred, target)
 
 

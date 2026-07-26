@@ -24,6 +24,8 @@ class LinearPredictor(NeSyModel):
             activation = torch.nn.Sigmoid()
         elif "mnist" in self.dataset:
             in_dim = concept_dim**n_images
+        elif self.dataset == "cebab":
+            in_dim = concept_dim**n_images
         else:
             in_dim = 2**concept_dim
 
@@ -45,7 +47,7 @@ class LinearPredictor(NeSyModel):
         else:
             worlds = (
                 outer_product(log_odds.squeeze(1))
-                if self.dataset in ["chx", "derma"]
+                if self.dataset in ["chx", "derma", "rival", "cifar"]
                 else outer_product(log_odds)
             )
             out = self.linear(worlds)
@@ -54,9 +56,8 @@ class LinearPredictor(NeSyModel):
 
 def configure_subparsers(subparsers):
     """Configure subparsers."""
-    # Subparser for Linear
-    linear_parser = subparsers.add_parser(
-        "linpred",
-        help="Use Linear Predictor as NeSy predictor",
+    cbm_parser = subparsers.add_parser(
+        "cbm",
+        help="Use CBM (Concept Bottleneck Model, Linear Predictor) as NeSy predictor",
     )
-    configure_global_arguments(linear_parser)
+    configure_global_arguments(cbm_parser)

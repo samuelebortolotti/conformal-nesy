@@ -8,7 +8,7 @@ from conformal.datasets.mnisthalf import MNISTHalfLoader
 from conformal.datasets.mnistevenodd import MNISTEvenOddLoader
 from conformal.datasets.mnistaddn import MNISTAdditionNLoader
 from conformal.datasets.derma import DERMALoader
-from conformal.datasets.boia import BOIALoader
+from conformal.datasets.boia import BOIALoader, BOIARawImageLoader
 from conformal.datasets.chx import CHXLoader
 from conformal.datasets.rival import RIVAL10Loader
 from conformal.datasets.cifar import CIFAR10Loader
@@ -21,6 +21,17 @@ from conformal.models.ltn import LTN
 from conformal.models.linear_predictor import LinearPredictor
 from conformal.models.dsl import DSL
 from conformal.utils.logic import DSLLogic, LinearLayerLogic
+
+
+_MNIST_DATASETS = ("mnistadd", "mnistsump", "mnisthalf", "mnistevenodd", "mnistaddn")
+
+
+def _get_input_norm(dataset):
+    if dataset in _MNIST_DATASETS:
+        return "mnist"
+    if dataset == "cifar":
+        return "cifar"
+    return "imagenet"
 
 
 class OptimizerFactory:
@@ -40,7 +51,8 @@ class OptimizerFactory:
 class NetworkFactory:
     @staticmethod
     def get_network(
-        name: str, input_shape=(1, 28, 28), output_dim=10, args=None, n_images=2
+        name: str, input_shape=(1, 28, 28), output_dim=10, args=None, n_images=2,
+        concept_names=None,
     ):
         if name.lower() == "resnet18":
             return ResNet18(input_shape=input_shape, num_classes=output_dim)
@@ -54,6 +66,16 @@ class NetworkFactory:
             return Lama(num_concepts=n_images, num_concept_dim=output_dim)
         elif name.lower() == "mpnet":
             return MPNetSentence(num_concepts=n_images, num_concept_dim=output_dim)
+        elif name.lower() == "clip":
+            from conformal.models.clip_encoder import CLIPEncoder
+            dataset = getattr(args, "dataset", "")
+            texts = CLIPEncoder.build_concept_texts(concept_names, dataset)
+            return CLIPEncoder(
+                num_classes=output_dim,
+                concept_texts=texts,
+                model_name=getattr(args, "clip_model", "openai/clip-vit-base-patch32"),
+                input_normalization=_get_input_norm(dataset),
+            )
         else:
             raise ValueError(f"Unknown network type: {name}")
 
@@ -73,6 +95,10 @@ class DatasetFactory:
         elif name == "mnistevenodd":
             return MNISTEvenOddLoader(**kwargs).load()
         elif name == "boia":
+            if getattr(args, "model", "") == "clip":
+                return BOIARawImageLoader(
+                    raw_root=getattr(args, "boia_raw_root", None), **kwargs
+                ).load()
             return BOIALoader(**kwargs).load()
         elif name == "chx":
             return CHXLoader(chx_multi_class=args.chx_multi_class, **kwargs).load()
@@ -132,7 +158,7 @@ class NeSyFactory:
                 p=args.p,
                 extra=extra,
             )
-        elif name.lower() == "linpred":
+        elif name.lower() in ("linpred", "cbm"):
             return LinearPredictor(
                 n_images=n_images,
                 encoder=model,
@@ -163,7 +189,7 @@ class LogicFactory:
     def get_logic(name: str, logic, model):
         if name.lower() in ["dpl", "ltn"]:
             return logic
-        elif name.lower() == "linpred":
+        elif name.lower() in ("linpred", "cbm"):
             return LinearLayerLogic(
                 model=model,
                 n_concepts=logic.n_concepts,

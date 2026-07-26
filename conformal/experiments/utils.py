@@ -103,7 +103,7 @@ def collect_predictions(
         all_g.append(concepts.cpu().numpy())
         all_output_raw.append(output.detach().cpu().numpy())
 
-        if is_dpl and circuit is None:
+        if is_dpl and circuit is None and not isinstance(extra, tuple):
             circuit = extra.detach().cpu()
 
     all_labels = np.concatenate(all_labels)
@@ -112,7 +112,7 @@ def collect_predictions(
     all_g = np.concatenate(all_g)
     all_output_raw = np.concatenate(all_output_raw)
 
-    if not is_dpl:
+    if not is_dpl or circuit is None:
         if all_conc_pred.ndim == 2:
             all_c = all_conc_pred.argmax(axis=1)
         elif all_conc_pred.ndim == 3:

@@ -2,15 +2,21 @@ import os
 import torch
 import numpy as np
 from torch.utils.data import Dataset, random_split
-from conformal.utils.logic import HardLogic
+from torchvision import transforms
+from conformal.utils.logic import HardLogic, FactorizedBoiaLogic
 from conformal.general_utils import log
 from conformal.models import resnet18, lenet, linear
+from conformal.models import clip_encoder
 import pickle
 
 
 def configure_global_arguments(parser):
     """Global arguments for BOIA"""
-    pass
+    parser.add_argument(
+        "--boia-raw-root",
+        default=None,
+        help="Path to raw BDD-OIA image frames (required when using --model clip).",
+    )
 
 
 CONCEPTS_ORDER = {
@@ -205,65 +211,65 @@ class BOIALoader:
         # AND (A∧B): Represented as A * B.
         # NOT (¬A): Represented as 1 - A.
 
-        logic = HardLogic(
-            lambda x: np.stack(
-                [
-                    # 1. STOP
-                    # red_light + stop_sign + obstacle
+        _boia_lambda = lambda x: np.stack(
+            [
+                # 1. STOP
+                # red_light + stop_sign + obstacle
+                np.clip(
+                    x[:, 3]
+                    + x[:, 4]
+                    + np.clip(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1),
+                    0,
+                    1,
+                ),
+                # 2. MOVE_FORWARD
+                # (green_light + follow + road_clear) * (1 - stop)
+                np.clip(
                     np.clip(
-                        x[:, 3]
-                        + x[:, 4]
-                        + np.clip(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1),
-                        0,
-                        1,
-                    ),
-                    # 2. MOVE_FORWARD
-                    # (green_light + follow + road_clear) * (1 - stop)
-                    np.clip(
-                        np.clip(
-                            x[:, 0]
-                            + x[:, 1]
-                            + (
-                                1 - np.clip(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1)
-                            ),
-                            0,
-                            1,
-                        )
-                        * (
-                            1
-                            - np.clip(
-                                x[:, 3]
-                                + x[:, 4]
-                                + np.clip(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1),
-                                0,
-                                1,
-                            )
+                        x[:, 0]
+                        + x[:, 1]
+                        + (
+                            1 - np.clip(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1)
                         ),
                         0,
                         1,
+                    )
+                    * (
+                        1
+                        - np.clip(
+                            x[:, 3]
+                            + x[:, 4]
+                            + np.clip(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1),
+                            0,
+                            1,
+                        )
                     ),
-                    # 3. TURN_LEFT
-                    # (can_turn_left) * (1 - cannot_turn_left)
-                    np.clip(
-                        np.clip(x[:, 18] + x[:, 19] + x[:, 20], 0, 1)
-                        * (1 - np.clip(x[:, 9] + x[:, 10] + x[:, 11], 0, 1)),
-                        0,
-                        1,
-                    ),
-                    # 4. TURN_RIGHT
-                    # (can_turn_right) * (1 - cannot_turn_right)
-                    np.clip(
-                        np.clip(x[:, 12] + x[:, 13] + x[:, 14], 0, 1)
-                        * (1 - np.clip(x[:, 15] + x[:, 16] + x[:, 17], 0, 1)),
-                        0,
-                        1,
-                    ),
-                ],
-                axis=1,
-            ),
+                    0,
+                    1,
+                ),
+                # 3. TURN_LEFT
+                # (can_turn_left) * (1 - cannot_turn_left)
+                np.clip(
+                    np.clip(x[:, 18] + x[:, 19] + x[:, 20], 0, 1)
+                    * (1 - np.clip(x[:, 9] + x[:, 10] + x[:, 11], 0, 1)),
+                    0,
+                    1,
+                ),
+                # 4. TURN_RIGHT
+                # (can_turn_right) * (1 - cannot_turn_right)
+                np.clip(
+                    np.clip(x[:, 12] + x[:, 13] + x[:, 14], 0, 1)
+                    * (1 - np.clip(x[:, 15] + x[:, 16] + x[:, 17], 0, 1)),
+                    0,
+                    1,
+                ),
+            ],
+            axis=1,
+        )
+        logic = FactorizedBoiaLogic(
+            _boia_lambda,
             n_concepts=n_images,
             concept_dim=concept_dim,
-            is_too_big=True,
         )
 
         log("Calculating class and concept weights for BOIA...", "INFO")
@@ -317,6 +323,151 @@ class BOIALoader:
         )
 
 
+class BOIARawDataset(Dataset):
+    """BOIA dataset that loads raw JPEG frames instead of precomputed .pt feature tensors."""
+
+    def __init__(self, pkl_file_path, raw_image_dir, precomputed_dir, transform=None):
+        from PIL import Image as PILImage
+        self._PIL = PILImage
+        self.data = pickle.load(open(pkl_file_path, "rb"))
+        self.raw_image_dir = raw_image_dir
+        self.precomputed_dir = precomputed_dir
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        img_data = self.data[idx]
+        img_path = img_data["img_path"]
+        t_path = img_path[:-4] + ".pt"
+
+        raw_path = os.path.join(self.raw_image_dir, img_path)
+        img = self._PIL.open(raw_path).convert("RGB")
+        if self.transform:
+            img = self.transform(img)
+
+        lab_path = os.path.join(self.precomputed_dir, "labels", t_path)
+        con_path = os.path.join(self.precomputed_dir, "concepts", t_path)
+        class_label = torch.load(lab_path).squeeze(0)[:4]
+        attr_label = torch.load(con_path).squeeze(0)
+
+        return img, attr_label, class_label.to(torch.long)
+
+
+class BOIARawImageLoader(BOIALoader):
+    """BOIA loader that uses raw video frames for CLIP-compatible image input.
+
+    Requires raw BDD-OIA JPEG frames in raw_root/{train,val,test}/img_path.
+    Labels and concepts are still read from precomputed .pt files in root/.
+    """
+
+    def __init__(self, raw_root=None, root="./data/bdd2048", val_split=0.1, device="cuda"):
+        super().__init__(root=root, val_split=val_split, device=device)
+        self.raw_root = raw_root or root
+
+    def load(self):
+        transform = transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
+        )
+
+        train_path = os.path.join(self.root, "train_BDD_OIA.pkl")
+        val_path = os.path.join(self.root, "val_BDD_OIA.pkl")
+        test_path = os.path.join(self.root, "test_BDD_OIA.pkl")
+        image_dir = self.root
+
+        full_train = BOIARawDataset(
+            pkl_file_path=train_path,
+            raw_image_dir=os.path.join(self.raw_root, "train"),
+            precomputed_dir=os.path.join(image_dir, "train"),
+            transform=transform,
+        )
+        val_dataset = BOIARawDataset(
+            pkl_file_path=val_path,
+            raw_image_dir=os.path.join(self.raw_root, "val"),
+            precomputed_dir=os.path.join(image_dir, "val"),
+            transform=transform,
+        )
+        test_dataset = BOIARawDataset(
+            pkl_file_path=test_path,
+            raw_image_dir=os.path.join(self.raw_root, "test"),
+            precomputed_dir=os.path.join(image_dir, "test"),
+            transform=transform,
+        )
+
+        val_size = int(self.val_split * len(full_train))
+        train_size = len(full_train) - val_size
+        train_dataset, _ = random_split(full_train, [train_size, val_size])
+
+        input_dim = (3, 224, 224)
+        concept_dim = len(CONCEPTS_ORDER)
+        output_dim = 4
+        n_images = 1
+        class_names = [f"Class_{i}" for i in range(output_dim)]
+        concept_names = sorted(CONCEPTS_ORDER, key=CONCEPTS_ORDER.get)
+
+        _boia_lambda_raw = lambda x: np.stack(
+            [
+                np.clip(x[:, 3] + x[:, 4] + np.clip(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1), 0, 1),
+                np.clip(np.clip(x[:, 0] + x[:, 1] + (1 - np.clip(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1)), 0, 1) * (1 - np.clip(x[:, 3] + x[:, 4] + np.clip(x[:, 5] + x[:, 6] + x[:, 7] + x[:, 8], 0, 1), 0, 1)), 0, 1),
+                np.clip(np.clip(x[:, 18] + x[:, 19] + x[:, 20], 0, 1) * (1 - np.clip(x[:, 9] + x[:, 10] + x[:, 11], 0, 1)), 0, 1),
+                np.clip(np.clip(x[:, 12] + x[:, 13] + x[:, 14], 0, 1) * (1 - np.clip(x[:, 15] + x[:, 16] + x[:, 17], 0, 1)), 0, 1),
+            ],
+            axis=1,
+        )
+        logic = FactorizedBoiaLogic(
+            _boia_lambda_raw,
+            n_concepts=n_images,
+            concept_dim=concept_dim,
+        )
+
+        log("Calculating class and concept weights for BOIA (raw images)...", "INFO")
+        all_concepts = []
+        all_labels = []
+
+        for i in range(len(full_train)):
+            img_data = full_train.dataset.data[i]
+            t_path = img_data["img_path"][:-4] + ".pt"
+            lab_path = os.path.join(image_dir, "train", "labels", t_path)
+            con_path = os.path.join(image_dir, "train", "concepts", t_path)
+            all_labels.append(torch.load(lab_path).squeeze(0)[:4].numpy())
+            all_concepts.append(torch.load(con_path).squeeze(0).numpy())
+
+        all_labels = np.array(all_labels)
+        all_concepts = np.array(all_concepts)
+
+        for i in range(all_labels.shape[1]):
+            counts = np.bincount(all_labels[:, i].astype(int), minlength=2)
+            w = len(all_labels) / (2.0 * counts)
+            self.label_weights.append(torch.tensor(w, dtype=torch.float32).to(self.device))
+
+        for i in range(all_concepts.shape[1]):
+            counts = np.bincount(all_concepts[:, i].astype(int), minlength=2)
+            w = [1.0, 1.0] if counts[1] == 0 or counts[0] == 0 else len(all_concepts) / (2.0 * counts)
+            self.concept_weights.append(torch.tensor(w, dtype=torch.float32).to(self.device))
+
+        return (
+            train_dataset,
+            val_dataset,
+            test_dataset,
+            input_dim,
+            concept_dim,
+            output_dim,
+            n_images,
+            class_names,
+            concept_names,
+            logic,
+            torch.nn.NLLLoss(),
+            self.concept_weights,
+            self.label_weights,
+        )
+
+
 def configure_subparsers(subparsers):
     """Configure subparsers."""
     # Subparser for BOIA
@@ -330,3 +481,4 @@ def configure_subparsers(subparsers):
     resnet18.configure_subparsers(subparsers)
     lenet.configure_subparsers(subparsers)
     linear.configure_subparsers(subparsers)
+    clip_encoder.configure_subparsers(subparsers)

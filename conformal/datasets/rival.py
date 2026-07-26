@@ -6,7 +6,7 @@ from PIL import Image
 import json
 from pathlib import Path
 from sklearn.model_selection import train_test_split
-from conformal.models import resnet18, lenet, linear
+from conformal.models import resnet18, lenet, linear, clip_encoder
 from conformal.utils.logic import HardLogic
 
 CIFAR_CONCEPT_LIST = [
@@ -322,3 +322,4 @@ def configure_subparsers(subparsers):
     resnet18.configure_subparsers(sub)
     lenet.configure_subparsers(sub)
     linear.configure_subparsers(sub)
+    clip_encoder.configure_subparsers(sub)

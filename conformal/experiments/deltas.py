@@ -60,6 +60,18 @@ def configure_global_arguments(parser):
         default="best_model.pth",
         help="Where to save the model.",
     )
+    parser.add_argument(
+        "--epsilon-symbols",
+        type=float,
+        default=0.2807344052335263,
+        help="DSL hyperparameter for learning symbols.",
+    )
+    parser.add_argument(
+        "--epsilon-rules",
+        type=float,
+        default=0.1077119516324264,
+        help="DSL hyperparameter for learning rules.",
+    )
 
 
 def test_parser(parser):

@@ -4,6 +4,8 @@ import argparse
 
 def outer_product(x):
     B, N, M = x.shape
+    if B == 0:
+        return x.new_zeros(B, M ** N)
     vectors = x.unbind(dim=1)
 
     result = vectors[0]

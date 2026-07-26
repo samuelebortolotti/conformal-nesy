@@ -6,25 +6,12 @@ from conformal.models.operators import (
     boia_dsl_weights,
     chx_dsl_weights,
     derma_dsl_weights,
+    rival_dsl_weights,
+    cifar_dsl_weights,
+    cebab_dsl_weights,
 )
 from conformal.models.nesy import NeSyModel
 from conformal.utils.other import outer_product
-
-
-def configure_global_arguments(parser):
-    """Global arguments for DSL"""
-    parser.add_argument(
-        "--epsilon-symbols",
-        type=float,
-        help="Hyperparameter for learning symbols",
-        default=0.2807344052335263,
-    )
-    parser.add_argument(
-        "--epsilon-rules",
-        type=float,
-        help="Hyperparameter for learning rules",
-        default=0.1077119516324264,
-    )
 
 
 class DSL(NeSyModel):
@@ -96,6 +83,34 @@ class DSL(NeSyModel):
             )
         elif dataset == "derma":
             return derma_dsl_weights(
+                n_images=n_images,
+                concept_dim=concept_dim,
+                output_dim=output_dim,
+                device=self.device,
+            )
+        elif dataset == "rival":
+            return rival_dsl_weights(
+                n_images=n_images,
+                concept_dim=concept_dim,
+                output_dim=output_dim,
+                device=self.device,
+            )
+        elif dataset == "cifar":
+            return cifar_dsl_weights(
+                n_images=n_images,
+                concept_dim=concept_dim,
+                output_dim=output_dim,
+                device=self.device,
+            )
+        elif dataset == "cebab":
+            return cebab_dsl_weights(
+                n_images=n_images,
+                concept_dim=concept_dim,
+                output_dim=output_dim,
+                device=self.device,
+            )
+        elif dataset in ("mnistevenodd", "mnistaddn"):
+            return mnist_add_dsl_weights(
                 n_images=n_images,
                 concept_dim=concept_dim,
                 output_dim=output_dim,
@@ -175,17 +190,17 @@ class DSL(NeSyModel):
         if self.arity == 1:
             worlds = (
                 outer_product(concepts.squeeze(1))
-                if self.dataset in ["chx", "derma"]
+                if self.dataset in ["chx", "derma", "rival", "cifar"]
                 else outer_product(concepts)
             )
             tv, sym = self.epsilon_greedy(worlds, eval)
-            truth_list.append(tv.squeeze())
+            truth_list.append(tv.reshape(-1))
             symbol_list.append(sym)
         else:
             # Multi-arity (e.g., MNIST add two digits)
             for i in range(self.arity):
                 tv, sym = self.epsilon_greedy(concepts[:, i], eval)
-                truth_list.append(tv.squeeze())
+                truth_list.append(tv.reshape(-1))
                 symbol_list.append(sym)
 
         rules_weights, g_matrix = self.get_rules_matrix(eval)
@@ -399,9 +414,7 @@ class DSL(NeSyModel):
 
 def configure_subparsers(subparsers):
     """Configure subparsers."""
-    # Subparser for DPL
-    dpl_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "dsl",
         help="Use DSL as NeSy predictor",
     )
-    configure_global_arguments(dpl_parser)

@@ -19,6 +19,12 @@ from conformal.experiments.utils import load_model, collect_predictions
 from conformal.statistics.metrics import (
     compute_statistics,
     conformal_metrics,
+    boia_conformal_metrics,
+    boia_per_group_concept_consistency,
+    boia_label_group_metrics,
+    boia_per_group_label_consistency,
+    boia_conditional_conformal_metrics_per_group,
+    boia_joint_failure_metrics_per_group,
     prediction_consistency,
     conditional_conformal_metrics,
     joint_failure_metrics,
@@ -86,6 +92,37 @@ def configure_global_arguments(parser):
         default=None,
         help="Directory to load the model checkpoint from (defaults to output_dir_path).",
     )
+    parser.add_argument(
+        "--epsilon-symbols",
+        type=float,
+        default=0.2807344052335263,
+        help="DSL hyperparameter for learning symbols.",
+    )
+    parser.add_argument(
+        "--epsilon-rules",
+        type=float,
+        default=0.1077119516324264,
+        help="DSL hyperparameter for learning rules.",
+    )
+    parser.add_argument(
+        "--alpha-label",
+        type=float,
+        default=0.1,
+        help="Label-level coverage error rate (alpha).",
+    )
+    parser.add_argument(
+        "--alpha-concepts",
+        type=float,
+        default=0.1,
+        help="Concept-level coverage error rate (beta).",
+    )
+    parser.add_argument(
+        "--cal-ratio",
+        type=float,
+        default=0.2,
+        dest="cal_ratio",
+        help="Fraction of the test set used for calibration (default 0.2).",
+    )
 
 
 def test_parser(parser):
@@ -126,6 +163,11 @@ def save_visual_examples(
     save_path.mkdir(parents=True, exist_ok=True)
 
     count = 0
+
+    # Skip visual examples for BOIA group-tuple representation
+    if len(concept_sets) > 0 and isinstance(concept_sets[0], tuple):
+        log(f"[Info] Skipping visual examples for BOIA group-tuple format ({method_name})", "INFO")
+        return
 
     for i in range(len(concept_sets)):
         if count >= limit:
@@ -361,6 +403,22 @@ def conformal_evaluation(
     log(f"[NeSy] Label Coverage: {label_coverage:.4f}", "INFO")
     log(f"[NeSy] Label Set Size: {label_size:.4f}", "INFO")
 
+    boia_m_nesy = None
+    if args.dataset == "boia":
+        from conformal.statistics.metrics import _BOIA_FS_IDX, _BOIA_L_IDX, _BOIA_R_IDX
+        nesy_tuples = [
+            (
+                all_c[i][_BOIA_FS_IDX].reshape(1, -1),
+                all_c[i][_BOIA_L_IDX].reshape(1, -1),
+                all_c[i][_BOIA_R_IDX].reshape(1, -1),
+            )
+            for i in range(len(all_c))
+        ]
+        boia_m_nesy = boia_conformal_metrics(nesy_tuples, all_g)
+        log(f"  [FS] NeSy concept coverage={boia_m_nesy['coverage_fs']:.4f}  set_size={boia_m_nesy['set_size_fs']:.1f}", "INFO")
+        log(f"  [L]  NeSy concept coverage={boia_m_nesy['coverage_l']:.4f}  set_size={boia_m_nesy['set_size_l']:.1f}", "INFO")
+        log(f"  [R]  NeSy concept coverage={boia_m_nesy['coverage_r']:.4f}  set_size={boia_m_nesy['set_size_r']:.1f}", "INFO")
+
     results_storage["No Conformal"] = {
         "test_loss": test_loss,
         "test_f1": test_f1,
@@ -380,6 +438,31 @@ def conformal_evaluation(
         "coverage_labels": label_coverage,
         "label_size": label_size,
     }
+    if boia_m_nesy is not None:
+        _nesy_preds_as_sets = np.expand_dims(all_preds, axis=1)
+        boia_gc_nesy = boia_per_group_concept_consistency(nesy_tuples, _nesy_preds_as_sets, logic)
+        boia_lg_nesy = boia_label_group_metrics(_nesy_preds_as_sets, all_labels)
+        boia_lc_nesy = boia_per_group_label_consistency(nesy_tuples, _nesy_preds_as_sets, logic)
+        results_storage["No Conformal"].update({
+            "coverage_fs": boia_m_nesy["coverage_fs"],
+            "coverage_l":  boia_m_nesy["coverage_l"],
+            "coverage_r":  boia_m_nesy["coverage_r"],
+            "set_size_fs": boia_m_nesy["set_size_fs"],
+            "set_size_l":  boia_m_nesy["set_size_l"],
+            "set_size_r":  boia_m_nesy["set_size_r"],
+            "concept_consistency_fs": boia_gc_nesy["fs"],
+            "concept_consistency_l":  boia_gc_nesy["l"],
+            "concept_consistency_r":  boia_gc_nesy["r"],
+            "coverage_label_fs": boia_lg_nesy["coverage_label_fs"],
+            "coverage_label_l":  boia_lg_nesy["coverage_label_l"],
+            "coverage_label_r":  boia_lg_nesy["coverage_label_r"],
+            "set_size_label_fs": boia_lg_nesy["set_size_label_fs"],
+            "set_size_label_l":  boia_lg_nesy["set_size_label_l"],
+            "set_size_label_r":  boia_lg_nesy["set_size_label_r"],
+            "label_consistency_fs": boia_lc_nesy["label_consistency_fs"],
+            "label_consistency_l":  boia_lc_nesy["label_consistency_l"],
+            "label_consistency_r":  boia_lc_nesy["label_consistency_r"],
+        })
 
     log("=== 2. Conformal (Calibrating Concepts) ===", "INFO")
 
@@ -397,8 +480,21 @@ def conformal_evaluation(
     log(f"[Conformal Concepts Only] Concept Coverage: {concept_coverage:.4f}", "INFO")
     log(f"[Conformal Concepts Only] Concept Set Size: {concept_set_size:.4f}", "INFO")
 
+    boia_m_2 = None
+    if args.dataset == "boia" and len(concept_sets) > 0 and isinstance(concept_sets[0], tuple):
+        boia_m_2 = boia_conformal_metrics(concept_sets, all_g)
+        log(f"  [FS]  coverage={boia_m_2['coverage_fs']:.4f}  set_size={boia_m_2['set_size_fs']:.1f}/512", "INFO")
+        log(f"  [L]   coverage={boia_m_2['coverage_l']:.4f}  set_size={boia_m_2['set_size_l']:.1f}/64", "INFO")
+        log(f"  [R]   coverage={boia_m_2['coverage_r']:.4f}  set_size={boia_m_2['set_size_r']:.1f}/64", "INFO")
+
     concept_consistency, label_consistency = prediction_consistency(
-        concept_sets, np.expand_dims(np.expand_dims(all_preds, axis=1), axis=1), logic
+        concept_sets,
+        (
+            np.expand_dims(np.expand_dims(all_preds, axis=1), axis=1)
+            if not multilabel
+            else np.expand_dims(all_preds, axis=1)
+        ),
+        logic,
     )
 
     log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
@@ -412,6 +508,31 @@ def conformal_evaluation(
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
     }
+    if boia_m_2 is not None:
+        _preds_as_sets = np.expand_dims(all_preds, axis=1)
+        boia_gc_2 = boia_per_group_concept_consistency(concept_sets, _preds_as_sets, logic)
+        boia_lg_2 = boia_label_group_metrics(_preds_as_sets, all_labels)
+        boia_lc_2 = boia_per_group_label_consistency(concept_sets, _preds_as_sets, logic)
+        results_storage["Conformal Concepts Only"].update({
+            "coverage_fs": boia_m_2["coverage_fs"],
+            "coverage_l":  boia_m_2["coverage_l"],
+            "coverage_r":  boia_m_2["coverage_r"],
+            "set_size_fs": boia_m_2["set_size_fs"],
+            "set_size_l":  boia_m_2["set_size_l"],
+            "set_size_r":  boia_m_2["set_size_r"],
+            "concept_consistency_fs": boia_gc_2["fs"],
+            "concept_consistency_l":  boia_gc_2["l"],
+            "concept_consistency_r":  boia_gc_2["r"],
+            "coverage_label_fs": boia_lg_2["coverage_label_fs"],
+            "coverage_label_l":  boia_lg_2["coverage_label_l"],
+            "coverage_label_r":  boia_lg_2["coverage_label_r"],
+            "set_size_label_fs": boia_lg_2["set_size_label_fs"],
+            "set_size_label_l":  boia_lg_2["set_size_label_l"],
+            "set_size_label_r":  boia_lg_2["set_size_label_r"],
+            "label_consistency_fs": boia_lc_2["label_consistency_fs"],
+            "label_consistency_l":  boia_lc_2["label_consistency_l"],
+            "label_consistency_r":  boia_lc_2["label_consistency_r"],
+        })
 
     save_visual_examples(
         test_dl.dataset,
@@ -464,6 +585,30 @@ def conformal_evaluation(
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
     }
+    if boia_m_nesy is not None:
+        boia_gc_to = boia_per_group_concept_consistency(nesy_tuples, label_sets, logic)
+        boia_lg_to = boia_label_group_metrics(label_sets, all_labels)
+        boia_lc_to = boia_per_group_label_consistency(nesy_tuples, label_sets, logic)
+        results_storage["Conformal only Labels"].update({
+            "coverage_fs": boia_m_nesy["coverage_fs"],
+            "coverage_l":  boia_m_nesy["coverage_l"],
+            "coverage_r":  boia_m_nesy["coverage_r"],
+            "set_size_fs": boia_m_nesy["set_size_fs"],
+            "set_size_l":  boia_m_nesy["set_size_l"],
+            "set_size_r":  boia_m_nesy["set_size_r"],
+            "concept_consistency_fs": boia_gc_to["fs"],
+            "concept_consistency_l":  boia_gc_to["l"],
+            "concept_consistency_r":  boia_gc_to["r"],
+            "coverage_label_fs": boia_lg_to["coverage_label_fs"],
+            "coverage_label_l":  boia_lg_to["coverage_label_l"],
+            "coverage_label_r":  boia_lg_to["coverage_label_r"],
+            "set_size_label_fs": boia_lg_to["set_size_label_fs"],
+            "set_size_label_l":  boia_lg_to["set_size_label_l"],
+            "set_size_label_r":  boia_lg_to["set_size_label_r"],
+            "label_consistency_fs": boia_lc_to["label_consistency_fs"],
+            "label_consistency_l":  boia_lc_to["label_consistency_l"],
+            "label_consistency_r":  boia_lc_to["label_consistency_r"],
+        })
 
     save_visual_examples(
         test_dl.dataset,
@@ -495,6 +640,13 @@ def conformal_evaluation(
         f"[Conformal both Concepts and Labels] Label Set Size: {label_size:.4f}", "INFO"
     )
 
+    boia_m_4 = None
+    if args.dataset == "boia" and len(concept_sets) > 0 and isinstance(concept_sets[0], tuple):
+        boia_m_4 = boia_conformal_metrics(concept_sets, all_g)
+        log(f"  [FS]  coverage={boia_m_4['coverage_fs']:.4f}  set_size={boia_m_4['set_size_fs']:.1f}/512", "INFO")
+        log(f"  [L]   coverage={boia_m_4['coverage_l']:.4f}  set_size={boia_m_4['set_size_l']:.1f}/64", "INFO")
+        log(f"  [R]   coverage={boia_m_4['coverage_r']:.4f}  set_size={boia_m_4['set_size_r']:.1f}/64", "INFO")
+
     concept_consistency, label_consistency = prediction_consistency(
         concept_sets, label_sets, logic
     )
@@ -510,6 +662,15 @@ def conformal_evaluation(
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
     }
+    if boia_m_4 is not None:
+        results_storage["Conformal both Concepts and Labels"].update({
+            "coverage_fs": boia_m_4["coverage_fs"],
+            "coverage_l":  boia_m_4["coverage_l"],
+            "coverage_r":  boia_m_4["coverage_r"],
+            "set_size_fs": boia_m_4["set_size_fs"],
+            "set_size_l":  boia_m_4["set_size_l"],
+            "set_size_r":  boia_m_4["set_size_r"],
+        })
 
     save_visual_examples(
         test_dl.dataset,
@@ -532,6 +693,13 @@ def conformal_evaluation(
 
     log(f"[Conformal Hard Logic] Label Coverage: {label_coverage:.4f}", "INFO")
     log(f"[Conformal Hard Logic] Label Set Size: {label_size:.4f}", "INFO")
+
+    boia_m_5 = None
+    if args.dataset == "boia" and len(concept_sets) > 0 and isinstance(concept_sets[0], tuple):
+        boia_m_5 = boia_conformal_metrics(concept_sets, all_g)
+        log(f"  [FS]  coverage={boia_m_5['coverage_fs']:.4f}  set_size={boia_m_5['set_size_fs']:.1f}/512", "INFO")
+        log(f"  [L]   coverage={boia_m_5['coverage_l']:.4f}  set_size={boia_m_5['set_size_l']:.1f}/64", "INFO")
+        log(f"  [R]   coverage={boia_m_5['coverage_r']:.4f}  set_size={boia_m_5['set_size_r']:.1f}/64", "INFO")
 
     concept_consistency, label_consistency = prediction_consistency(
         concept_sets, label_sets, logic
@@ -565,6 +733,36 @@ def conformal_evaluation(
         "label_consistency": label_consistency,
         "delta_de": delta_de,
     }
+    if boia_m_5 is not None:
+        boia_gc_5 = boia_per_group_concept_consistency(concept_sets, label_sets, logic)
+        boia_lg_5 = boia_label_group_metrics(label_sets, all_labels)
+        boia_lc_5 = boia_per_group_label_consistency(concept_sets, label_sets, logic)
+        boia_cond_5 = boia_conditional_conformal_metrics_per_group(
+            concept_sets, label_sets, all_g, all_labels
+        )
+        results_storage["Conformal Hard Logic"].update({
+            "coverage_fs": boia_m_5["coverage_fs"],
+            "coverage_l":  boia_m_5["coverage_l"],
+            "coverage_r":  boia_m_5["coverage_r"],
+            "set_size_fs": boia_m_5["set_size_fs"],
+            "set_size_l":  boia_m_5["set_size_l"],
+            "set_size_r":  boia_m_5["set_size_r"],
+            "concept_consistency_fs": boia_gc_5["fs"],
+            "concept_consistency_l":  boia_gc_5["l"],
+            "concept_consistency_r":  boia_gc_5["r"],
+            "coverage_label_fs": boia_lg_5["coverage_label_fs"],
+            "coverage_label_l":  boia_lg_5["coverage_label_l"],
+            "coverage_label_r":  boia_lg_5["coverage_label_r"],
+            "set_size_label_fs": boia_lg_5["set_size_label_fs"],
+            "set_size_label_l":  boia_lg_5["set_size_label_l"],
+            "set_size_label_r":  boia_lg_5["set_size_label_r"],
+            "label_consistency_fs": boia_lc_5["label_consistency_fs"],
+            "label_consistency_l":  boia_lc_5["label_consistency_l"],
+            "label_consistency_r":  boia_lc_5["label_consistency_r"],
+            "delta_de_fs": boia_cond_5["delta_de_fs"],
+            "delta_de_l":  boia_cond_5["delta_de_l"],
+            "delta_de_r":  boia_cond_5["delta_de_r"],
+        })
 
     save_visual_examples(
         test_dl.dataset,
@@ -647,11 +845,64 @@ def conformal_evaluation(
         "label_consistency": label_consistency,
         "delta_ab": delta_ab,
     }
+    if args.dataset == "boia" and len(concept_sets) > 0 and isinstance(concept_sets[0], tuple):
+        boia_m_ab = boia_conformal_metrics(concept_sets, all_g)
+        log(f"  [FS]  coverage={boia_m_ab['coverage_fs']:.4f}  set_size={boia_m_ab['set_size_fs']:.1f}/512", "INFO")
+        log(f"  [L]   coverage={boia_m_ab['coverage_l']:.4f}  set_size={boia_m_ab['set_size_l']:.1f}/64", "INFO")
+        log(f"  [R]   coverage={boia_m_ab['coverage_r']:.4f}  set_size={boia_m_ab['set_size_r']:.1f}/64", "INFO")
+        boia_gc_ab = boia_per_group_concept_consistency(concept_sets, label_sets, logic)
+        boia_lg_ab = boia_label_group_metrics(label_sets, all_labels)
+        boia_lc_ab = boia_per_group_label_consistency(concept_sets, label_sets, logic)
+        boia_cond_ab = boia_conditional_conformal_metrics_per_group(
+            concept_sets, label_sets, all_g, all_labels
+        )
+        results_storage["Conformal with Abduction"].update({
+            "coverage_fs": boia_m_ab["coverage_fs"],
+            "coverage_l":  boia_m_ab["coverage_l"],
+            "coverage_r":  boia_m_ab["coverage_r"],
+            "set_size_fs": boia_m_ab["set_size_fs"],
+            "set_size_l":  boia_m_ab["set_size_l"],
+            "set_size_r":  boia_m_ab["set_size_r"],
+            "concept_consistency_fs": boia_gc_ab["fs"],
+            "concept_consistency_l":  boia_gc_ab["l"],
+            "concept_consistency_r":  boia_gc_ab["r"],
+            "coverage_label_fs": boia_lg_ab["coverage_label_fs"],
+            "coverage_label_l":  boia_lg_ab["coverage_label_l"],
+            "coverage_label_r":  boia_lg_ab["coverage_label_r"],
+            "set_size_label_fs": boia_lg_ab["set_size_label_fs"],
+            "set_size_label_l":  boia_lg_ab["set_size_label_l"],
+            "set_size_label_r":  boia_lg_ab["set_size_label_r"],
+            "label_consistency_fs": boia_lc_ab["label_consistency_fs"],
+            "label_consistency_l":  boia_lc_ab["label_consistency_l"],
+            "label_consistency_r":  boia_lc_ab["label_consistency_r"],
+            "delta_ab_fs": boia_cond_ab["delta_ab_fs"],
+            "delta_ab_l":  boia_cond_ab["delta_ab_l"],
+            "delta_ab_r":  boia_cond_ab["delta_ab_r"],
+        })
 
-    results_storage["COCOCO Joint Failures"] = {
-        "joint_c_miss": joint_c_miss,
-        "joint_y_miss": joint_y_miss,
-    }
+        boia_joint_grp = boia_joint_failure_metrics_per_group(
+            gamma_beta_sets,
+            upsilon_alpha_sets,
+            gamma_ab_sets,
+            upsilon_de_sets,
+            all_g,
+            all_labels,
+        )
+        results_storage["COCOCO Joint Failures"] = {
+            "joint_c_miss": joint_c_miss,
+            "joint_y_miss": joint_y_miss,
+            "joint_c_fs": boia_joint_grp["joint_c_fs"],
+            "joint_c_l":  boia_joint_grp["joint_c_l"],
+            "joint_c_r":  boia_joint_grp["joint_c_r"],
+            "joint_y_fs": boia_joint_grp["joint_y_fs"],
+            "joint_y_l":  boia_joint_grp["joint_y_l"],
+            "joint_y_r":  boia_joint_grp["joint_y_r"],
+        }
+    else:
+        results_storage["COCOCO Joint Failures"] = {
+            "joint_c_miss": joint_c_miss,
+            "joint_y_miss": joint_y_miss,
+        }
 
     save_visual_examples(
         test_dl.dataset,
@@ -690,6 +941,13 @@ def conformal_evaluation(
         "INFO",
     )
 
+    boia_m_7 = None
+    if args.dataset == "boia" and len(concept_sets) > 0 and isinstance(concept_sets[0], tuple):
+        boia_m_7 = boia_conformal_metrics(concept_sets, all_g)
+        log(f"  [FS]  coverage={boia_m_7['coverage_fs']:.4f}  set_size={boia_m_7['set_size_fs']:.1f}/512", "INFO")
+        log(f"  [L]   coverage={boia_m_7['coverage_l']:.4f}  set_size={boia_m_7['set_size_l']:.1f}/64", "INFO")
+        log(f"  [R]   coverage={boia_m_7['coverage_r']:.4f}  set_size={boia_m_7['set_size_r']:.1f}/64", "INFO")
+
     concept_consistency, label_consistency = prediction_consistency(
         concept_sets, label_sets, logic
     )
@@ -718,6 +976,15 @@ def conformal_evaluation(
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
     }
+    if boia_m_7 is not None:
+        results_storage["Conformal both Concepts and Labels with Concept Refinement"].update({
+            "coverage_fs": boia_m_7["coverage_fs"],
+            "coverage_l":  boia_m_7["coverage_l"],
+            "coverage_r":  boia_m_7["coverage_r"],
+            "set_size_fs": boia_m_7["set_size_fs"],
+            "set_size_l":  boia_m_7["set_size_l"],
+            "set_size_r":  boia_m_7["set_size_r"],
+        })
 
     log("=== 8. Conformal with Label Refinement ===", "INFO")
 
@@ -747,6 +1014,13 @@ def conformal_evaluation(
         "INFO",
     )
 
+    boia_m_8 = None
+    if args.dataset == "boia" and len(concept_sets) > 0 and isinstance(concept_sets[0], tuple):
+        boia_m_8 = boia_conformal_metrics(concept_sets, all_g)
+        log(f"  [FS]  coverage={boia_m_8['coverage_fs']:.4f}  set_size={boia_m_8['set_size_fs']:.1f}/512", "INFO")
+        log(f"  [L]   coverage={boia_m_8['coverage_l']:.4f}  set_size={boia_m_8['set_size_l']:.1f}/64", "INFO")
+        log(f"  [R]   coverage={boia_m_8['coverage_r']:.4f}  set_size={boia_m_8['set_size_r']:.1f}/64", "INFO")
+
     concept_consistency, label_consistency = prediction_consistency(
         concept_sets, label_sets, logic
     )
@@ -775,6 +1049,30 @@ def conformal_evaluation(
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
     }
+    if boia_m_8 is not None:
+        boia_gc_8 = boia_per_group_concept_consistency(concept_sets, label_sets, logic)
+        boia_lg_8 = boia_label_group_metrics(label_sets, all_labels)
+        boia_lc_8 = boia_per_group_label_consistency(concept_sets, label_sets, logic)
+        results_storage["Conformal both Concepts and Labels with Label Refinement"].update({
+            "coverage_fs": boia_m_8["coverage_fs"],
+            "coverage_l":  boia_m_8["coverage_l"],
+            "coverage_r":  boia_m_8["coverage_r"],
+            "set_size_fs": boia_m_8["set_size_fs"],
+            "set_size_l":  boia_m_8["set_size_l"],
+            "set_size_r":  boia_m_8["set_size_r"],
+            "concept_consistency_fs": boia_gc_8["fs"],
+            "concept_consistency_l":  boia_gc_8["l"],
+            "concept_consistency_r":  boia_gc_8["r"],
+            "coverage_label_fs": boia_lg_8["coverage_label_fs"],
+            "coverage_label_l":  boia_lg_8["coverage_label_l"],
+            "coverage_label_r":  boia_lg_8["coverage_label_r"],
+            "set_size_label_fs": boia_lg_8["set_size_label_fs"],
+            "set_size_label_l":  boia_lg_8["set_size_label_l"],
+            "set_size_label_r":  boia_lg_8["set_size_label_r"],
+            "label_consistency_fs": boia_lc_8["label_consistency_fs"],
+            "label_consistency_l":  boia_lc_8["label_consistency_l"],
+            "label_consistency_r":  boia_lc_8["label_consistency_r"],
+        })
 
     log("=== 9. Conformal with Concept and Label Refinement ===", "INFO")
 
@@ -804,6 +1102,13 @@ def conformal_evaluation(
         f"[Conformal both Concepts and Labels with Concept and Label Refinement] Label Set Size: {label_size:.4f}",
         "INFO",
     )
+
+    boia_m_9 = None
+    if args.dataset == "boia" and len(concept_sets) > 0 and isinstance(concept_sets[0], tuple):
+        boia_m_9 = boia_conformal_metrics(concept_sets, all_g)
+        log(f"  [FS]  coverage={boia_m_9['coverage_fs']:.4f}  set_size={boia_m_9['set_size_fs']:.1f}/512", "INFO")
+        log(f"  [L]   coverage={boia_m_9['coverage_l']:.4f}  set_size={boia_m_9['set_size_l']:.1f}/64", "INFO")
+        log(f"  [R]   coverage={boia_m_9['coverage_r']:.4f}  set_size={boia_m_9['set_size_r']:.1f}/64", "INFO")
 
     concept_consistency, label_consistency = prediction_consistency(
         concept_sets, label_sets, logic
@@ -838,69 +1143,96 @@ def conformal_evaluation(
         "concept_consistency": concept_consistency,
         "label_consistency": label_consistency,
     }
+    if boia_m_9 is not None:
+        boia_gc_9 = boia_per_group_concept_consistency(concept_sets, label_sets, logic)
+        boia_lg_9 = boia_label_group_metrics(label_sets, all_labels)
+        boia_lc_9 = boia_per_group_label_consistency(concept_sets, label_sets, logic)
+        results_storage["Conformal both Concepts and Labels with Concept and Label Refinement"].update({
+            "coverage_fs": boia_m_9["coverage_fs"],
+            "coverage_l":  boia_m_9["coverage_l"],
+            "coverage_r":  boia_m_9["coverage_r"],
+            "set_size_fs": boia_m_9["set_size_fs"],
+            "set_size_l":  boia_m_9["set_size_l"],
+            "set_size_r":  boia_m_9["set_size_r"],
+            "concept_consistency_fs": boia_gc_9["fs"],
+            "concept_consistency_l":  boia_gc_9["l"],
+            "concept_consistency_r":  boia_gc_9["r"],
+            "coverage_label_fs": boia_lg_9["coverage_label_fs"],
+            "coverage_label_l":  boia_lg_9["coverage_label_l"],
+            "coverage_label_r":  boia_lg_9["coverage_label_r"],
+            "set_size_label_fs": boia_lg_9["set_size_label_fs"],
+            "set_size_label_l":  boia_lg_9["set_size_label_l"],
+            "set_size_label_r":  boia_lg_9["set_size_label_r"],
+            "label_consistency_fs": boia_lc_9["label_consistency_fs"],
+            "label_consistency_l":  boia_lc_9["label_consistency_l"],
+            "label_consistency_r":  boia_lc_9["label_consistency_r"],
+        })
 
     log("=== 10. Conformal with Concept and Label Refinement (E-Values) ===", "INFO")
 
-    cp_e = ConformalEPredictor(
-        model,
-        device=device,
-        logic=logic,
-        dataset=args.dataset,
-        concept_dim=model.concept_dim,
-        n_concepts=model.n_images,
-        experiment_name=str(args.output_dir_path / f"{experiment_name}"),
-        multiconcepts=multiconcept,
-        multilabel=multilabel,
-    )
+    try:
+        cp_e = ConformalEPredictor(
+            model,
+            device=device,
+            logic=logic,
+            dataset=args.dataset,
+            concept_dim=model.concept_dim,
+            n_concepts=model.n_images,
+            experiment_name=str(args.output_dir_path / f"{experiment_name}"),
+            multiconcepts=multiconcept,
+            multilabel=multilabel,
+        )
 
-    cp_e.calibrate_per_concept(val_dl)
-    cp_e.calibrate_labels(val_dl)
+        cp_e.calibrate_per_concept(val_dl)
+        cp_e.calibrate_labels(val_dl)
 
-    concept_sets, label_sets = cp_e.predict_concepts_and_labels(
-        test_dl, alpha_labels=alpha_label, beta_concepts=alpha_concepts
-    )
+        concept_sets, label_sets = cp_e.predict_concepts_and_labels(
+            test_dl, alpha_labels=alpha_label, beta_concepts=alpha_concepts
+        )
 
-    concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
-    label_coverage, label_size = conformal_metrics(
-        label_sets, np.expand_dims(all_labels, axis=1)
-    )
+        concept_coverage, concept_set_size = conformal_metrics(concept_sets, all_g)
+        label_coverage, label_size = conformal_metrics(
+            label_sets, np.expand_dims(all_labels, axis=1)
+        )
 
-    log(f"[E-Value Refinement] Concept Coverage: {concept_coverage:.4f}", "INFO")
-    log(f"[E-Value Refinement] Concept Set Size: {concept_set_size:.4f}", "INFO")
-    log(f"[E-Value Refinement] Label Coverage: {label_coverage:.4f}", "INFO")
-    log(f"[E-Value Refinement] Label Set Size: {label_size:.4f}", "INFO")
+        log(f"[E-Value Refinement] Concept Coverage: {concept_coverage:.4f}", "INFO")
+        log(f"[E-Value Refinement] Concept Set Size: {concept_set_size:.4f}", "INFO")
+        log(f"[E-Value Refinement] Label Coverage: {label_coverage:.4f}", "INFO")
+        log(f"[E-Value Refinement] Label Set Size: {label_size:.4f}", "INFO")
 
-    concept_consistency, label_consistency = prediction_consistency(
-        concept_sets, label_sets, logic
-    )
+        concept_consistency, label_consistency = prediction_consistency(
+            concept_sets, label_sets, logic
+        )
 
-    log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
-    log(f"Label Consistency: {label_consistency:.4f}", "INFO")
+        log(f"Concept Consistency: {concept_consistency:.4f}", "INFO")
+        log(f"Label Consistency: {label_consistency:.4f}", "INFO")
 
-    assert concept_consistency == 1.0, (
-        f"[Section 10] Concept consistency must be 1.0 by construction, got {concept_consistency:.6f}"
-    )
-    assert label_consistency == 1.0, (
-        f"[Section 10] Label consistency must be 1.0 by construction, got {label_consistency:.6f}"
-    )
+        assert concept_consistency == 1.0, (
+            f"[Section 10] Concept consistency must be 1.0 by construction, got {concept_consistency:.6f}"
+        )
+        assert label_consistency == 1.0, (
+            f"[Section 10] Label consistency must be 1.0 by construction, got {label_consistency:.6f}"
+        )
 
-    save_visual_examples(
-        test_dl.dataset,
-        concept_sets,
-        label_sets,
-        "Conformal with E-Value Concept and Label Refinement",
-        args.output_dir_path,
-        is_image=is_image,
-    )
+        save_visual_examples(
+            test_dl.dataset,
+            concept_sets,
+            label_sets,
+            "Conformal with E-Value Concept and Label Refinement",
+            args.output_dir_path,
+            is_image=is_image,
+        )
 
-    results_storage["Conformal with E-Value Concept and Label Refinement"] = {
-        "coverage_concepts": concept_coverage,
-        "concept_size": concept_set_size,
-        "coverage_labels": label_coverage,
-        "label_size": label_size,
-        "concept_consistency": concept_consistency,
-        "label_consistency": label_consistency,
-    }
+        results_storage["Conformal with E-Value Concept and Label Refinement"] = {
+            "coverage_concepts": concept_coverage,
+            "concept_size": concept_set_size,
+            "coverage_labels": label_coverage,
+            "label_size": label_size,
+            "concept_consistency": concept_consistency,
+            "label_consistency": label_consistency,
+        }
+    except Exception as e:
+        log(f"[Section 10] E-value refinement failed (skipped): {e}", "WARNING")
 
     return results_storage
 
@@ -925,7 +1257,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     ) = DatasetFactory.get_dataset(args, name=args.dataset, device=args.device)
 
     n_test = len(test_ds)
-    n_calib = int(0.2 * n_test)
+    n_calib = int(args.cal_ratio * n_test)
     n_eval = n_test - n_calib
     calib_ds, eval_ds = random_split(
         test_ds, [n_calib, n_eval],
@@ -938,7 +1270,8 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     log("Loading the model", "INFO")
 
     model = NetworkFactory.get_network(
-        args.model, input_dim, concept_dim, args, n_images
+        args.model, input_dim, concept_dim, args, n_images,
+        concept_names=concept_names,
     )
     model = NeSyFactory.get_nesy_model(
         args.nesy, n_images, model, concept_dim, output_dim, device, logic, args
@@ -960,8 +1293,8 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     # load the logic
     logic_from_model = LogicFactory.get_logic(args.nesy, logic, model)
 
-    alpha_concepts = 0.1
-    alpha_label = 0.1
+    alpha_concepts = args.alpha_concepts
+    alpha_label = args.alpha_label
     result_storage = conformal_evaluation(
         model,
         calib_dl,

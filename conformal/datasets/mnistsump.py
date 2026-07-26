@@ -1,7 +1,7 @@
 from conformal.datasets.mnist import MNISTLoader
 from conformal.datasets.mnistadd import MNISTAdditionDataset
 from conformal.utils.logic import HardLogic
-from conformal.models import resnet18, lenet, linear
+from conformal.models import resnet18, lenet, linear, clip_encoder
 from conformal.datasets.mnistadd import mnist_addition_weights
 import torch
 
@@ -68,3 +68,4 @@ def configure_subparsers(subparsers):
     resnet18.configure_subparsers(subparsers)
     lenet.configure_subparsers(subparsers)
     linear.configure_subparsers(subparsers)
+    clip_encoder.configure_subparsers(subparsers)

@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 from torchvision import transforms
 from conformal.utils.logic import HardLogic
 from conformal.general_utils import log
-from conformal.models import resnet18, lenet, linear
+from conformal.models import resnet18, lenet, linear, clip_encoder
 
 
 def configure_global_arguments(parser):
@@ -273,3 +273,4 @@ def configure_subparsers(subparsers):
     resnet18.configure_subparsers(subparsers)
     lenet.configure_subparsers(subparsers)
     linear.configure_subparsers(subparsers)
+    clip_encoder.configure_subparsers(subparsers)

@@ -4,7 +4,7 @@ import torchvision
 from torch.utils.data import Dataset
 from medmnist import DermaMNIST
 from torchvision import transforms
-from conformal.models import resnet18, lenet, linear
+from conformal.models import resnet18, lenet, linear, clip_encoder
 from conformal.utils.logic import HardLogic
 
 
@@ -152,3 +152,4 @@ def configure_subparsers(subparsers):
     resnet18.configure_subparsers(subparsers)
     lenet.configure_subparsers(subparsers)
     linear.configure_subparsers(subparsers)
+    clip_encoder.configure_subparsers(subparsers)

@@ -243,71 +243,55 @@ class boia_ltn_loss(torch.nn.Module):
         self.sat_agg_op = sat_agg_op
 
     def forward(self, conc_preds, actions):
-        # Cut probabilities
+        # Cut probabilities — shape (B, 21)
         conc_preds = conc_preds[:, 0, :, 1]
 
-        # Variables
-        green_light = ltn.Variable("green_light", conc_preds[:, 0], add_batch_dim=False)
-        follow = ltn.Variable("follow", conc_preds[:, 1], add_batch_dim=False)
-        road_clear = ltn.Variable("road_clear", conc_preds[:, 2], add_batch_dim=False)
-        red_light = ltn.Variable("red_light", conc_preds[:, 3], add_batch_dim=False)
-        stop_sign = ltn.Variable("stop_sign", conc_preds[:, 4], add_batch_dim=False)
-        car = ltn.Variable("car", conc_preds[:, 5], add_batch_dim=False)
-        person = ltn.Variable("person", conc_preds[:, 6], add_batch_dim=False)
-        rider = ltn.Variable("rider", conc_preds[:, 7], add_batch_dim=False)
-        other_obstacle = ltn.Variable(
-            "other_obstacle", conc_preds[:, 8], add_batch_dim=False
-        )
-        left_lane = ltn.Variable("left_lane", conc_preds[:, 9], add_batch_dim=False)
-        left_green_light = ltn.Variable(
-            "left_green_light", conc_preds[:, 10], add_batch_dim=False
-        )
-        left_follow = ltn.Variable(
-            "left_follow", conc_preds[:, 11], add_batch_dim=False
-        )
-        no_left_lane = ltn.Variable(
-            "no_left_lane", conc_preds[:, 12], add_batch_dim=False
-        )
-        left_obstacle = ltn.Variable(
-            "left_obstacle", conc_preds[:, 13], add_batch_dim=False
-        )
-        left_solid_line = ltn.Variable(
-            "left_solid_line", conc_preds[:, 14], add_batch_dim=False
-        )
-        right_lane = ltn.Variable("right_lane", conc_preds[:, 15], add_batch_dim=False)
-        right_green_light = ltn.Variable(
-            "right_green_light", conc_preds[:, 16], add_batch_dim=False
-        )
-        right_follow = ltn.Variable(
-            "right_follow", conc_preds[:, 17], add_batch_dim=False
-        )
-        no_right_lane = ltn.Variable(
-            "no_right_lane", conc_preds[:, 18], add_batch_dim=False
-        )
-        right_obstacle = ltn.Variable(
-            "right_obstacle", conc_preds[:, 19], add_batch_dim=False
-        )
-        right_solid_line = ltn.Variable(
-            "right_solid_line", conc_preds[:, 20], add_batch_dim=False
-        )
-        move_forward = ltn.Variable("move_forward", actions[:, 0], add_batch_dim=False)
-        stop = ltn.Variable("stop", actions[:, 1], add_batch_dim=False)
-        turn_left = ltn.Variable("turn_left", actions[:, 2], add_batch_dim=False)
-        turn_right = ltn.Variable("turn_right", actions[:, 3], add_batch_dim=False)
+        # Concept variables — indices follow CONCEPTS_ORDER in boia.py:
+        #  0:green_light  1:follow  2:clear  3:red_light  4:stop_sign
+        #  5:car  6:person  7:rider  8:other_obstacle
+        #  9:no_left_lane  10:left_obstacle  11:left_solid_line
+        #  12:right_lane  13:right_green_light  14:right_follow
+        #  15:no_right_lane  16:right_obstacle  17:right_solid_line
+        #  18:left_lane  19:left_green_light  20:left_follow
+        green_light    = ltn.Variable("green_light",    conc_preds[:, 0],  add_batch_dim=False)
+        follow         = ltn.Variable("follow",         conc_preds[:, 1],  add_batch_dim=False)
+        road_clear     = ltn.Variable("road_clear",     conc_preds[:, 2],  add_batch_dim=False)
+        red_light      = ltn.Variable("red_light",      conc_preds[:, 3],  add_batch_dim=False)
+        stop_sign      = ltn.Variable("stop_sign",      conc_preds[:, 4],  add_batch_dim=False)
+        car            = ltn.Variable("car",            conc_preds[:, 5],  add_batch_dim=False)
+        person         = ltn.Variable("person",         conc_preds[:, 6],  add_batch_dim=False)
+        rider          = ltn.Variable("rider",          conc_preds[:, 7],  add_batch_dim=False)
+        other_obstacle = ltn.Variable("other_obstacle", conc_preds[:, 8],  add_batch_dim=False)
+        no_left_lane   = ltn.Variable("no_left_lane",   conc_preds[:, 9],  add_batch_dim=False)
+        left_obstacle  = ltn.Variable("left_obstacle",  conc_preds[:, 10], add_batch_dim=False)
+        left_solid_line= ltn.Variable("left_solid_line",conc_preds[:, 11], add_batch_dim=False)
+        right_lane     = ltn.Variable("right_lane",     conc_preds[:, 12], add_batch_dim=False)
+        right_green_light=ltn.Variable("right_green_light",conc_preds[:, 13],add_batch_dim=False)
+        right_follow   = ltn.Variable("right_follow",   conc_preds[:, 14], add_batch_dim=False)
+        no_right_lane  = ltn.Variable("no_right_lane",  conc_preds[:, 15], add_batch_dim=False)
+        right_obstacle = ltn.Variable("right_obstacle", conc_preds[:, 16], add_batch_dim=False)
+        right_solid_line=ltn.Variable("right_solid_line",conc_preds[:, 17],add_batch_dim=False)
+        left_lane      = ltn.Variable("left_lane",      conc_preds[:, 18], add_batch_dim=False)
+        left_green_light=ltn.Variable("left_green_light",conc_preds[:, 19],add_batch_dim=False)
+        left_follow    = ltn.Variable("left_follow",    conc_preds[:, 20], add_batch_dim=False)
 
-        # REDLIGHT: red_light ⇒ ¬green_light
+        # Label variables — label order: 0=STOP, 1=MOVE_FORWARD, 2=TURN_LEFT, 3=TURN_RIGHT
+        stop         = ltn.Variable("stop",         actions[:, 0], add_batch_dim=False)
+        move_forward = ltn.Variable("move_forward", actions[:, 1], add_batch_dim=False)
+        turn_left    = ltn.Variable("turn_left",    actions[:, 2], add_batch_dim=False)
+        turn_right   = ltn.Variable("turn_right",   actions[:, 3], add_batch_dim=False)
 
-        # phi1 = self.Forall(ltn.diag(red_light, green_light), self.Implies(red_light, self.Not(green_light)))
+        # OBSTACLE aggregate: car ∨ person ∨ rider ∨ other_obstacle
+        def obstacle(c, p, r, o):
+            return self.or_op(c, self.or_op(p, self.or_op(r, o)))
+
+        # phi1: red_light ⇒ ¬green_light
         phi1 = self.forall_op(
             ltn.diag(red_light, green_light),
             self.not_op(self.and_op(red_light, green_light)),
         )
 
-        # OBSTACLE: obstacle = car ∨ person ∨ rider ∨ other_obstacle
-        def obstacle(c, p, r, o):
-            return self.or_op(c, self.or_op(p, self.or_op(r, o)))
-
-        # ROAD_CLEAR: road_clear ⇐⇒ ¬obstacle
+        # phi2: road_clear ⇔ ¬obstacle
         phi2 = self.forall_op(
             ltn.diag(road_clear, car, person, rider, other_obstacle),
             self.equiv_op(
@@ -315,15 +299,20 @@ class boia_ltn_loss(torch.nn.Module):
             ),
         )
 
-        # MOVE_FORWARD: green_light ∨ follow ∨ clear ⇒ move_forward
+        # phi3: (green_light ∧ follow ∧ road_clear) ⇒ move_forward
+        # AND (not OR): all three conditions must hold before the axiom fires.
+        # IMP (not equiv): the reverse direction would push move_forward toward the AND product
+        # value (~0.125 when concepts are uncertain), conflicting with label BCE for forward
+        # scenarios and causing F1 to decline after early epochs.
+        # phi5 handles the stop-priority case without needing the reverse direction here.
         phi3 = self.forall_op(
             ltn.diag(green_light, follow, road_clear, move_forward),
             self.imp_op(
-                self.or_op(green_light, self.or_op(follow, road_clear)), move_forward
+                self.and_op(green_light, self.and_op(follow, road_clear)), move_forward
             ),
         )
 
-        # STOP: red_light ∨ stop_sign ∨ obstacle ⇒ stop
+        # phi4: (red_light ∨ stop_sign ∨ obstacle) ⇒ stop
         phi4 = self.forall_op(
             ltn.diag(red_light, stop_sign, car, person, rider, other_obstacle, stop),
             self.imp_op(
@@ -335,64 +324,58 @@ class boia_ltn_loss(torch.nn.Module):
             ),
         )
 
+        # phi5: stop_cause ⇒ ¬move_forward (stop takes priority)
+        # Note: we do NOT use the global mutual exclusion ¬(stop_cause ∧ move_cause) because
+        # in BOIA green_light=1 AND obstacle=1 can legally coexist (stop takes priority).
         phi5 = self.forall_op(
             ltn.diag(
-                red_light,
-                stop_sign,
-                car,
-                person,
-                rider,
-                other_obstacle,
-                green_light,
-                follow,
-                road_clear,
+                red_light, stop_sign, car, person, rider, other_obstacle, move_forward
             ),
-            self.not_op(
-                self.and_op(
-                    self.or_op(
-                        red_light,
-                        self.or_op(
-                            stop_sign, obstacle(car, person, rider, other_obstacle)
-                        ),
-                    ),
-                    self.or_op(green_light, self.or_op(follow, road_clear)),
-                )
+            self.imp_op(
+                self.or_op(
+                    red_light,
+                    self.or_op(stop_sign, obstacle(car, person, rider, other_obstacle)),
+                ),
+                self.not_op(move_forward),
             ),
         )
 
-        # LEFT CAN TURN: can_turn = left_lane ∨ left_green_lane ∨ left_follow
-        def can_turn(lane, green_light, follow):
-            return self.or_op(lane, self.or_op(green_light, follow))
+        # Helper functions for turn logic
+        def can_turn(lane, gl, fol):
+            return self.or_op(lane, self.or_op(gl, fol))
 
-        # LEFT CANNOT TURN: cannot_turn = no_left_lane ∨ left_obstacle ∨ left_solid_line
-        def cannot_turn(no_lane, obstacle, solid_line):
-            return self.or_op(no_lane, self.or_op(obstacle, solid_line))
+        def cannot_turn(no_lane, obs, solid):
+            return self.or_op(no_lane, self.or_op(obs, solid))
 
-        # TURN LEFT: can_turn ∧ ¬cannot_turn ⇒ turn_left
+        # phi6: turn_left ⇔ (can_turn_left ∧ ¬cannot_turn_left)
+        # Uses correct indices: enablers at 18/19/20, inhibitors at 9/10/11
         phi6 = self.forall_op(
-            ltn.diag(left_lane, left_green_light, left_follow, turn_left),
-            self.equiv_op(
-                can_turn(left_lane, left_green_light, left_follow), turn_left
+            ltn.diag(
+                left_lane, left_green_light, left_follow,
+                no_left_lane, left_obstacle, left_solid_line,
+                turn_left,
             ),
-        )
-        phi7 = self.forall_op(
-            ltn.diag(no_left_lane, left_obstacle, left_solid_line, turn_left),
             self.equiv_op(
-                self.not_op(cannot_turn(no_left_lane, left_obstacle, left_solid_line)),
+                self.and_op(
+                    can_turn(left_lane, left_green_light, left_follow),
+                    self.not_op(cannot_turn(no_left_lane, left_obstacle, left_solid_line)),
+                ),
                 turn_left,
             ),
         )
-        phi8 = self.forall_op(
-            ltn.diag(right_lane, right_green_light, right_follow, turn_right),
-            self.equiv_op(
-                can_turn(right_lane, right_green_light, right_follow), turn_right
+
+        # phi7: turn_right ⇔ (can_turn_right ∧ ¬cannot_turn_right)
+        # Uses correct indices: enablers at 12/13/14, inhibitors at 15/16/17
+        phi7 = self.forall_op(
+            ltn.diag(
+                right_lane, right_green_light, right_follow,
+                no_right_lane, right_obstacle, right_solid_line,
+                turn_right,
             ),
-        )
-        phi9 = self.forall_op(
-            ltn.diag(no_right_lane, right_obstacle, right_solid_line, turn_right),
             self.equiv_op(
-                self.not_op(
-                    cannot_turn(no_right_lane, right_obstacle, right_solid_line)
+                self.and_op(
+                    can_turn(right_lane, right_green_light, right_follow),
+                    self.not_op(cannot_turn(no_right_lane, right_obstacle, right_solid_line)),
                 ),
                 turn_right,
             ),
@@ -405,17 +388,13 @@ class boia_ltn_loss(torch.nn.Module):
         log("phi5: " + str(phi5), "DEBUG")
         log("phi6: " + str(phi6), "DEBUG")
         log("phi7: " + str(phi7), "DEBUG")
-        log("phi8: " + str(phi8), "DEBUG")
-        log("phi9: " + str(phi9), "DEBUG")
 
         log(
-            f"LTN loss: {1.0 - self.sat_agg_op(phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9)}",
+            f"LTN loss: {1.0 - self.sat_agg_op(phi1, phi2, phi3, phi4, phi5, phi6, phi7)}",
             "DEBUG",
         )
 
-        return 1.0 - self.sat_agg_op(
-            phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9
-        )
+        return 1.0 - self.sat_agg_op(phi1, phi2, phi3, phi4, phi5, phi6, phi7)
 
 
 def boia_dsl_weights(n_images, concept_dim, output_dim, device):
@@ -685,6 +664,18 @@ class derma_ltn_loss(torch.nn.Module):
 
 def derma_dsl_weights(n_images, concept_dim, output_dim, device):
     return _generic_dsl_words_weights(n_images, concept_dim, output_dim, device)
+
+
+def rival_dsl_weights(n_images, concept_dim, output_dim, device):
+    return _generic_dsl_words_weights(1, concept_dim, output_dim, device)
+
+
+def cifar_dsl_weights(n_images, concept_dim, output_dim, device):
+    return _generic_dsl_words_weights(1, concept_dim, output_dim, device)
+
+
+def cebab_dsl_weights(n_images, concept_dim, output_dim, device):
+    return _generic_dsl_weights(n_images, concept_dim, output_dim, device)
 
 
 ##

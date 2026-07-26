@@ -69,7 +69,8 @@ class DPL(NeSyModel):
     def inference(self, concepts, eval=False):
         """DPL-specific probabilistic circuit inference."""
         if self.dataset == "boia":
-            return self._boia_inference(concepts), None
+            pred, worlds = self._boia_inference(concepts)
+            return pred, worlds
 
         # Standard DPL logic
         worlds = (

@@ -67,6 +67,18 @@ def configure_global_arguments(parser):
         default="best_model.pth",
         help="Where to save the model.",
     )
+    parser.add_argument(
+        "--epsilon-symbols",
+        type=float,
+        default=0.2807344052335263,
+        help="DSL hyperparameter for learning symbols.",
+    )
+    parser.add_argument(
+        "--epsilon-rules",
+        type=float,
+        default=0.1077119516324264,
+        help="DSL hyperparameter for learning rules.",
+    )
 
 
 def train_parser(parser):
@@ -232,6 +244,7 @@ def train(
     experiment_name,
     concept_weights,
     label_weights,
+    pruning_callback=None,
 ):
     statistics = Statistics()
     model = model.to(device)
@@ -239,14 +252,12 @@ def train(
     warmup_end = max(1, epochs // 4)
 
     for epoch in range(epochs):
-        # Concept supervision warm-up: only for LTN with full concept supervision
-        if args.nesy == "ltn" and args.concept_supervision == 1.0:
-            if epoch < warmup_end:
-                concept_sup_weight = 0.0
-            else:
-                concept_sup_weight = (epoch - warmup_end) / max(1, epochs - warmup_end)
-        else:
-            concept_sup_weight = args.concept_supervision
+        # Concept supervision schedule for LTN:
+        #   - Always use full concept_supervision weight (no warmup).
+        #   - The original LTN-first warmup (zero concept sup for first 25% epochs) caused
+        #     gradient vanishing: implies(stop_cause, 0) = 0 blocks concept gradients when
+        #     the consequence label is 0. Starting with concept BCE loss prevents this.
+        concept_sup_weight = args.concept_supervision
 
         # p scheduler: linearly ramp from 1 to args.p over all epochs (LTN only)
         if args.nesy == "ltn" and args.p > 1:
@@ -285,6 +296,9 @@ def train(
         statistics.log(
             epoch, train_loss, train_f1, val_f1, train_c_f1, val_c_f1, val_loss, model
         )
+
+        if pruning_callback is not None:
+            pruning_callback(epoch, val_f1)
 
         log(
             f"Epoch {epoch+1:3}/{epochs:3} - Train Loss: {train_loss:2.4f} - Train F1: {train_f1:2.4f} - Val Loss: {val_loss:2.4f} - Val F1: {val_f1:2.4f} - Train C F1: {train_c_f1:2.4f} - Val C F1: {val_c_f1:2.4f} - Val H(C|X): {H_c:2.4f} - Val YECE: {yece:2.4f} - Val CECE: {cece:2.4f}",
@@ -411,7 +425,7 @@ def evaluate_and_log_model(
     return test_f1
 
 
-def main(experiment_name, results_output_h, stats_output_h, args, device):
+def main(experiment_name, results_output_h, stats_output_h, args, device, pruning_callback=None):
     """Main function that parses the arguments and writes the output."""
 
     (
@@ -442,7 +456,8 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     log("Training model", "INFO")
 
     model = NetworkFactory.get_network(
-        args.model, input_dim, concept_dim, args, n_images=n_images
+        args.model, input_dim, concept_dim, args, n_images=n_images,
+        concept_names=concept_names,
     )
     model = NeSyFactory.get_nesy_model(
         args.nesy, n_images, model, concept_dim, output_dim, device, logic, args
@@ -466,6 +481,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         experiment_name,
         concept_weights,
         label_weights,
+        pruning_callback=pruning_callback,
     )
 
     log("> Training completed.", "INFO")

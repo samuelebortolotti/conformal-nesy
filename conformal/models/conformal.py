@@ -180,21 +180,44 @@ class ConformalPredictor:
 
         # Determine the effective alpha per concept
         k = scores.shape[1]  # Number of concepts
-        eff_alpha = alpha / k if self.bonferroni else alpha
 
-        if self.bonferroni:
+        if self.dataset == "boia" and self.bonferroni:
+            # BOIA: group-specific Bonferroni correction
+            # FS group (indices 0-8): 9 concepts
+            # L group (indices 9,10,11,18,19,20): 6 concepts
+            # R group (indices 12-17): 6 concepts
             log(
-                f"[Conformal] Applying Bonferroni: Joint alpha {alpha} -> Per-concept alpha {eff_alpha:.4f}",
+                f"[Conformal] BOIA group-specific Bonferroni: alpha={alpha}",
                 "INFO",
             )
+            per_concept_alpha = np.zeros(k)
+            for i in self.BOIA_FS_IDX:
+                per_concept_alpha[i] = alpha / len(self.BOIA_FS_IDX)
+            for i in self.BOIA_L_IDX:
+                per_concept_alpha[i] = alpha / len(self.BOIA_L_IDX)
+            for i in self.BOIA_R_IDX:
+                per_concept_alpha[i] = alpha / len(self.BOIA_R_IDX)
+            self.per_concept_thresholds = np.array([
+                np.quantile(scores[:, i], 1 - per_concept_alpha[i])
+                for i in range(k)
+            ])
         else:
-            log(
-                f"[Conformal] Calibrating per-concept thresholds with alpha {alpha} (no Bonferroni adjustment)",
-                "INFO",
-            )
+            eff_alpha = alpha / k if self.bonferroni else alpha
 
-        # Compute the (1 - eff_alpha) quantile for each concept column
-        self.per_concept_thresholds = np.quantile(scores, 1 - eff_alpha, axis=0)
+            if self.bonferroni:
+                log(
+                    f"[Conformal] Applying Bonferroni: Joint alpha {alpha} -> Per-concept alpha {eff_alpha:.4f}",
+                    "INFO",
+                )
+            else:
+                log(
+                    f"[Conformal] Calibrating per-concept thresholds with alpha {alpha} (no Bonferroni adjustment)",
+                    "INFO",
+                )
+
+            # Compute the (1 - eff_alpha) quantile for each concept column
+            self.per_concept_thresholds = np.quantile(scores, 1 - eff_alpha, axis=0)
+
         log(
             f"[Conformal] Per-concept thresholds: {self.per_concept_thresholds}", "INFO"
         )
@@ -223,28 +246,39 @@ class ConformalPredictor:
     def calibrate_labels(self, dl, alpha=0.1):
         """
         Calibrate threshold for the final label set.
+
+        For BOIA with Bonferroni: uses per-group correction so each independent
+        group (FS k=2, L k=1, R k=1) achieves ≥(1-alpha) marginal coverage.
         """
         scores = self.compute_label_scores(dl)
 
-        # Determine the effective alpha per label
-        # Number of labels
-        k = 1
-        if len(scores.shape) > 1:
-            k = scores.shape[1]
-        eff_alpha = alpha / k if self.bonferroni else alpha
+        k = 1 if len(scores.shape) == 1 else scores.shape[1]
 
-        if self.bonferroni:
+        if self.dataset == "boia" and self.bonferroni and k == 4:
+            # Per-group Bonferroni: labels [0,1]=FS(k=2), [2]=L(k=1), [3]=R(k=1)
+            eff_alphas = [alpha / 2, alpha / 2, alpha, alpha]
+            self.label_threshold = np.array([
+                np.quantile(scores[:, i], 1 - eff_alphas[i]) for i in range(4)
+            ])
             log(
-                f"[Conformal] Applying Bonferroni (Multilabel): Joint alpha {alpha} -> Per-label alpha {eff_alpha:.4f}",
+                f"[Conformal] BOIA per-group label Bonferroni: "
+                f"FS eff_alpha={alpha/2:.4f}, L eff_alpha={alpha:.4f}, R eff_alpha={alpha:.4f}",
                 "INFO",
             )
         else:
-            log(
-                f"[Conformal] Calibrating label threshold with alpha {alpha} (no Bonferroni adjustment)",
-                "INFO",
-            )
+            eff_alpha = alpha / k if self.bonferroni else alpha
+            if self.bonferroni:
+                log(
+                    f"[Conformal] Applying Bonferroni (Multilabel): Joint alpha {alpha} -> Per-label alpha {eff_alpha:.4f}",
+                    "INFO",
+                )
+            else:
+                log(
+                    f"[Conformal] Calibrating label threshold with alpha {alpha} (no Bonferroni adjustment)",
+                    "INFO",
+                )
+            self.label_threshold = np.quantile(scores, 1 - eff_alpha, axis=0)
 
-        self.label_threshold = np.quantile(scores, 1 - eff_alpha, axis=0)
         log(f"[Conformal] Label threshold: {self.label_threshold}", "INFO")
 
         # SANITY CHECK
@@ -309,15 +343,69 @@ class ConformalPredictor:
 
             return batch_sets
 
+    MAX_CONCEPT_TUPLES = 8192
+
+    # BOIA factorized group indices (must match FactorizedBoiaLogic)
+    BOIA_FS_IDX = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    BOIA_L_IDX  = [9, 10, 11, 18, 19, 20]
+    BOIA_R_IDX  = [12, 13, 14, 15, 16, 17]
+
     def _generate_combinations(self, marginal_list):
-        """Generate Cartesian product of concept sets, handling empty sets with a placeholder token."""
+        """
+        Generate concept worlds from per-concept marginal sets.
+
+        For BOIA: enumerate each factorized group (FS/L/R) independently,
+        producing at most 2^9 + 2^6 + 2^6 = 640 worlds instead of 2^21.
+        Each world row has EMPTY_TOKEN for concepts outside its group.
+
+        For other datasets: standard Cartesian product, capped at MAX_CONCEPT_TUPLES.
+        """
+        if self.dataset == "boia":
+            return self._generate_combinations_boia(marginal_list)
+
         processed = []
         for s in marginal_list:
             if len(s) == 0:
                 processed.append(np.array([self.EMPTY_TOKEN], dtype=int))
             else:
                 processed.append(s)
-        return np.array(list(itertools.product(*processed)), dtype=int)
+
+        total = 1
+        for s in processed:
+            total *= len(s)
+
+        if total <= self.MAX_CONCEPT_TUPLES:
+            return np.array(list(itertools.product(*processed)), dtype=int)
+
+        rng = np.random.default_rng()
+        rows = np.stack(
+            [rng.choice(s, size=self.MAX_CONCEPT_TUPLES, replace=True) for s in processed],
+            axis=1,
+        )
+        return np.unique(rows, axis=0)
+
+    def _generate_combinations_boia(self, marginal_list):
+        """
+        Factorized world enumeration for BOIA.
+
+        Enumerates FS / L / R groups independently (max 512 + 64 + 64 worlds).
+        Returns a 3-tuple (fs_worlds, l_worlds, r_worlds) where each element is a
+        2D array of shape (n_worlds, group_size) containing the group sub-vectors.
+        """
+        group_arrays = []
+        for group_idx in [self.BOIA_FS_IDX, self.BOIA_L_IDX, self.BOIA_R_IDX]:
+            group_size = len(group_idx)
+            group_marginals = [marginal_list[i] for i in group_idx]
+
+            # If any concept's marginal is empty, that group has 0 worlds
+            if any(len(s) == 0 for s in group_marginals):
+                group_arrays.append(np.zeros((0, group_size), dtype=int))
+                continue
+
+            combos = list(itertools.product(*group_marginals))
+            group_arrays.append(np.array(combos, dtype=int))
+
+        return tuple(group_arrays)
 
     @torch.no_grad()
     def predict_concepts(self, dl):
@@ -346,6 +434,102 @@ class ConformalPredictor:
 
         return all_tuple_sets
 
+    def _refine_boia_concept_groups(self, labels, group_tuple):
+        """
+        Filter BOIA per-group concept sub-worlds by label consistency.
+
+        group_tuple is (fs_worlds, l_worlds, r_worlds) where each is shape (n, group_size).
+        For each group, keep only rows whose sub-vector produces a label output
+        consistent with at least one label in the predicted set.
+        """
+        fs_worlds, l_worlds, r_worlds = group_tuple
+
+        if len(labels) == 0:
+            return group_tuple  # empty label set → keep all rows unchanged
+
+        labels_arr = np.asarray(labels)
+        if labels_arr.ndim == 1:
+            labels_arr = labels_arr.reshape(1, -1)
+
+        req_stop_fwd = set(map(tuple, labels_arr[:, :2].tolist()))
+        req_left  = set(int(v) for v in labels_arr[:, 2])
+        req_right = set(int(v) for v in labels_arr[:, 3])
+
+        group_specs = [
+            (self.BOIA_FS_IDX, fs_worlds, req_stop_fwd, lambda lv: (int(lv[1] > 0), int(lv[0] > 0))),
+            (self.BOIA_L_IDX,  l_worlds,  req_left,     lambda lv: int(lv[2] > 0)),
+            (self.BOIA_R_IDX,  r_worlds,  req_right,    lambda lv: int(lv[3] > 0)),
+        ]
+
+        result_groups = []
+        for grp_idx, grp_worlds, req_vals, extract_fn in group_specs:
+            group_size = len(grp_idx)
+            if len(grp_worlds) == 0:
+                result_groups.append(np.zeros((0, group_size), dtype=int))
+                continue
+            keep = []
+            for row in grp_worlds:
+                eval_vec = np.zeros(21, dtype=int)
+                for local_i, gi in enumerate(grp_idx):
+                    eval_vec[gi] = row[local_i]
+                lv = np.asarray(self.logic.forward(eval_vec.reshape(1, -1)))
+                lv = lv[0] if lv.ndim == 2 else lv.ravel()
+                if extract_fn(lv) in req_vals:
+                    keep.append(row)
+            if keep:
+                result_groups.append(np.array(keep, dtype=int))
+            else:
+                result_groups.append(np.zeros((0, group_size), dtype=int))
+
+        return tuple(result_groups)
+
+    def _refine_boia_label_groups(self, labels, group_tuple):
+        """
+        Filter BOIA label vectors to only those achievable by the factorized group sub-worlds.
+
+        group_tuple is (fs_worlds, l_worlds, r_worlds) where each is shape (n, group_size).
+        Computes achievable (stop,fwd)/left/right values per group and keeps label
+        vectors where all bits are achievable independently.
+        """
+        fs_worlds, l_worlds, r_worlds = group_tuple
+        n_labels = getattr(self.logic, "n_labels", 4)
+
+        if len(labels) == 0:
+            return np.zeros((0, n_labels), dtype=int)
+
+        labels_arr = np.asarray(labels)
+        if labels_arr.ndim == 1:
+            labels_arr = labels_arr.reshape(1, -1)
+
+        achievable_stop_fwd = set()
+        achievable_left     = set()
+        achievable_right    = set()
+
+        group_specs = [
+            (self.BOIA_FS_IDX, fs_worlds, achievable_stop_fwd, lambda lv: (int(lv[1] > 0), int(lv[0] > 0))),
+            (self.BOIA_L_IDX,  l_worlds,  achievable_left,     lambda lv: int(lv[2] > 0)),
+            (self.BOIA_R_IDX,  r_worlds,  achievable_right,    lambda lv: int(lv[3] > 0)),
+        ]
+        for grp_idx, grp_worlds, achievable_set, extract_fn in group_specs:
+            for row in grp_worlds:
+                eval_vec = np.zeros(21, dtype=int)
+                for local_i, gi in enumerate(grp_idx):
+                    eval_vec[gi] = row[local_i]
+                lv = np.asarray(self.logic.forward(eval_vec.reshape(1, -1)))
+                lv = lv[0] if lv.ndim == 2 else lv.ravel()
+                achievable_set.add(extract_fn(lv))
+
+        valid_mask = np.array([
+            (int(lv[0]), int(lv[1])) in achievable_stop_fwd
+            and int(lv[2]) in achievable_left
+            and int(lv[3]) in achievable_right
+            for lv in labels_arr
+        ], dtype=bool)
+
+        if not np.any(valid_mask):
+            return np.zeros((0, n_labels), dtype=int)
+        return labels_arr[valid_mask]
+
     def _refine_concept_prediction_set(
         self, label_prediction_set, concept_prediction_tuples
     ):
@@ -356,6 +540,11 @@ class ConformalPredictor:
         refined_batch_tuples = []
 
         for labels, tuples in zip(label_prediction_set, concept_prediction_tuples):
+            # BOIA factorized path: group_tuple is a 3-tuple of sub-world arrays
+            if isinstance(tuples, tuple):
+                refined_batch_tuples.append(self._refine_boia_concept_groups(labels, tuples))
+                continue
+
             if tuples.size == 0:
                 # Keep tuples as is when empty
                 refined_batch_tuples.append(tuples)
@@ -385,10 +574,21 @@ class ConformalPredictor:
 
             # Filter them
             filtered_tuples = tuples[~empty_mask]
+            if len(filtered_tuples) == 0:
+                refined_batch_tuples.append(filtered_tuples)
+                continue
             if self.logic.multi_set_logic is None:
                 derived_labels = self.logic.forward(filtered_tuples)
                 # Keep tuples that result in an allowed label
-                valid_tuples = filtered_tuples[np.isin(derived_labels, labels)]
+                if self.multilabel and np.asarray(derived_labels).ndim == 2 and np.asarray(labels).ndim == 2:
+                    labels_arr = np.asarray(labels)
+                    valid_rows = np.array([
+                        np.any(np.all(dr == labels_arr, axis=1))
+                        for dr in derived_labels
+                    ], dtype=bool)
+                    valid_tuples = filtered_tuples[valid_rows]
+                else:
+                    valid_tuples = filtered_tuples[np.isin(derived_labels, labels)]
                 refined_batch_tuples.append(valid_tuples)
             else:
                 derived_labels = self.logic.forward_multi_set(filtered_tuples)
@@ -414,6 +614,11 @@ class ConformalPredictor:
         refined_label_sets = []
 
         for labels, tuples in zip(label_prediction_set, concept_prediction_tuples):
+            # BOIA factorized path: group_tuple is a 3-tuple of sub-world arrays
+            if isinstance(tuples, tuple):
+                refined_label_sets.append(self._refine_boia_label_groups(labels, tuples))
+                continue
+
             if len(tuples) == 0 or len(labels) == 0:
                 refined_label_sets.append(np.array([], dtype=int))
                 continue
@@ -446,9 +651,19 @@ class ConformalPredictor:
                 derived_labels = np.unique(np.concatenate(derived_labels_sets))
 
             # Keep labels that are produced by a tuple
-            valid_mask = np.isin(labels, derived_labels)
-            valid_labels = np.expand_dims(labels[valid_mask], axis=1)
-            refined_label_sets.append(valid_labels)
+            derived_labels_arr = np.asarray(derived_labels)
+            labels_arr = np.asarray(labels)
+            if self.multilabel and derived_labels_arr.ndim == 2 and labels_arr.ndim == 2:
+                valid_mask = np.array([
+                    np.any(np.all(lbl == derived_labels_arr, axis=1))
+                    for lbl in labels_arr
+                ], dtype=bool)
+                valid_labels = labels_arr[valid_mask]  # (K', n_labels)
+                refined_label_sets.append(valid_labels)
+            else:
+                valid_mask = np.isin(labels, derived_labels)
+                valid_labels = np.expand_dims(labels[valid_mask], axis=1)
+                refined_label_sets.append(valid_labels)
 
         return refined_label_sets
 
@@ -483,12 +698,64 @@ class ConformalPredictor:
             if hasattr(labels_valid, "cpu"):
                 labels_valid = labels_valid.cpu().numpy()
 
-            labels_valid = np.array(labels_valid).ravel()
-            raw_labels[valid_mask] = labels_valid
+            labels_valid = np.array(labels_valid)
+            if self.multilabel and labels_valid.ndim == 2:
+                # multilabel: store each row as an object so raw_labels stays (N,)
+                for j, idx in enumerate(np.where(valid_mask)[0]):
+                    raw_labels[idx] = labels_valid[j]
+            else:
+                raw_labels[valid_mask] = labels_valid.ravel()
 
         # Assign empty arrays for invalid tuples
         raw_labels[invalid_mask] = None
         return raw_labels
+
+    def _compute_derived_labels_from_boia_group_tuples(self, batch_concept_tuples):
+        """
+        Derives labels from BOIA group-tuple concept sets using Hard Logic.
+
+        Each element of batch_concept_tuples is a 3-tuple (fs_worlds, l_worlds, r_worlds).
+        Returns list of (K, 4) unique label arrays per sample.
+        """
+        n_labels = getattr(self.logic, "n_labels", 4)
+        batch_label_sets = []
+        group_idx_list = [self.BOIA_FS_IDX, self.BOIA_L_IDX, self.BOIA_R_IDX]
+        for group_tuple in batch_concept_tuples:
+            # Collect achievable label bits from each group
+            achievable_stop_fwd = set()
+            achievable_left     = set()
+            achievable_right    = set()
+            achievable_sets = [achievable_stop_fwd, achievable_left, achievable_right]
+            extract_fns = [
+                lambda lv: (int(lv[0] > 0), int(lv[1] > 0)),
+                lambda lv: int(lv[2] > 0),
+                lambda lv: int(lv[3] > 0),
+            ]
+
+            for grp_idx, grp_worlds, ach_set, extract_fn in zip(
+                group_idx_list, group_tuple, achievable_sets, extract_fns
+            ):
+                for row in grp_worlds:
+                    eval_vec = np.zeros(21, dtype=int)
+                    for local_i, gi in enumerate(grp_idx):
+                        eval_vec[gi] = row[local_i]
+                    lv = np.asarray(self.logic.forward(eval_vec.reshape(1, -1)))
+                    lv = lv[0] if lv.ndim == 2 else lv.ravel()
+                    ach_set.add(extract_fn(lv))
+
+            # Build all achievable label combinations
+            label_combos = []
+            for sf in achievable_stop_fwd:
+                for left in achievable_left:
+                    for right in achievable_right:
+                        label_combos.append([sf[0], sf[1], left, right])
+
+            if label_combos:
+                unique_labels = np.unique(np.array(label_combos, dtype=int), axis=0)
+            else:
+                unique_labels = np.zeros((0, n_labels), dtype=int)
+            batch_label_sets.append(unique_labels)
+        return batch_label_sets
 
     def _compute_derived_labels_from_tuples(self, batch_concept_tuples):
         """
@@ -496,11 +763,16 @@ class ConformalPredictor:
 
         Args:
             batch_concept_tuples: List of np.ndarrays, each of shape (N_combinations, N_concepts)
+                                  OR list of 3-tuples for BOIA group representation.
         Returns:
             List of np.ndarrays containing unique predicted labels per sample.
         """
         if not batch_concept_tuples:
             return []
+
+        # BOIA group-tuple path
+        if isinstance(batch_concept_tuples[0], tuple):
+            return self._compute_derived_labels_from_boia_group_tuples(batch_concept_tuples)
 
         # Track indices to split the batch later
         sample_counts = [t.shape[0] for t in batch_concept_tuples]
@@ -508,40 +780,33 @@ class ConformalPredictor:
         # Flatten all tuples into one massive matrix for a single logic pass
         big_matrix = np.concatenate(batch_concept_tuples, axis=0)
 
-        if self.permutation is not None:
-            big_matrix = (
-                torch.nn.functional.one_hot(
-                    torch.tensor(big_matrix),
-                    self.concept_dim if self.dataset.startswith("mnist") else 2,
-                )
-                .detach()
-                .cpu()
-                .numpy()
-            )
-            big_matrix = align_knowledge_input(
-                big_matrix,
-                self.permutation,
-            )
-            big_matrix = np.argmax(big_matrix, axis=-1)
-
-        # Apply logic to the big matrix
+        # Apply logic to the big matrix (_apply_logic handles EMPTY_TOKEN filtering
+        # and the permutation/one-hot transform internally on valid rows only)
         raw_labels = self._apply_logic(big_matrix)
 
-        # Ensure labels are flat (for single-label classification tasks)
-        raw_labels = np.array(raw_labels).ravel()
+        # raw_labels is an object array (N_total,); for multilabel each entry is a (4,) array
+        raw_labels = np.array(raw_labels)
 
         # Reconstruct per-sample unique label sets
         batch_label_sets = []
         cursor = 0
         for count in sample_counts:
-            # Slice labels belonging to this specific sample
             sample_preds = raw_labels[cursor : cursor + count]
-            # remove the None
-            clean_preds = np.array([x for x in sample_preds if x is not None])
-            unique_labels = np.unique(clean_preds)
-            if unique_labels.size == 1 and unique_labels[0] is None:
-                unique_labels = np.array([])
-            batch_label_sets.append(unique_labels.reshape(-1, 1))
+            valid_preds = [x for x in sample_preds if x is not None]
+            if self.multilabel:
+                if valid_preds:
+                    clean_preds = np.stack(valid_preds)  # (count, n_labels)
+                    unique_labels = np.unique(clean_preds, axis=0)  # (K, n_labels)
+                else:
+                    n_labels = getattr(self.logic, "n_labels", 1)
+                    unique_labels = np.zeros((0, n_labels), dtype=int)
+                batch_label_sets.append(unique_labels)
+            else:
+                clean_preds = np.array(valid_preds)
+                unique_labels = np.unique(clean_preds)
+                if unique_labels.size == 1 and unique_labels[0] is None:
+                    unique_labels = np.array([])
+                batch_label_sets.append(unique_labels.reshape(-1, 1))
             cursor += count
 
         return batch_label_sets
@@ -609,16 +874,19 @@ class ConformalPredictor:
         if self.multilabel:
             # label_pred shape: (B, N_labels, N_classes)
             thresholds = threshold.view(1, -1, 1)
-
-            mask = scores <= thresholds
-
-            batch_label_sets = [
-                [
-                    torch.where(mask[b, j])[0].unsqueeze(1).cpu().numpy()
+            mask = scores <= thresholds  # (B, N_labels, N_classes)
+            batch_label_sets = []
+            for b in range(mask.shape[0]):
+                per_label_classes = [
+                    torch.where(mask[b, j])[0].cpu().numpy()
                     for j in range(mask.shape[1])
                 ]
-                for b in range(mask.shape[0])
-            ]
+                prod = list(itertools.product(*per_label_classes))
+                if prod:
+                    combos = np.array(prod, dtype=int)  # (K, N_labels)
+                else:
+                    combos = np.zeros((0, mask.shape[1]), dtype=int)
+                batch_label_sets.append(combos)
 
         else:
             # label_pred shape: (B, N_classes)
