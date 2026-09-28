@@ -6,7 +6,6 @@ from conformal.models.operators import (
     mnist_sump_circuit,
     boia_circuit,
     chx_circuit,
-    derma_circuit,
     cifar_circuit,
     cebab_circuit,
 )
@@ -14,7 +13,6 @@ from conformal.models.nesy import NeSyModel
 
 
 def configure_global_arguments(parser):
-    """Global arguments for DeepProbLog"""
     pass
 
 
@@ -58,8 +56,6 @@ class DPL(NeSyModel):
             return boia_circuit()
         elif dataset == "chx":
             return chx_circuit(multi_class=extra["chx-multi-class"])
-        elif dataset == "derma":
-            return derma_circuit()
         elif dataset in ["cifar", "rival"]:
             return cifar_circuit()
         elif dataset in ["cebab"]:
@@ -67,22 +63,19 @@ class DPL(NeSyModel):
         raise NotImplementedError(f"Circuit for dataset {dataset} not implemented.")
 
     def inference(self, concepts, eval=False):
-        """DPL-specific probabilistic circuit inference."""
         if self.dataset == "boia":
             pred, worlds = self._boia_inference(concepts)
             return pred, worlds
 
-        # Standard DPL logic
         worlds = (
             outer_product(concepts.squeeze(1))
-            if self.dataset in ["chx", "derma", "rival", "cifar"]
+            if self.dataset in ["chx", "rival", "cifar"]
             else outer_product(concepts)
         )
         query_prob = torch.matmul(worlds, self.circuit)
         return self._normalize(query_prob), (self.circuit)
 
     def _boia_inference(self, pCs):
-        """Factored ProbLog inference for BOIA task"""
         pCs = pCs.squeeze(1)
 
         # 1. Compute Logic Obstacle (OR of 4 specific bits)
@@ -120,7 +113,6 @@ class DPL(NeSyModel):
         return pred, (w_FS, w_L, w_R)
 
     def _compute_worlds(self, concept_probs):
-        """Computes joint probability of worlds using outer products"""
         res = concept_probs[0]
         for next_c in concept_probs[1:]:
             res = torch.einsum("bi,bj->bij", res, next_c).reshape(res.shape[0], -1)
@@ -128,8 +120,6 @@ class DPL(NeSyModel):
 
 
 def configure_subparsers(subparsers):
-    """Configure subparsers."""
-    # Subparser for DPL
     dpl_parser = subparsers.add_parser(
         "dpl",
         help="Use DPL as NeSy predictor",

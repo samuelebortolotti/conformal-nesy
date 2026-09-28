@@ -16,7 +16,6 @@ from torchvision.datasets import CIFAR10
 
 
 def configure_global_arguments(parser):
-    """Global arguments for CIFAR10"""
     pass
 
 
@@ -79,13 +78,11 @@ class CIFAR10Loader(RIVAL10Loader):
         train_labels = np.array(train_labels)
         train_concepts = np.array(train_concepts)
 
-        # Label weights (CrossEntropy)
         y_counts = np.bincount(train_labels, minlength=self.n_labels)
         self.label_weights = torch.tensor(
             len(train_labels) / (self.n_labels * y_counts), dtype=torch.float
         ).to(self.device)
 
-        # Concept weights (BCEWithLogitsLoss or specific concept loss)
         for i in range(self.concept_dim):
             c_counts = np.bincount(train_concepts[:, i].astype(int), minlength=2)
             if c_counts[0] == 0 or c_counts[1] == 0:

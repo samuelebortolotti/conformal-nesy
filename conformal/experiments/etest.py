@@ -1,5 +1,3 @@
-"""Test the Conformal Sets on the datasets."""
-
 import numpy as np
 import csv
 import math
@@ -26,7 +24,6 @@ from conformal.experiments.test import save_visual_examples
 from conformal.datasets import (
     boia,
     chx,
-    derma,
     mnistadd,
     mnisthalf,
     mnistsump,
@@ -39,8 +36,6 @@ from conformal.datasets import (
 
 
 def configure_global_arguments(parser):
-    """Configure global arguments that are shared across models and datasets."""
-
     parser.add_argument(
         "--batch-size", type=int, default=64, help="Batch size for training."
     )
@@ -88,7 +83,6 @@ def test_parser(parser):
     mnisthalf.configure_subparsers(subparsers)
     mnistsump.configure_subparsers(subparsers)
     mnistaddn.configure_subparsers(subparsers)
-    derma.configure_subparsers(subparsers)
     chx.configure_subparsers(subparsers)
     boia.configure_subparsers(subparsers)
     cifar.configure_subparsers(subparsers)
@@ -98,7 +92,6 @@ def test_parser(parser):
 
 
 def configure_subparsers(subparsers):
-    """Configure the subparsers."""
     parser = subparsers.add_parser(
         "e-test",
         help="Evaluate conformal predictions on a dataset with a trained model",
@@ -122,7 +115,6 @@ def avg_set_size(s):
 
 
 def find_minimum_set_per_size(conformal_sets, alphas, size):
-    """Find the minimum alpha that achieves a conformal set of size at most `size`."""
     if not any(avg_set_size(s) <= size for s in conformal_sets):
         log("No alpha achieves the desired size", "INFO")
         log(
@@ -141,7 +133,6 @@ def find_minimum_set_per_size(conformal_sets, alphas, size):
 def find_minimum_set_per_size_joint(
     label_sets, concept_sets, alphas, betas, max_label_size, max_concept_size
 ):
-    """Find the minimum alpha and beta that achieves a conformal set of size at most `size` for both labels and concepts."""
     if not any(
         avg_set_size(l) <= max_label_size and avg_set_size(c) <= max_concept_size
         for l, c in zip(label_sets, concept_sets)
@@ -179,9 +170,6 @@ def get_conformal_metrics_for_size_fixed(
     label_min_idx,
     concept_min_idx,
 ):
-    """
-    Compute the conformal metrics for the setting where the size of the label set is fixed to a certain value.
-    """
     concept_consistency, label_consistency = prediction_consistency(
         concept_sets[concept_min_idx], label_sets[label_min_idx], logic
     )
@@ -193,15 +181,6 @@ def get_conformal_metrics_for_size_fixed(
     label_coverage, label_size = conformal_metrics(
         label_sets[label_min_idx], np.expand_dims(all_labels, axis=1)
     )
-
-    # save_visual_examples(
-    #     test_dl.dataset,
-    #     concept_sets[concept_min_idx],
-    #     label_sets[label_min_idx],
-    #     "Conformal both Concepts and Labels with Concept and Label Refinement",
-    #     args.output_dir_path,
-    #     is_image=is_image,
-    # )
 
     return {
         "concept_consistency": concept_consistency,
@@ -216,15 +195,6 @@ def get_conformal_metrics_for_size_fixed(
 def plot_one_minus_alpha(
     alpha_mins, alphas, output_path, prob, title="Histogram of $1-\\tilde{\\alpha}$"
 ):
-    """
-    Plot a histogram of 1 - alpha_mins and save the figure.
-
-    Args:
-        alpha_mins (list or np.array): list of minimum alpha values across iterations
-        alphas (list or np.array): grid of alphas used in the evaluation
-        output_path (str or Path): path to save the figure (PDF/PNG)
-        title (str): title of the plot
-    """
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -232,7 +202,6 @@ def plot_one_minus_alpha(
 
     fig, ax = plt.subplots(figsize=(7, 4))
 
-    # Histogram
     ax.hist(
         1 - alpha_mins,
         color="green",
@@ -241,7 +210,6 @@ def plot_one_minus_alpha(
         align="left",
     )
 
-    # Mean line
     mean_val = np.mean(1 - alpha_mins)
     ax.axvline(
         x=mean_val,
@@ -256,7 +224,7 @@ def plot_one_minus_alpha(
     ax.set_ylabel("Frequency", fontsize=16)
     ax.set_title(title, fontsize=16)
     ax.set_xlim(0.55, 1)
-    ax.set_ylim(0, max(10, len(alpha_mins) // 2))  # adaptive y-axis
+    ax.set_ylim(0, max(10, len(alpha_mins) // 2))
 
     ax.tick_params(axis="both", labelsize=14)
     ax.set_xticks(np.arange(0.1, 1.1, 0.1))
@@ -271,7 +239,6 @@ def plot_one_minus_alpha(
 
 
 def median_set(sets):
-    """Pick the set whose avg size is closest to the median avg size."""
     sizes = [avg_set_size(s) for s in sets]
     median_val = np.median(sizes)
     closest_idx = min(range(len(sizes)), key=lambda i: abs(sizes[i] - median_val))
@@ -300,10 +267,8 @@ def _run_single_iteration(
     max_concept_size,
     n_iterations,
 ):
-    """Run a single bootstrap iteration. Designed to be joblib-safe."""
     model.to(device)
 
-    # Conformal EPredictor
     cp = ConformalEPredictor(
         model,
         device=device,
@@ -328,13 +293,11 @@ def _run_single_iteration(
 
     log(f"=== Iteration {iter_idx+1}/{n_iterations} ===", "INFO")
 
-    # Each worker gets its own bootstrapped dataloader
     val_dl = bootstrap_dataloader(val_ds, batch_size=args.batch_size)
     test_dl = DataLoader(
         test_ds, batch_size=args.batch_size, shuffle=False, num_workers=0
     )
 
-    # Calibrate on this bootstrap sample
     cp.calibrate_per_concept(val_dl)
     cp.calibrate_labels(val_dl)
 
@@ -408,7 +371,6 @@ def _run_single_iteration(
         min(sets, key=avg_set_size) for sets in concept_sets_by_alpha
     ]
 
-    # Find minimum alpha/beta achieving target max sizes
     alpha_min, label_min_idx = find_minimum_set_per_size(
         label_sets_per_alpha, alphas, max_label_size
     )
@@ -521,13 +483,12 @@ def conformal_e_evaluation(
 
     multiconcept = (
         False
-        if args.dataset not in ["boia", "chx", "derma", "cifar", "rival"]
+        if args.dataset not in ["boia", "chx", "cifar", "rival"]
         else True
     )
     multilabel = False if args.dataset not in ["boia"] else True
-    is_image = args.dataset in ["boia", "chx", "derma", "cifar", "rival"]
+    is_image = args.dataset in ["boia", "chx", "cifar", "rival"]
 
-    # log("Computing the permutation if needed...", "INFO")
     permutation = None
 
     log("Extracting the basic predictions...", "INFO")
@@ -543,7 +504,6 @@ def conformal_e_evaluation(
         is_dpl=(args.nesy == "dpl"),
     )
 
-    # log("Computing the permutation if needed...", "INFO")
     permutation = None
 
     results_storage = {}
@@ -561,7 +521,6 @@ def conformal_e_evaluation(
     alpha_mins, beta_mins, alpha_beta_mins = [], [], []
     expected_alpha, expected_beta = 0.1, 0.1
 
-    # --- Parallel loop over iterations ---
     model.cpu()
     iter_results = Parallel(n_jobs=3, backend="loky", verbose=10)(
         delayed(_run_single_iteration)(
@@ -590,7 +549,6 @@ def conformal_e_evaluation(
     )
     model.to(device)
 
-    # Collect results, skipping failed iterations
     for result in iter_results:
         if result is None:
             continue
@@ -871,8 +829,6 @@ def conformal_e_evaluation(
 
 
 def main(experiment_name, results_output_h, stats_output_h, args, device):
-    """Main function that parses the arguments and writes the output."""
-
     (
         train_ds,
         val_ds,
@@ -928,7 +884,6 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
     model = load_model(model, model_path, device)
     model.to(device)
 
-    # load the logic
     logic_from_model = LogicFactory.get_logic(args.nesy, logic, model)
 
     alpha_concepts = 0.1

@@ -1,5 +1,3 @@
-"""Test the Conformal Sets on the datasets."""
-
 import numpy as np
 import textwrap
 from pathlib import Path
@@ -40,7 +38,6 @@ from conformal.utils.visualization import (
 from conformal.datasets import (
     boia,
     chx,
-    derma,
     mnistadd,
     mnisthalf,
     mnistsump,
@@ -53,8 +50,6 @@ from conformal.datasets import (
 
 
 def configure_global_arguments(parser):
-    """Configure global arguments that are shared across models and datasets."""
-
     parser.add_argument(
         "--batch-size", type=int, default=64, help="Batch size for training."
     )
@@ -133,7 +128,6 @@ def test_parser(parser):
     mnisthalf.configure_subparsers(subparsers)
     mnistsump.configure_subparsers(subparsers)
     mnistaddn.configure_subparsers(subparsers)
-    derma.configure_subparsers(subparsers)
     chx.configure_subparsers(subparsers)
     boia.configure_subparsers(subparsers)
     cifar.configure_subparsers(subparsers)
@@ -143,7 +137,6 @@ def test_parser(parser):
 
 
 def configure_subparsers(subparsers):
-    """Configure the subparsers."""
     parser = subparsers.add_parser(
         "test",
         help="Evaluate conformal predictions on a dataset with a trained model",
@@ -183,10 +176,7 @@ def save_visual_examples(
         if is_interesting:
             image_data, true_concepts, true_label = dataset[i]
 
-            # Setup Plot
             fig = plt.figure(figsize=(8, 6))
-
-            # Layout: Image on top, Text details below
             gs = fig.add_gridspec(2, 1, height_ratios=[2, 1])
             ax_img = fig.add_subplot(gs[0])
             ax_txt = fig.add_subplot(gs[1])
@@ -194,12 +184,10 @@ def save_visual_examples(
             if is_image:
                 if hasattr(image_data, "permute"):  # PyTorch Tensor
                     img_np = image_data.permute(1, 2, 0).cpu().numpy()
-                    # Simple un-normalization (clip to 0-1) for visualization
                     img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
                 else:
                     img_np = np.array(image_data)
 
-                # Show Image
                 if img_np.shape[-1] == 1:  # Grayscale
                     ax_img.imshow(img_np, cmap="gray")
                 else:
@@ -210,7 +198,6 @@ def save_visual_examples(
                 f"Sample {i} | Method: {method_name}", fontsize=12, fontweight="bold"
             )
 
-            # Clean up long arrays for display
             wrapped_text = textwrap.fill(str(c_sets), width=80)
 
             ax_txt.text(
@@ -226,7 +213,6 @@ def save_visual_examples(
             )
             ax_txt.axis("off")
 
-            # Save
             fname = save_path / f"sample_{i}.pdf"
             log(fname, "DEBUG")
             plt.savefig(fname, format="pdf", bbox_inches="tight")
@@ -256,7 +242,7 @@ def conformal_evaluation(
 
     multiconcept = (
         False
-        if args.dataset not in ["boia", "chx", "derma", "cifar", "rival"]
+        if args.dataset not in ["boia", "chx", "cifar", "rival"]
         else True
     )
     multilabel = False if args.dataset not in ["boia"] else True
@@ -351,7 +337,7 @@ def conformal_evaluation(
             ),
             multilabel=(
                 True
-                if args.dataset in ["boia", "chx", "derma", "cifar", "rival"]
+                if args.dataset in ["boia", "chx", "cifar", "rival"]
                 else False
             ),
         )
@@ -1238,7 +1224,6 @@ def conformal_evaluation(
 
 
 def main(experiment_name, results_output_h, stats_output_h, args, device):
-    """Main function that parses the arguments and writes the output."""
 
     (
         train_ds,
@@ -1325,7 +1310,7 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         concept_names=args.concept_names if hasattr(args, "concept_names") else None,
         multiconcepts=(
             True
-            if args.dataset in ["boia", "chx", "derma", "cifar", "rival"]
+            if args.dataset in ["boia", "chx", "cifar", "rival"]
             else False
         ),
     )

@@ -45,7 +45,6 @@ CIFAR_CLASS_TO_CONCEPTS = {
 
 
 def configure_global_arguments(parser):
-    """Global arguments for RIVAL10"""
     pass
 
 
@@ -81,9 +80,6 @@ class RIVAL10Loader:
 
     def _return_cifar_logic(self):
         def logic(x):
-            """
-            Logic function for RIVAL10.
-            """
             wheels = x[:, 0]
             metallic = x[:, 1]
             wings = x[:, 2]
@@ -145,9 +141,6 @@ class RIVAL10Loader:
 
     def _return_multi_set_cifar_logic(self):
         def logic(x):
-            """
-            Logic function for RIVAL10.
-            """
             wheels = x[:, 0]
             metallic = x[:, 1]
             wings = x[:, 2]
@@ -245,7 +238,6 @@ class RIVAL10Loader:
         train_files = sorted(list(base_dir.glob("train/ordinary/*.JPEG")))
         test_files = sorted(list(base_dir.glob("test/ordinary/*.JPEG")))
 
-        # Process both sets
         train_paths, train_concepts, train_targets = self.process_files(
             train_files, wnid_to_class, label_mappings
         )
@@ -261,13 +253,11 @@ class RIVAL10Loader:
             random_state=42,
         )
 
-        # Label weights for CrossEntropy
         y_counts = np.bincount(y_train, minlength=self.n_labels)
         self.label_weights = torch.tensor(
             len(y_train) / (self.n_labels * y_counts), dtype=torch.float
         ).to(self.device)
 
-        # Concept weights for Multi-label Binary CrossEntropy
         for i in range(c_train.shape[1]):
             c_counts = np.bincount(c_train[:, i].astype(int), minlength=2)
             weights = len(c_train) / (2.0 * c_counts)

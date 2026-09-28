@@ -1,28 +1,33 @@
-# Conformal NeSy
+# Conformal Prediction for Neuro-Symbolic Concept Bottleneck Models
 
-This repository contains the code for our experiments on combining **conformal prediction** with **neuro-symbolic (NeSy) AI** methods. The idea is simple: instead of returning a single predicted label, we return a *prediction set* that is guaranteed to contain the true label with at least probability 1-α — and we do this on top of NeSy models (DeepProbLog and Logic Tensor Networks) that already give us **interpretable** and **consistent**, concept-level reasoning.
+This is the official codebase for the paper:
 
-The experiments cover a range of tasks: digit arithmetic on `MNIST`, object recognition on `CIFAR-10` and `RIVAL-10`, `chest X-ray` pathology detection, skin lesion classification and sentiment analysis on restaurant reviews (`CEBaB`).
+> **Concise and Logically Consistent Conformal Sets for Neuro-Symbolic Concept-Based Models**
+> Recently accepted at **NeurIPS 2025** · [arXiv:2605.18202](https://arxiv.org/abs/2605.18202)
+
+## Abstract
+
+Neuro-Symbolic Concept-based Models (NeSy-CBMs) are a family of architectures that integrate neural networks with symbolic reasoning for enhanced reliability in high-stakes applications. They work by first extracting high-level concepts from the input and then inferring a task label from these compatibly with given logical constraints. Yet, their label and concept predictions can be overconfident, making it difficult for stakeholders to gauge when the model's decisions can be trusted. We address this issue by integrating ideas from Conformal Prediction (CP), a framework providing rigorous, distribution-free coverage guarantees. We formalize three desiderata — consistency, coverage, and conciseness — that any conformal method for NeSy-CBMs should satisfy, and show that existing approaches fall short of at least one. We then introduce COCOCO, a post-hoc framework that conformalizes concepts and labels jointly and reconciles them via a single deduction-abduction revision step. COCOCO satisfies all three desiderata, retains distribution-free coverage, is robust to imperfect knowledge and supports user-specified size budgets. Our experiments on 8 data sets highlight how COCOCO compares favorably against competitors and natural baselines in terms of performance and set size.
 
 ---
 
-## How it works
+## Method
 
-The overall pipeline is:
+A NeSy-CBM has three components:
 
-1. A **backbone encoder** (LeNet, ResNet-18, BERT, etc.) maps raw inputs to concept-level predictions -- for example, on MNIST-Addition the encoder predicts which digit each image shows.
-2. A **NeSy wrapper** uses those concept predictions to reason about the task label through a symbolic logic circuit — the label is determined by a fixed rule (e.g. `label = digit_1 + digit_2`).
-3. A **conformal wrapper** is applied at test time: using a held-out calibration set, we compute a nonconformity threshold and use it to produce prediction sets with provable marginal coverage guarantees.
+1. A **backbone encoder** (LeNet, ResNet-18, BERT, etc.) that maps raw inputs to concept probability distributions.
+2. A **symbolic reasoning layer** that maps concept assignments to task labels via a fixed logic circuit — for example, `label = digit₁ + digit₂` for MNIST-Addition.
+3. A **conformal wrapper** that uses a held-out calibration split to compute nonconformity thresholds and produce prediction sets.
 
 Two NeSy backends are supported:
 
-- **DeepProbLog (DPL)**: Implements probabilistic logic via a probabilistic circuit. Concept predictions are independent Bernoulli/categorical variables; label probabilities are computed via weighted-model counting over all consistent "worlds". Inference is exact and deterministic.
-- **Logic Tensor Networks (LTN)**: Implements the logic in fuzzy semantics using neural operators (Gödel, product, Łukasiewicz, etc.). The logic satisfaction is part of the training loss, so the model learns to satisfy the rules softly.
+- **[DeepProbLog (DPL)](https://proceedings.neurips.cc/paper_files/paper/2018/hash/dc5d637ed5e62c36ecb73b654b05ba2a-Abstract.html)**.
+- **[LogicTensorNetworks (LTN)](https://www.sciencedirect.com/science/article/pii/S0004370221002009)**.
 
-For conformal prediction we implement two approaches:
+Two conformal strategies are implemented:
 
-- **Standard threshold-based conformal**: calibrate a quantile threshold on nonconformity scores; include all labels whose score is below that threshold.
-- **E-value based conformal**: an alternative using soft-rank e-variables, which can behave better on small calibration sets.
+- **P-value CP**.
+- **E-value CP**.
 
 ---
 
@@ -32,176 +37,132 @@ For conformal prediction we implement two approaches:
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-# optional dev tools 
-pip install -r requirements.dev.txt
 ```
-
-The main dependencies are PyTorch, TorchVision, LTNtorch, Optuna, scikit-learn, seaborn, and medmnist. See [requirements.txt](requirements.txt) for the pinned versions.
-
----
-
-## Running experiments
-
-The CLI is the `conformal` module:
-
-```
-python -m conformal [--seed SEED] [--device {cuda,cpu}] OUTPUT_DIR COMMAND [OPTIONS] DATASET NETWORK NESY_MODEL
-```
-
-**Commands:** `train`, `test`, `etest`, `deltas`, `analyze`, `optuna`, `joint_failure`
-
-**Datasets:** `mnistadd`, `mnistsump`, `mnisthalf`, `mnistevenodd`, `mnistaddn`, `cifar`, `rival`, `cebab`, `chx`
-
-**Networks:** `lenet`, `resnet18`, `linear`, `bert`, `lama`
-
-**NeSy models:** `dpl`, `ltn`
-
-### Quick start — MNIST-Addition with DPL
-
-```bash
-# Train
-python -m conformal --seed 1011 CONF_MNIST train \
-    --epochs 200 \
-    --learning-rate 0.1 \
-    --momentum 0.1 \
-    --batch-size 32 \
-    --opt sgd \
-    --concept-sup 0.0 \
-    mnistadd lenet dpl
-
-# Evaluate with conformal prediction
-python -m conformal --seed 1011 CONF_MNIST test \
-    --epochs 200 \
-    --learning-rate 0.1 \
-    --momentum 0.1 \
-    --batch-size 32 \
-    --opt sgd \
-    --concept-sup 0.0 \
-    mnistadd lenet dpl
-```
-
-The test command wraps the trained model in a conformal predictor, calibrates on the validation split, and reports coverage, set size, and consistency on the test set.
-
-### LTN — configuring the fuzzy operators
-
-LTN has several operator choices you can tune:
-
-```bash
-python -m conformal --seed 1011 CONF_MNIST train \
-    --epochs 200 \
-    --learning-rate 0.1 \
-    --momentum 1e-5 \
-    --batch-size 64 \
-    --opt sgd \
-    --concept-sup 0.0 \
-    mnistadd lenet ltn \
-    --and_op prod \
-    --or_op prod \
-    --imp_op prod \
-    --p 8
-```
-
-Operator choices for `--and_op`, `--or_op`, `--imp_op`: `godel`, `prod`, `lukasiewicz`, `goguen`, `kleene`. `--p` controls the quantifier aggregation exponent.
-
-### MNIST with N digits
-
-The `mnistaddn` dataset generalises MNIST-Addition to N digits:
-
-```bash
-python -m conformal --seed 1011 CONF_MNIST train \
-    --concept-sup 0.0 --epochs 200 --learning-rate 0.1 \
-    --batch-size 32 --opt sgd \
-    mnistaddn --n-digits 3 \
-    lenet dpl
-```
-
-### Concept supervision
-
-The `--concept-sup` flag controls what fraction of training samples come with ground-truth concept labels (digit identities, attribute flags, etc.). At `0.0` the model is trained only on task labels; at `1.0` it gets full concept supervision. This lets you study the effect of weak/no concept labels on conformal efficiency.
-
-### ChestX-ray
-
-```bash
-python -m conformal --seed 1011 CONF_CHX train \
-    --epochs 50 --learning-rate 1e-4 --batch-size 32 \
-    --concept-sup 1.0 \
-    chx resnet18 dpl --chx-multi-class
-
-python -m conformal --seed 1011 CONF_CHX test \
-    --epochs 50 --learning-rate 1e-4 --batch-size 32 \
-    --concept-sup 1.0 \
-    chx resnet18 dpl --chx-multi-class
-```
-
-### CEBaB (text)
-
-```bash
-python -m conformal --seed 1011 CONF_CEBAB train \
-    --epochs 20 --learning-rate 2e-5 --batch-size 16 \
-    --concept-sup 1.0 \
-    cebab bert dpl
-
-python -m conformal --seed 1011 CONF_CEBAB test \
-    --epochs 20 --learning-rate 2e-5 --batch-size 16 \
-    --concept-sup 1.0 \
-    cebab bert dpl
-```
-
-### E-value based conformal
-
-```bash
-python -m conformal --seed 1011 CONF_MNIST etest \
-    --epochs 200 --learning-rate 0.1 --batch-size 32 --opt sgd --concept-sup 0.0 \
-    mnistadd lenet dpl
-```
-
-### Hyperparameter optimization
-
-```bash
-python -m conformal --seed 1011 CONF_OPT optuna \
-    mnistadd lenet ltn
-```
-
-Uses Optuna to tune LTN operator choices, learning rate, etc.
-
----
-
-## Output structure
-
-Each run saves its results under `OUTPUT_DIR/`:
-
-```
-OUTPUT_DIR/
-├── <experiment_name>.best_model.pth       # Trained model checkpoint
-├── <experiment_name>.train_results.csv    # Per-epoch training stats
-└── <experiment_name>.test_results.csv     # Conformal evaluation metrics
-```
-
-The experiment name is derived automatically from the command-line arguments (seed, dataset, network, NeSy model, concept supervision, etc.), so results from different configurations don't collide.
 
 ---
 
 ## Datasets
 
-| Dataset | Task | Concepts | Notes |
+| ID | Task | Concepts | Notes |
 |---|---|---|---|
-| `mnistadd` | Sum of two MNIST digits (0–18) | Two digit identities | Classic NeSy benchmark |
-| `mnistaddn` | Sum of N MNIST digits | N digit identities | Scalability test; set `--n-digits` |
-| `mnistsump` | Parity of the sum | Two digits | JRSs benchmark |
-| `mnisthalf` | Biased sum of two MNIST digits (0-8) | Two digits | RSs benchmark |
-| `mnistevenodd` | Biased sum of two MNIST digits (0-18) | Two digits | RSs benchmark |
-| `cifar` | CIFAR-10 object class | Binary visual attributes | Concept to class via logic |
-| `rival` | RIVAL-10 species | Binary visual attributes | Concept to class via logic |
-| `chx` | Chest X-ray pathology | 4 radiological findings | Medical; `--chx-multi-class` for 5-class |
-| `cebab` | Restaurant review sentiment | 4 aspect scores | Text; 5-class sentiment |
+| `mnistadd` | Sum of 2 MNIST digits (0–18) | 2 digit identities | Standard NeSy benchmark |
+| `mnistaddn` | Sum of N MNIST digits | N digit identities | Scalability; set `--n-digits N` |
+| `mnistsump` | Parity of the sum | 2 digit identities | |
+| `mnisthalf` | Biased digit sum (0–8) | 2 digit identities | |
+| `mnistevenodd` | Biased digit sum (0–18) | 2 digit identities | |
+| `cifar` | CIFAR-10 object class | 7 binary visual attributes | Concept→class via logic |
+| `rival` | RIVAL-10 species | 7 binary visual attributes | Concept→class via logic |
+| `chx` | Chest X-ray pathology | 4 radiological findings | Medical imaging; requires NIH access |
+| `cebab` | Restaurant review sentiment | 4 aspect scores | NLP; 5-class output |
+| `boia` | Autonomous driving action | 21 road-scene concepts | 4 driving actions; see below |
+
+### Downloading datasets
+
+```bash
+make download_mnist    # MNIST (via torchvision)
+make download_cifar    # CIFAR-10 (via torchvision)
+make download_cebab    # CeBaB (via Hugging Face Hub)
+make download_rival    # RIVAL-10 (instructions printed)
+make download_chx      # ChestX-ray NIH (instructions printed)
+make download_all      # all auto-downloadable datasets
+```
+
+**RIVAL-10** must be downloaded from Kaggle (`rival10` dataset) and placed at `data/RIVAL10/`.
+
+**ChestX-ray (NIH)** requires CSV annotation files from the [NIH CXR dataset](https://nihcc.app.box.com/v/ChestXray-NIHCC). Place the following in `data/`:
+- `four_findings_expert_labels_individual_readers.csv`
+- `four_findings_expert_labels_test_labels.csv`
+- `four_findings_expert_labels_validation_labels.csv`
+
+Images are downloaded automatically by the loader on first use.
+
+**BOIA (BDD-OIA)** uses the BDD-OIA dataset preprocessed by [rsbench](https://unitn-sml.github.io/rsbench/). Follow the rsbench data preparation instructions and place the resulting pickle files in `data/bdd2048/`.
 
 ---
 
-## Misc options
+## Running experiments
 
-- `--device cuda` / `--device cpu` — default is `cuda`
-- `--seed INT` — sets random seed for full reproducibility (data splits, weight init, etc.)
-- `--dry-run` — run the full pipeline without writing any output files (useful for debugging)
-- `--output-compression {7z,gzip}` — compress output CSVs
-- `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`
+```
+python -m conformal [--seed SEED] [--device {cuda,cpu}] OUTPUT_DIR COMMAND [OPTIONS] DATASET NETWORK NESY_MODEL
+```
+
+**Commands:** `train`, `test`, `etest`, `deltas`, `analyze`, `optuna`
+
+**Datasets:** `mnistadd`, `mnistaddn`, `mnistsump`, `mnisthalf`, `mnistevenodd`, `cifar`, `rival`, `chx`, `cebab`, `boia`
+
+**Networks:** `lenet`, `resnet18`, `linear`, `bert`, `mpnet`, `clip`
+
+**NeSy models:** `dpl`, `ltn`, `dsl`, `linear_predictor`
+
+### MNIST-Addition with DPL
+
+```bash
+python -m conformal --seed 1011 CONF_MNISTADD train \
+    --learning-rate 0.1 --momentum 0.1 --batch-size 32 --opt sgd \
+    --concept-sup 0.0 --epochs 200 \
+    mnistadd lenet dpl
+
+python -m conformal --seed 1011 CONF_MNISTADD test \
+    --learning-rate 0.1 --momentum 0.1 --batch-size 32 --opt sgd \
+    --concept-sup 0.0 --epochs 200 \
+    mnistadd lenet dpl
+```
+
+### LTN operator configuration
+
+```bash
+python -m conformal --seed 1011 CONF_MNISTADD train \
+    --learning-rate 0.0001 --momentum 0.9 --batch-size 256 --opt adam \
+    --concept-sup 0.0 --epochs 200 \
+    mnistadd lenet ltn \
+    --and_op prod --or_op prod --imp_op goguen --p 4
+```
+
+Operator choices for `--and_op`, `--or_op`, `--imp_op`: `godel`, `prod`, `lukasiewicz`, `goguen`, `kleene`.
+
+### Concept supervision
+
+`--concept-sup` (float in [0, 1]) controls the fraction of training samples with ground-truth concept labels. `0.0` trains on task labels only; `1.0` gives full concept supervision.
+
+### E-value conformal testing
+
+```bash
+python -m conformal --seed 1011 CONF_MNISTADD etest \
+    --learning-rate 0.1 --batch-size 32 --opt sgd --concept-sup 0.0 --epochs 200 \
+    mnistadd lenet dpl
+```
+
+### Hyperparameter search
+
+```bash
+python -m conformal --seed 42 CONF_OPT optuna mnistadd lenet ltn
+```
+
+---
+
+## Output structure
+
+```
+OUTPUT_DIR/
+├── <experiment_name>.best_model.pth       # Model checkpoint
+├── <experiment_name>.train_results.csv    # Per-epoch training stats
+└── <experiment_name>.test_results.csv     # Coverage / set-size / consistency
+```
+
+The experiment name encodes seed, dataset, network, NeSy model, and concept supervision level so runs with different configurations never collide.
+
+---
+
+## Citation
+
+```bibtex
+@misc{bortolotti2026concise,
+    title={Concise and Logically Consistent Conformal Sets for Neuro-Symbolic Concept-Based Models}, 
+    author={Samuele Bortolotti and Emanuele Marconato and Andrea Pugnana and Andrea Passerini and Stefano Teso},
+    year={2026},
+    eprint={2605.18202},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG},
+    url={https://arxiv.org/abs/2605.18202}, 
+}
+```

@@ -21,28 +21,59 @@ exp
 
 animal-with-attributes.py
 
-# no longer in use
+# Removed / unused source files
 conformal/experiments/active.py
+conformal/experiments/small_etest.py
 conformal/datasets/cub.py
+conformal/datasets/derma.py
+conformal/models/lama.py
 
+# Experiment output directories
 CONF*
+exp
+LMAO*
+optuna_runs/
+optuna_cbm_cs0/
+optuna_cbm_cs1/
+optuna_clip_cbm_cs0/
+optuna_clip_dsl_cs0/
+optuna_dsl_cs0/
+optuna_dsl_cs1/
+optuna_ltn_boia/
+optuna_ltn_boia_v2/
+e-value-new-full/
+e-value-new-small/
+plots/
+rebuttal/
+rebuttal-boia/
+rebuttal-calibration/
 
-*.png
-
+# Dev / scratch files
 viva.py
 viva_2.py
-.vscode
+prova.md
+missing_evaluations.md
+animal-with-attributes.py
 a.sh
 b.sh
 c.sh
 check.sh
 tuning.sh
+
+# Media / generated artefacts
+*.png
 *.pdf
 *.ipynb
-*.txt
-latex_tables/
-.claude
-LMAO*
 *.tex
+latex_tables/
+
+# Config / secrets
+.vscode
+.claude
 CLAUDE.md
-conformal/experiments/small_etest.py
+.python-version
+
+# Text files (keep requirements)
+*.txt
+!requirements.txt
+!requirements.dev.txt

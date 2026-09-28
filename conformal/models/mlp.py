@@ -2,9 +2,6 @@ import torch.nn as nn
 
 
 class MLP(nn.Module):
-    """
-    Shared classification head.
-    """
 
     def __init__(
         self,

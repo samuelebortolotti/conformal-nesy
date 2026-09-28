@@ -1,5 +1,3 @@
-"""Measure per-example inference latency for each conformal method."""
-
 import time as _time  # alias immediately — this file is named time.py
 
 import csv
@@ -22,7 +20,6 @@ from conformal.models.econformal import ConformalEPredictor
 from conformal.datasets import (
     boia,
     chx,
-    derma,
     mnistadd,
     mnisthalf,
     mnistsump,
@@ -35,7 +32,6 @@ from conformal.datasets import (
 
 
 def configure_global_arguments(parser):
-    """Configure global arguments shared across models and datasets."""
     parser.add_argument(
         "--batch-size", type=int, default=64, help="Batch size for training."
     )
@@ -83,7 +79,6 @@ def timing_parser(parser):
     mnisthalf.configure_subparsers(subparsers)
     mnistsump.configure_subparsers(subparsers)
     mnistaddn.configure_subparsers(subparsers)
-    derma.configure_subparsers(subparsers)
     chx.configure_subparsers(subparsers)
     boia.configure_subparsers(subparsers)
     cifar.configure_subparsers(subparsers)
@@ -93,7 +88,6 @@ def timing_parser(parser):
 
 
 def configure_subparsers(subparsers):
-    """Configure the subparsers."""
     parser = subparsers.add_parser(
         "timing",
         help="Measure per-example inference latency for each conformal method",
@@ -169,7 +163,7 @@ def timing_evaluation(model, val_dl, timing_dl, device, args, logic, experiment_
 
     Returns a list of dicts with keys: method, mean_time_ms, relative_to_baseline_pct.
     """
-    multiconcept = args.dataset in ["boia", "chx", "derma", "cifar", "rival"]
+    multiconcept = args.dataset in ["boia", "chx", "cifar", "rival"]
     multilabel = args.dataset in ["boia"]
     n_examples = len(timing_dl.dataset)
 
@@ -198,10 +192,6 @@ def timing_evaluation(model, val_dl, timing_dl, device, args, logic, experiment_
         multilabel=multilabel,
     )
 
-    # --- Calibrate ALL predictors once upfront, before any timed run ---
-    # This ensures every method starts from the same GPU state and avoids
-    # the cumulative warm-up bias that comes from re-calibrating inside each
-    # time_method() call.
     log("=== Calibrating all predictors (untimed) ===", "INFO")
     cp.calibrate_per_concept(val_dl, alpha=0.1)
     cp.calibrate_labels(val_dl, alpha=0.1)
@@ -210,13 +200,11 @@ def timing_evaluation(model, val_dl, timing_dl, device, args, logic, experiment_
 
     results = []
 
-    # --- 1. No Conformal (baseline) ---
     log("=== Timing 1. No Conformal ===", "INFO")
     baseline_ms = time_baseline(model, timing_dl, device)
     baseline_ms = max(baseline_ms, 1e-9)
     results.append({"method": "No Conformal", "mean_time_ms": baseline_ms})
 
-    # --- 2. Conformal Concepts Only ---
     log("=== Timing 2. Conformal Concepts Only ===", "INFO")
     mean_ms = time_method(
         predict_fn=lambda: cp.predict_concepts(timing_dl),
@@ -226,7 +214,6 @@ def timing_evaluation(model, val_dl, timing_dl, device, args, logic, experiment_
     log(f"[Timing] Conformal Concepts Only: {mean_ms:.4f} ms/example", "INFO")
     results.append({"method": "Conformal Concepts Only", "mean_time_ms": mean_ms})
 
-    # --- 3. Conformal only Labels ---
     log("=== Timing 3. Conformal only Labels ===", "INFO")
     mean_ms = time_method(
         predict_fn=lambda: cp.predict_labels(timing_dl, use_hard_logic=False),
@@ -236,7 +223,6 @@ def timing_evaluation(model, val_dl, timing_dl, device, args, logic, experiment_
     log(f"[Timing] Conformal only Labels: {mean_ms:.4f} ms/example", "INFO")
     results.append({"method": "Conformal only Labels", "mean_time_ms": mean_ms})
 
-    # --- 4–9. predict_concepts_and_labels variants ---
     variants = [
         (
             "Conformal both Concepts and Labels",
@@ -281,7 +267,6 @@ def timing_evaluation(model, val_dl, timing_dl, device, args, logic, experiment_
         log(f"[Timing] {method_name}: {mean_ms:.4f} ms/example", "INFO")
         results.append({"method": method_name, "mean_time_ms": mean_ms})
 
-    # --- 10. E-Value Refinement ---
     log("=== Timing 10. E-Value Refinement ===", "INFO")
     mean_ms = time_method(
         predict_fn=lambda: cp_e.predict_concepts_and_labels(

@@ -7,14 +7,12 @@ from conformal.datasets.mnistsump import MNISTSumParityLoader
 from conformal.datasets.mnisthalf import MNISTHalfLoader
 from conformal.datasets.mnistevenodd import MNISTEvenOddLoader
 from conformal.datasets.mnistaddn import MNISTAdditionNLoader
-from conformal.datasets.derma import DERMALoader
 from conformal.datasets.boia import BOIALoader, BOIARawImageLoader
 from conformal.datasets.chx import CHXLoader
 from conformal.datasets.rival import RIVAL10Loader
 from conformal.datasets.cifar import CIFAR10Loader
 from conformal.datasets.cebab import CeBaBLoader
 from conformal.models.bert import Bert
-from conformal.models.lama import Lama
 from conformal.models.mpnet import MPNetSentence
 from conformal.models.dpl import DPL
 from conformal.models.ltn import LTN
@@ -62,8 +60,6 @@ class NetworkFactory:
             return Linear(input_shape=input_shape, num_classes=output_dim)
         elif name.lower() == "bert":
             return Bert(num_concepts=n_images, num_concept_dim=output_dim)
-        elif name.lower() == "lama":
-            return Lama(num_concepts=n_images, num_concept_dim=output_dim)
         elif name.lower() == "mpnet":
             return MPNetSentence(num_concepts=n_images, num_concept_dim=output_dim)
         elif name.lower() == "clip":
@@ -102,8 +98,6 @@ class DatasetFactory:
             return BOIALoader(**kwargs).load()
         elif name == "chx":
             return CHXLoader(chx_multi_class=args.chx_multi_class, **kwargs).load()
-        elif name == "derma":
-            return DERMALoader(**kwargs).load()
         elif name == "cifar":
             return CIFAR10Loader(**kwargs).load()
         elif name == "rival":
@@ -111,8 +105,6 @@ class DatasetFactory:
         elif name == "cebab":
             if args.model == "bert":
                 tokenizer = "bert-base-uncased"
-            elif args.model == "lama":
-                tokenizer = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
             elif args.model == "mpnet":
                 tokenizer = "sentence-transformers/all-mpnet-base-v2"
             else:

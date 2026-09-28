@@ -12,7 +12,6 @@ from conformal.experiments.train import train_parser
 
 
 def configure_subparsers(subparsers):
-    """Configure the subparsers."""
     parser = subparsers.add_parser(
         "optuna",
         help="Trains a nn model on a dataset",

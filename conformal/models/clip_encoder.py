@@ -31,15 +31,6 @@ DATASET_CONCEPT_TEMPLATES = {
         "a chest X-ray showing airspace opacity or consolidation",
         "a chest X-ray showing a pulmonary nodule or mass",
     ],
-    "derma": [
-        "a dermoscopy image of actinic keratoses",
-        "a dermoscopy image of basal cell carcinoma",
-        "a dermoscopy image of benign keratosis",
-        "a dermoscopy image of dermatofibroma",
-        "a dermoscopy image of melanocytic nevi",
-        "a dermoscopy image of melanoma",
-        "a dermoscopy image of vascular lesions",
-    ],
     "mnistadd": [
         "a handwritten digit zero",
         "a handwritten digit one",

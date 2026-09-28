@@ -6,9 +6,6 @@ from conformal.models.mlp import MLP
 
 
 class BaseLM(nn.Module):
-    """
-    Shared superclass for pretrained language models.
-    """
 
     def __init__(
         self,

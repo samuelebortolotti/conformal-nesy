@@ -1,5 +1,3 @@
-"""Main module that parses command line arguments."""
-
 import argparse
 import os
 import pathlib
@@ -17,7 +15,6 @@ from conformal.experiments import (
     test,
     analyze,
     etest,
-    small_etest,
     deltas,
     joint_failures,
 )
@@ -25,7 +22,6 @@ import conformal.experiments.time as conformal_time
 
 
 def compressor_7z(file_path: str):
-    """ "Return a file-object that compresses data written using 7z."""
     p = subprocess.Popen(
         ["7z", "a", "-si", file_path],
         stdin=subprocess.PIPE,
@@ -36,7 +32,6 @@ def compressor_7z(file_path: str):
 
 
 def output_writer(path: str, compression: Optional[str]):
-    """Write data to a compressed file."""
     if compression == "7z":
         return compressor_7z(path + ".7z")
     elif compression == "gzip":
@@ -46,7 +41,6 @@ def output_writer(path: str, compression: Optional[str]):
 
 
 def get_args():
-    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         prog="conformal",
         description="Conformal NeSy methods experiments.",
@@ -105,7 +99,6 @@ def get_args():
     test.configure_subparsers(subparsers)
     analyze.configure_subparsers(subparsers)
     etest.configure_subparsers(subparsers)
-    small_etest.configure_subparsers(subparsers)
     deltas.configure_subparsers(subparsers)
     joint_failures.configure_subparsers(subparsers)
     conformal_time.configure_subparsers(subparsers)
@@ -119,7 +112,6 @@ def get_args():
 
 
 def main():
-    """Main function."""
     args = get_args()
 
     if not args.output_dir_path.exists():

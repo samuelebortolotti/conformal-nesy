@@ -55,24 +55,20 @@ class BaseMNISTLTNLoss(torch.nn.Module):
         raise NotImplementedError
 
     def forward(self, pred_concepts, labels):
-        # Variables representing the input images and the target label
         image_vars = [
             ltn.Variable(f"x{i}", pred_concepts[:, i]) for i in range(self.n_images)
         ]
         n = ltn.Variable("n", labels)
 
-        # LTN predicate for digit classification
         digit_pred = ltn.Predicate(
             func=lambda digits, d_idx: torch.gather(digits, 1, d_idx)
         )
 
-        # Digit variables for all possible digit values
         digit_vars = [
             ltn.Variable(f"d{i}", torch.arange(pred_concepts.shape[-1]))
             for i in range(self.n_images)
         ]
 
-        # The core logical formula: Forall x,y,n: Exists d1,d2 such that (d1+d2 satisfy condition)
         sat_agg = self.forall_op(
             ltn.diag(*image_vars, n),
             self.exists_op(
@@ -224,10 +220,6 @@ def _or_four_bits_circuit():
 
 
 class boia_ltn_loss(torch.nn.Module):
-    """
-    Base class for LTN-based MNIST logic losses.
-    Encapsulates the common logic for variable creation and satisfaction aggregation.
-    """
 
     def __init__(
         self, and_op, or_op, not_op, imp_op, exists_op, forall_op, equiv_op, sat_agg_op
@@ -243,7 +235,6 @@ class boia_ltn_loss(torch.nn.Module):
         self.sat_agg_op = sat_agg_op
 
     def forward(self, conc_preds, actions):
-        # Cut probabilities — shape (B, 21)
         conc_preds = conc_preds[:, 0, :, 1]
 
         # Concept variables — indices follow CONCEPTS_ORDER in boia.py:
@@ -340,7 +331,6 @@ class boia_ltn_loss(torch.nn.Module):
             ),
         )
 
-        # Helper functions for turn logic
         def can_turn(lane, gl, fol):
             return self.or_op(lane, self.or_op(gl, fol))
 
@@ -587,82 +577,6 @@ class chx_ltn_loss(torch.nn.Module):
 
 
 def chx_dsl_weights(n_images, concept_dim, output_dim, device):
-    return _generic_dsl_words_weights(n_images, concept_dim, output_dim, device)
-
-
-##
-# DERMA
-##
-
-
-def derma_circuit():
-    possible_worlds = list(product(range(2), repeat=7))
-    n_worlds = len(possible_worlds)
-    n_queries = 2
-    look_up = {i: c for i, c in zip(range(n_worlds), possible_worlds)}
-
-    w_q = torch.zeros(n_worlds, n_queries)
-    for w in range(n_worlds):
-        actinic, basal, benign, derma, melano, melanoma, vascular = look_up[w]
-
-        # Healty vs not healty
-        if actinic + basal + melanoma >= 1:
-            w_q[w, 1] = 1
-        else:
-            w_q[w, 0] = 1
-    return w_q
-
-
-class derma_ltn_loss(torch.nn.Module):
-    def __init__(self, equiv_op, forall_op, not_op, exists_op, sat_agg_op) -> None:
-        """
-        Logic:
-        Malignant (1) <=> Concept 0 OR Concept 1 OR Concept 5 is True.
-        Benign (0)    <=> NOT (Concept 0 OR Concept 1 OR Concept 5).
-        """
-        super().__init__()
-
-        self.equiv_op = equiv_op
-        self.forall_op = forall_op
-        self.not_op = not_op
-        self.sat_agg_op = sat_agg_op
-        self.exists_op = exists_op
-
-    def forward(self, pred_concepts, labels):
-        x = ltn.Variable("x", pred_concepts[:, 0, :, 1])
-        l = ltn.Variable("l", labels)
-        indices = ltn.Variable("indices", torch.tensor([0, 1, 5]))
-
-        # Predicates
-        is_present = ltn.Predicate(func=lambda c, idx: torch.gather(c, 1, idx.long()))
-        is_healthy = ltn.Predicate(
-            func=lambda l: (l == 1).float()
-        )  # NOTE: different from CHX
-
-        # If healty <-> for all indices not present
-        healty = self.forall_op(
-            ltn.diag(x, l),
-            self.equiv_op(
-                is_healthy(l),
-                self.forall_op([indices], self.not_op(is_present(x, indices))),
-            ),
-        )
-
-        # If malignant <-> exists at least one
-        malignant = self.forall_op(
-            ltn.diag(x, l),
-            self.equiv_op(
-                self.not_op(is_healthy(l)),
-                self.exists_op([indices], is_present(x, indices)),
-            ),
-        )
-
-        sat_agg = self.sat_agg_op(healty, malignant)
-        log(f"LTN loss: {1 - sat_agg}", "DEBUG")
-        return 1 - sat_agg
-
-
-def derma_dsl_weights(n_images, concept_dim, output_dim, device):
     return _generic_dsl_words_weights(n_images, concept_dim, output_dim, device)
 
 

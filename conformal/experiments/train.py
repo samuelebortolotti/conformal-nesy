@@ -1,5 +1,3 @@
-"""Trains a NN and saves statistics and output"""
-
 import torch
 import csv
 
@@ -21,7 +19,6 @@ from conformal.statistics.metrics import compute_statistics
 from conformal.datasets import (
     boia,
     chx,
-    derma,
     mnistadd,
     mnisthalf,
     mnistsump,
@@ -34,8 +31,6 @@ from conformal.datasets import (
 
 
 def configure_global_arguments(parser):
-    """Configure global arguments that are shared across models and datasets."""
-
     parser.add_argument(
         "--batch-size", type=int, default=64, help="Batch size for training."
     )
@@ -90,7 +85,6 @@ def train_parser(parser):
     mnisthalf.configure_subparsers(subparsers)
     mnistsump.configure_subparsers(subparsers)
     mnistaddn.configure_subparsers(subparsers)
-    derma.configure_subparsers(subparsers)
     chx.configure_subparsers(subparsers)
     boia.configure_subparsers(subparsers)
     cifar.configure_subparsers(subparsers)
@@ -100,7 +94,6 @@ def train_parser(parser):
 
 
 def configure_subparsers(subparsers):
-    """Configure the subparsers."""
     parser = subparsers.add_parser(
         "train",
         help="Trains a nn model on a dataset",
@@ -113,9 +106,6 @@ def train_epoch(
     model, train_dl, optimizer, criterion, device, args, concept_weights, label_weights,
     concept_sup_weight=None,
 ):
-    """
-    Train model for one epoch.
-    """
     if concept_sup_weight is None:
         concept_sup_weight = args.concept_supervision
 
@@ -126,7 +116,7 @@ def train_epoch(
     all_g = []
     all_c = []
 
-    model.train()  # Ensure the model is in training mode
+    model.train()
     for data, concepts, target in train_dl:
         data = data.to(device)
         target = target.to(device)
@@ -135,7 +125,6 @@ def train_epoch(
         optimizer.zero_grad()
         output, conc_pred, extra = model(data, eval=False)
 
-        # NeSy loss specific
         loss = model.compute_loss(
             args.dataset,
             criterion,
@@ -147,11 +136,10 @@ def train_epoch(
             extra,
         )
 
-        # Add concept supervision loss if specified
         if concept_sup_weight > 0:
             concept_loss = 0.0
 
-            if args.dataset in ["chx", "boia", "derma", "rival", "cifar"]:
+            if args.dataset in ["chx", "boia", "rival", "cifar"]:
                 for i in range(conc_pred.size(1)):
                     concept_loss += torch.nn.functional.nll_loss(
                         conc_pred[:, 0, i, :].log(),
@@ -210,7 +198,7 @@ def train_epoch(
         present_l = np.unique(all_labels)
         train_f1 = f1_score(all_labels, all_preds, labels=present_l, average="macro")
 
-    if args.dataset in ["boia", "chx", "derma", "rival", "cifar"]:
+    if args.dataset in ["boia", "chx", "rival", "cifar"]:
         train_c_f1 = 0.0
         for idx in range(all_g.shape[1]):
             present_c = np.unique(all_g[:, idx])
@@ -286,7 +274,7 @@ def train(
                 is_train=False,
                 multiclass=(
                     False
-                    if args.dataset not in ["boia", "chx", "derma", "cifar", "rival"]
+                    if args.dataset not in ["boia", "chx", "cifar", "rival"]
                     else True
                 ),
                 multilabel=False if args.dataset not in ["boia"] else True,
@@ -342,7 +330,7 @@ def evaluate_and_log_model(
             is_train=False,
             multiclass=(
                 False
-                if args.dataset not in ["boia", "chx", "derma", "rival", "cifar"]
+                if args.dataset not in ["boia", "chx", "rival", "cifar"]
                 else True
             ),
             multilabel=False if args.dataset not in ["boia"] else True,
@@ -364,7 +352,7 @@ def evaluate_and_log_model(
                 args.nesy,
                 multiclass=(
                     False
-                    if args.dataset not in ["boia", "chx", "derma", "rival", "cifar"]
+                    if args.dataset not in ["boia", "chx", "rival", "cifar"]
                     else True
                 ),
                 multilabel=False if args.dataset not in ["boia"] else True,
@@ -395,7 +383,7 @@ def evaluate_and_log_model(
             ),
             multilabel=(
                 True
-                if args.dataset in ["boia", "chx", "derma", "rival", "cifar"]
+                if args.dataset in ["boia", "chx", "rival", "cifar"]
                 else False
             ),
         )
@@ -426,7 +414,6 @@ def evaluate_and_log_model(
 
 
 def main(experiment_name, results_output_h, stats_output_h, args, device, pruning_callback=None):
-    """Main function that parses the arguments and writes the output."""
 
     (
         train_ds,

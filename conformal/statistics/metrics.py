@@ -11,7 +11,6 @@ from conformal.utils.other import outer_product
 
 
 def compute_ece(probs, labels, n_bins=15):
-    """Compute Expected Calibration Error (ECE)."""
     confidences = np.max(probs, axis=1)
     predictions = np.argmax(probs, axis=1)
 
@@ -43,9 +42,6 @@ def compute_statistics(
     permutation=None,
     is_dpl=False,
 ):
-    """
-    Compute loss and F1 score for the dataset (train or validation).
-    """
     model.eval() if not is_train else model.train()
     prev_grad = torch.is_grad_enabled()
     torch.set_grad_enabled(is_train)
@@ -119,7 +115,7 @@ def compute_statistics(
         # Consistent y and c given by argmax (c, y) p(c, y | x)
         worlds = (
             outer_product(torch.tensor(all_conc_pred).squeeze(1))
-            if dataset in ["chx", "derma", "rival", "cifar"]
+            if dataset in ["chx", "rival", "cifar"]
             else outer_product(torch.tensor(all_conc_pred))
         )  # p(c | x)
 
@@ -144,7 +140,7 @@ def compute_statistics(
 
         num_concepts = (
             all_conc_pred.shape[2]
-            if dataset in ["chx", "derma", "rival", "cifar"]
+            if dataset in ["chx", "rival", "cifar"]
             else all_conc_pred.shape[1]
         )
         all_c = (
@@ -262,7 +258,6 @@ def compute_statistics(
         )
         H_c = H_c.mean()
 
-        # Per-concept-value entropy
         N, C = all_conc_pred.shape
         H_per_value = -np.mean(
             all_conc_pred * np.log(all_conc_pred + 1e-12), axis=0
@@ -589,7 +584,6 @@ def conformal_metrics(prediction_tuples, true_labels, ignore_token=-1):
                            or list of 3-tuples (fs_worlds, l_worlds, r_worlds) for BOIA.
         true_labels: np.ndarray [Samples, Concepts]
     """
-    # BOIA group-tuple path: delegate to dedicated function
     if len(prediction_tuples) > 0 and isinstance(prediction_tuples[0], tuple):
         m = boia_conformal_metrics(prediction_tuples, true_labels)
         return m["coverage_avg"], m["set_size_avg"]
@@ -646,7 +640,6 @@ def conformal_metrics(prediction_tuples, true_labels, ignore_token=-1):
 
         set_size_total += len(valid_tuples)
 
-    # Calculate final averages
     coverage = coverage_total / N
     avg_set_size = set_size_total / N
 
@@ -654,10 +647,6 @@ def conformal_metrics(prediction_tuples, true_labels, ignore_token=-1):
 
 
 def prediction_consistency(concept_tuples, label_sets, logic, EMPTY_TOKEN=-1):
-    """
-    Consistency metrics for the predicted concept tuples and the predicted label sets.
-    """
-    # BOIA group-tuple path: delegate to dedicated function
     if len(concept_tuples) > 0 and isinstance(concept_tuples[0], tuple):
         return _prediction_consistency_boia_groups(concept_tuples, label_sets, logic)
 

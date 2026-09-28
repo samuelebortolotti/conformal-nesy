@@ -9,7 +9,6 @@ from conformal.models import resnet18, lenet, linear, clip_encoder
 
 
 def configure_global_arguments(parser):
-    """Global arguments for MNIST-Addition"""
     pass
 
 
@@ -25,7 +24,6 @@ class MNISTAdditionDataset(Dataset):
         self.pairs = self._build_pairs()
 
     def _label_aggregator(self, label1, label2):
-        """Aggregate two labels into a single label."""
         return label1 + label2
 
     def _build_pairs(self):
@@ -89,7 +87,6 @@ class MNISTAdditionLoader(MNISTLoader):
 
 
 def mnist_addition_weights(train_ds, label_count, digit_count, device):
-    # Calculate Label Weights
     train_labels = np.array([p[2] for p in train_ds.pairs])
     label_counts = np.bincount(train_labels, minlength=label_count)
 
@@ -101,7 +98,6 @@ def mnist_addition_weights(train_ds, label_count, digit_count, device):
         dtype=torch.float32,
     ).to(device)
 
-    # Calculate Concept Weights
     train_concepts = np.array([p[1].numpy() for p in train_ds.pairs]).flatten()
     concept_counts = np.bincount(train_concepts, minlength=digit_count)
 
@@ -118,8 +114,6 @@ def mnist_addition_weights(train_ds, label_count, digit_count, device):
 
 
 def configure_subparsers(subparsers):
-    """Configure subparsers."""
-    # Subparser for MNIST-Addition
     mnist_add_parser = subparsers.add_parser(
         "mnistadd",
         help="Use MNIST-Addition as dataset",

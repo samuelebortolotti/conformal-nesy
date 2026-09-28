@@ -22,11 +22,6 @@ class ConformalPredictor:
         multilabel=False,
         bonferroni=False,
     ):
-        """
-        model: PyTorch model returning (label_pred, concept_pred)
-        device: 'cuda' or 'cpu'
-        logic: object that converts concept predictions to label probabilities
-        """
         self.model = model
         self.device = device
         self.logic = logic
@@ -45,7 +40,6 @@ class ConformalPredictor:
 
     @torch.no_grad()
     def compute_permutation(self, dl):
-        """Compute concept permutation"""
         self.model.eval()
 
         all_probs = []
@@ -74,7 +68,6 @@ class ConformalPredictor:
         return permutation
 
     def set_permutation(self, permutation):
-        """Setting permutation"""
         self.permutation = permutation
 
     @torch.no_grad()
@@ -113,7 +106,6 @@ class ConformalPredictor:
                     else conc_pred.unsqueeze(1)
                 )
 
-            # For each concept, compute 1 - probability of true label
             if self.multiconcepts:
                 batch_scores = torch.stack(
                     [
@@ -222,27 +214,6 @@ class ConformalPredictor:
             f"[Conformal] Per-concept thresholds: {self.per_concept_thresholds}", "INFO"
         )
 
-        # SANITY CHECK
-        # import matplotlib.pyplot as plt
-
-        # for i in range(k):
-        #     concept_scores = scores[:, i]
-        #     q = self.per_concept_thresholds[i]
-
-        #     plt.figure()
-
-        #     # Histogram of scores
-        #     plt.hist(concept_scores, bins=50)
-
-        #     # Quantile line
-        #     plt.axvline(q)
-
-        #     plt.title(f"Concept {i} score distribution")
-        #     plt.xlabel("Nonconformity score")
-        #     plt.ylabel("Frequency")
-        #     plt.savefig(f"{self.experiment_name}_concept_{i}_scores.pdf")
-        #     plt.close()
-
     def calibrate_labels(self, dl, alpha=0.1):
         """
         Calibrate threshold for the final label set.
@@ -281,44 +252,16 @@ class ConformalPredictor:
 
         log(f"[Conformal] Label threshold: {self.label_threshold}", "INFO")
 
-        # SANITY CHECK
-
-        # import matplotlib.pyplot as plt
-
-        # for i in range(k):
-        #     label_scores = scores if len(scores.shape) == 1 else scores[:, i]
-        #     q = self.label_threshold
-
-        #     plt.figure()
-
-        #     # Histogram of scores
-        #     plt.hist(label_scores, bins=50)
-
-        #     # Quantile line
-        #     plt.axvline(q)
-
-        #     plt.title(f"Label {i} score distribution")
-        #     plt.xlabel("Nonconformity score")
-        #     plt.ylabel("Frequency")
-        #     plt.savefig(f"{self.experiment_name}_label_{i}_scores.pdf")
-        #     plt.close()
-
     def _build_concept_sets_for_batch(self, conc_pred):
-
-        # aggregate the thresholds
         thresholds = torch.tensor(self.per_concept_thresholds, device=conc_pred.device)
-
-        # build the scores
         scores = 1 - conc_pred
 
         if self.multiconcepts:
-
             thresholds = thresholds.view(1, 1, -1, 1)
             mask = scores <= thresholds
 
             batch_sets = []
 
-            # get the batch
             for sample_mask in mask:
                 included_list = [
                     torch.where(sample_mask[0, k])[0].cpu().numpy()
@@ -332,7 +275,6 @@ class ConformalPredictor:
             thresholds = thresholds.view(1, -1, 1)
             mask = scores <= thresholds
 
-            # get the batch
             batch_sets = [
                 [
                     torch.where(sample_mask[j])[0].cpu().numpy()
@@ -424,10 +366,8 @@ class ConformalPredictor:
             data = data.to(self.device)
             _, conc_pred, _ = self.model(data, eval=True)
 
-            # Get marginals first
             batch_marginal_sets = self._build_concept_sets_for_batch(conc_pred)
 
-            # Convert to tuples immediately if we can
             for sample_marginal in batch_marginal_sets:
                 tuples = self._generate_combinations(sample_marginal)
                 all_tuple_sets.append(tuples)

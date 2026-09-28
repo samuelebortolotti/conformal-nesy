@@ -5,7 +5,6 @@ from conformal.models.nesy import NeSyModel
 
 
 def configure_global_arguments(parser):
-    """Global arguments for Linear Predictor"""
     pass
 
 
@@ -47,7 +46,7 @@ class LinearPredictor(NeSyModel):
         else:
             worlds = (
                 outer_product(log_odds.squeeze(1))
-                if self.dataset in ["chx", "derma", "rival", "cifar"]
+                if self.dataset in ["chx", "rival", "cifar"]
                 else outer_product(log_odds)
             )
             out = self.linear(worlds)

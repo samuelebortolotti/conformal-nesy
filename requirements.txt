@@ -1,8 +1,13 @@
 matplotlib~=3.9.4
+numpy~=2.2.0
 torch~=2.6.0
 torchvision~=0.21.0
 optuna~=4.4.0
 scikit-learn~=1.6.1
 seaborn~=0.13.2
-medmnist~=3.0.2
 LTNtorch~=1.0.2
+transformers~=4.48.0
+scipy~=1.15.0
+joblib~=1.4.0
+pandas~=2.2.0
+Pillow~=11.1.0

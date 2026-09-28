@@ -4,7 +4,6 @@ from conformal.models.operators import (
     mnist_sump_ltn_loss,
     boia_ltn_loss,
     chx_ltn_loss,
-    derma_ltn_loss,
     cifar_ltn_loss,
     cebab_ltn_loss,
     cifar_circuit,
@@ -16,7 +15,6 @@ import torch.nn.functional as F
 
 
 def configure_global_arguments(parser):
-    """Configure global arguments for LTN."""
     parser.add_argument(
         "--and_op",
         type=str,
@@ -184,14 +182,6 @@ class LTN(NeSyModel):
                 and_op=self.and_op,
                 multi_class=extra["chx-multi-class"],
             )
-        elif dataset == "derma":
-            return derma_ltn_loss(
-                equiv_op=self.equiv_op,
-                forall_op=self.forall_op,
-                not_op=self.not_op,
-                exists_op=self.exists_op,
-                sat_agg_op=self.sat_agg_op,
-            )
         elif dataset in ["cifar", "rival"]:
             return cifar_ltn_loss(
                 equiv_op=self.equiv_op,
@@ -216,7 +206,6 @@ class LTN(NeSyModel):
         )
 
     def set_p(self, p: int):
-        """Rebuild quantifiers and LTN loss with a new p value (used by the p scheduler)."""
         if p == self._current_p:
             return
         self._current_p = p
@@ -303,8 +292,6 @@ class LTN(NeSyModel):
 
 
 def configure_subparsers(subparsers):
-    """Configure subparsers."""
-    # Subparser for LTN
     ltn_parser = subparsers.add_parser(
         "ltn",
         help="Use LTN as NeSy predictor",

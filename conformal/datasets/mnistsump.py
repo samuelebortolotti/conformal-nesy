@@ -7,7 +7,6 @@ import torch
 
 
 def configure_global_arguments(parser):
-    """Global arguments for MNIST-SumParity"""
     pass
 
 

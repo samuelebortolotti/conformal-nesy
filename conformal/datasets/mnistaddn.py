@@ -10,7 +10,6 @@ from conformal.models import resnet18, lenet, linear, clip_encoder
 
 
 def configure_global_arguments(parser):
-    """Global arguments for MNIST-AddN"""
     parser.add_argument(
         "--n-digits", type=int_ge_2, default="3", help="Number of MNIST-digits"
     )

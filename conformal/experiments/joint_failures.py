@@ -5,7 +5,6 @@ from conformal.general_utils import log
 from conformal.datasets import (
     boia,
     chx,
-    derma,
     mnistadd,
     mnisthalf,
     mnistsump,
@@ -27,7 +26,6 @@ from conformal.experiments.analyze import (
 
 
 def configure_global_arguments(parser):
-    """Configure global arguments that are shared across models and datasets."""
 
     parser.add_argument(
         "--batch-size", type=int, default=64, help="Batch size for training."
@@ -82,7 +80,6 @@ def test_parser(parser):
     mnisthalf.configure_subparsers(subparsers)
     mnistsump.configure_subparsers(subparsers)
     mnistaddn.configure_subparsers(subparsers)
-    derma.configure_subparsers(subparsers)
     chx.configure_subparsers(subparsers)
     boia.configure_subparsers(subparsers)
     rival.configure_subparsers(subparsers)
@@ -92,7 +89,6 @@ def test_parser(parser):
 
 
 def configure_subparsers(subparsers):
-    """Configure the subparsers."""
     parser = subparsers.add_parser(
         "joint_failures",
         help="Aggregate joint-failure correction terms (Prop A.7 and A.8) across seeds",
@@ -102,7 +98,6 @@ def configure_subparsers(subparsers):
 
 
 def main(experiment_name, results_output_h, stats_output_h, args, device):
-    """Main function that parses the arguments and writes the output."""
     files = collect_result_files(args.output_dir_path, build_seed_regex(args))
     seed_position = get_seed_position(args)
     loaded = load_results(files, str(args.output_dir_path), seed_position)

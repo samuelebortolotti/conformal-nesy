@@ -5,7 +5,6 @@ from conformal.models.operators import (
     mnist_sump_dsl_weights,
     boia_dsl_weights,
     chx_dsl_weights,
-    derma_dsl_weights,
     rival_dsl_weights,
     cifar_dsl_weights,
     cebab_dsl_weights,
@@ -52,7 +51,6 @@ class DSL(NeSyModel):
             self.arity = self.weights.dim() - 1
 
     def _build_weights(self, concept_dim, output_dim, n_images, dataset):
-        """Build DSL weights"""
         if dataset == "mnistadd" or dataset == "mnisthalf":
             return mnist_add_dsl_weights(
                 n_images=n_images,
@@ -76,13 +74,6 @@ class DSL(NeSyModel):
             )
         elif dataset == "chx":
             return chx_dsl_weights(
-                n_images=n_images,
-                concept_dim=concept_dim,
-                output_dim=output_dim,
-                device=self.device,
-            )
-        elif dataset == "derma":
-            return derma_dsl_weights(
                 n_images=n_images,
                 concept_dim=concept_dim,
                 output_dim=output_dim,
@@ -121,7 +112,6 @@ class DSL(NeSyModel):
         )
 
     def epsilon_greedy(self, t, eval, dim=1):
-        """Epsilon greedy strat for learning symbols"""
         if eval:
             truth_values, chosen_symbols = torch.max(t, dim=dim)
         else:
@@ -139,12 +129,6 @@ class DSL(NeSyModel):
         return truth_values, chosen_symbols
 
     def get_rules_matrix(self, eval, index=None):
-        """
-        Returns:
-        rules_weights: tensor of shape [C, ...] (arity dims)
-        g_matrix:      tensor of same shape, symbolic outputs
-        """
-        # set weights
         if index is not None:
             weights = self.weights[index]
         else:
@@ -156,7 +140,6 @@ class DSL(NeSyModel):
             )
             return rules_weights, g_matrix
 
-        # training (epsilon-greedy)
         rule_shape = weights.shape[:-1]  # e.g. (C,) or (C, C)
         n_outputs = weights.shape[-1]
 
@@ -177,20 +160,16 @@ class DSL(NeSyModel):
         return rules_weights, g_matrix
 
     def inference(self, concepts, eval=False):
-        """
-        General DSL inference.
-        """
         if self.dataset == "boia":
             return self._boia_inference(concepts, eval)
 
         truth_list = []
         symbol_list = []
 
-        # If unary DSL
         if self.arity == 1:
             worlds = (
                 outer_product(concepts.squeeze(1))
-                if self.dataset in ["chx", "derma", "rival", "cifar"]
+                if self.dataset in ["chx", "rival", "cifar"]
                 else outer_product(concepts)
             )
             tv, sym = self.epsilon_greedy(worlds, eval)
@@ -210,7 +189,6 @@ class DSL(NeSyModel):
         rule_truth = rules_weights[idx]
         predicted_symbols = g_matrix[idx]
 
-        # Combine rule truth with individual concept truth-values
         all_truths = torch.stack([rule_truth] + truth_list, dim=1)
         prediction_truth, _ = torch.min(all_truths, dim=1)
 
@@ -375,7 +353,6 @@ class DSL(NeSyModel):
         label_weights,
         extra,
     ):
-        """Return the DSL loss."""
         truth_values = extra  # fuzzy truth values from symbolic layer
 
         if dataset == "boia":
@@ -383,7 +360,6 @@ class DSL(NeSyModel):
             n_blocks = target.shape[1]
 
             for i in range(n_blocks):
-                # Binary supervision for each block
                 block_output = output[:, i]
                 block_target = target[:, i]
 
@@ -401,7 +377,7 @@ class DSL(NeSyModel):
 
                 total_loss += block_loss
 
-            return total_loss / n_blocks  # average over blocks
+            return total_loss / n_blocks
 
         model_labels = (output.argmax(dim=-1) == target).float()
         truth_logits = torch.logit(truth_values.view(-1), eps=1e-4)
@@ -413,7 +389,6 @@ class DSL(NeSyModel):
 
 
 def configure_subparsers(subparsers):
-    """Configure subparsers."""
     subparsers.add_parser(
         "dsl",
         help="Use DSL as NeSy predictor",

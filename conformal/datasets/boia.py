@@ -11,7 +11,6 @@ import pickle
 
 
 def configure_global_arguments(parser):
-    """Global arguments for BOIA"""
     parser.add_argument(
         "--boia-raw-root",
         default=None,
@@ -45,11 +44,6 @@ CONCEPTS_ORDER = {
 
 
 class BOIADataset(Dataset):
-    """
-    Torch Dataset for BOIA (BDD) dataset.
-    Returns: (image_tensor, class_label[:4], concept_vector)
-    """
-
     def __init__(
         self,
         pkl_file_path,
@@ -62,18 +56,6 @@ class BOIADataset(Dataset):
         c_sup=1,
         which_c=[-1],
     ):
-        """
-        Args:
-            pkl_file_path: path to pickle file
-            use_attr: whether to load concepts/attributes
-            no_img: if True, return dummy image tensors
-            uncertain_label: use uncertain attribute labels
-            image_dir: folder containing preprocessed images (.pt)
-            n_class_attr: number of classes per attribute
-            transform: image transform (optional)
-            c_sup: concept supervision threshold
-            which_c: list of concept indices to keep (-1 = all)
-        """
         self.data = pickle.load(open(pkl_file_path, "rb"))
         self.transform = transform
         self.use_attr = use_attr
@@ -94,18 +76,15 @@ class BOIADataset(Dataset):
         img_data = self.data[idx]
         img_path = img_data["img_path"]
 
-        # Preprocessed paths
         t_path = img_path[:-4] + ".pt"
         img_path_full = os.path.join(self.image_dir, "inputs", t_path)
         lab_path = os.path.join(self.image_dir, "labels", t_path)
         con_path = os.path.join(self.image_dir, "concepts", t_path)
 
-        # Load tensors
         img = torch.load(img_path_full).squeeze(0)
         class_label = torch.load(lab_path).squeeze(0)[:4]  # only first 4 classes
         attr_label = torch.load(con_path).squeeze(0)
 
-        # Filter concepts according to supervision
         if self.c_sup != 1:
             if self.r_seq[idx] > self.c_sup:
                 attr_label[:] = -1
@@ -128,7 +107,6 @@ class BOIADataset(Dataset):
                     ]:
                         attr_label[order] = -1
 
-        # Apply transform if defined
         if self.transform and not self.no_img:
             img = self.transform(img)
 
@@ -139,12 +117,6 @@ class BOIADataset(Dataset):
 
 
 class BOIALoader:
-    """
-    Simplified BOIA loader following MNIST/CUB style.
-    Returns:
-    train, val, test, input_dim, concept_dim, output_dim, n_images, class_names, concept_names, label_aggregator
-    """
-
     def __init__(self, root="./data/bdd2048", val_split=0.1, device="cuda"):
         self.root = root
         self.val_split = val_split
@@ -154,18 +126,14 @@ class BOIALoader:
         self.device = device
 
     def _label_aggregator(self, label):
-        # Identity function (can be customized)
         return label
 
     def load(self):
-        """Load BOIA datasets and return metadata."""
-
         train_path = os.path.join(self.root, "train_BDD_OIA.pkl")
         val_path = os.path.join(self.root, "val_BDD_OIA.pkl")
         test_path = os.path.join(self.root, "test_BDD_OIA.pkl")
         image_dir = self.root
 
-        # Load datasets
         full_train = BOIADataset(
             pkl_file_path=train_path,
             use_attr=True,
@@ -198,18 +166,12 @@ class BOIALoader:
         train_size = len(full_train) - val_size
         train_dataset, _ = random_split(full_train, [train_size, val_size])
 
-        # Metadata
         input_dim = 2048
         concept_dim = len(CONCEPTS_ORDER)
         output_dim = 4
         n_images = 1
         class_names = [f"Class_{i}" for i in range(output_dim)]
         concept_names = sorted(CONCEPTS_ORDER, key=CONCEPTS_ORDER.get)
-
-        # Fuzzy intepretation that is still hard and ok
-        # OR (A∨B): Represented as torch.clamp(A + B, 0, 1).
-        # AND (A∧B): Represented as A * B.
-        # NOT (¬A): Represented as 1 - A.
 
         _boia_lambda = lambda x: np.stack(
             [
@@ -272,7 +234,7 @@ class BOIALoader:
             concept_dim=concept_dim,
         )
 
-        log("Calculating class and concept weights for BOIA...", "INFO")
+        log("Calculating class and concept weights...", "INFO")
         all_concepts = []
         all_labels = []
 
@@ -469,8 +431,6 @@ class BOIARawImageLoader(BOIALoader):
 
 
 def configure_subparsers(subparsers):
-    """Configure subparsers."""
-    # Subparser for BOIA
     boia_parser = subparsers.add_parser(
         "boia",
         help="Use BOIA as dataset",

@@ -22,8 +22,6 @@ class Bert(BaseLM):
 
 
 def configure_subparsers(subparsers):
-    """Configure subparsers."""
-    # Subparser for Bert
     bert_parser = subparsers.add_parser(
         "bert",
         help="Train a bert model",

@@ -1,5 +1,3 @@
-"""Module used for global utils functions"""
-
 import logging
 import random
 import torch
@@ -15,9 +13,6 @@ def set_log_level(level_str):
 
 
 def log(message, level_str="INFO"):
-    """
-    Logs a message if the message's level is >= current global LOG_LEVEL.
-    """
     numeric_level = getattr(logging, level_str.upper(), logging.INFO)
     if numeric_level >= LOG_LEVEL:
         logging.log(numeric_level, message)
@@ -36,10 +31,6 @@ def get_basename(args, separator="_"):
     # Keys never included in the experiment name
     always_exclude = {"func", "model_path", "model_dir", "alpha_concepts", "alpha_label", "cal_ratio"}
 
-    # epsilon_symbols / epsilon_rules were added to the global argparser for DSL support,
-    # but DPL/LTN/CBM checkpoints were saved before these args existed.  Exclude them
-    # from the basename for any model that is not DSL or linear_predictor so that
-    # checkpoint lookups for those older models still resolve correctly.
     nesy = getattr(args, "nesy", None)
     if nesy not in ("dsl", "linear_predictor"):
         always_exclude |= {"epsilon_symbols", "epsilon_rules"}

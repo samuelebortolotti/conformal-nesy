@@ -4,7 +4,6 @@ from conformal.models import dpl, ltn, linear_predictor, dsl
 
 
 def configure_global_arguments(parser):
-    """Configure global arguments that are shared across models and datasets."""
     pass
 
 

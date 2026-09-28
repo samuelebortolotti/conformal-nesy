@@ -8,7 +8,7 @@ from transformers import AutoTokenizer
 from torch.utils.data import Dataset
 
 from conformal.utils.logic import HardLogic
-from conformal.models import bert, lama, mpnet
+from conformal.models import bert, mpnet
 
 
 def configure_global_arguments(parser):
@@ -16,8 +16,6 @@ def configure_global_arguments(parser):
 
 
 class CeBaBDataset(Dataset):
-    """Wrap CeBaB text + concepts + labels."""
-
     def __init__(
         self,
         texts,
@@ -79,7 +77,6 @@ class CeBaBLoader:
         self.concepts_weights = []
 
     def build_concepts(self, entries):
-        """Convert JSON entries to one-hot concept matrix"""
         concepts_list = []
         for aspect in self.aspects:
             vals = []
@@ -98,7 +95,6 @@ class CeBaBLoader:
         return np.stack(concepts_list, axis=1)
 
     def build_star_concept_labels(self, entries):
-        """Convert stars entries to concept"""
         concept = np.zeros(len(entries))
         for i, e in enumerate(entries):
             r = e.get("review_majority", "unknown")
@@ -156,19 +152,16 @@ class CeBaBLoader:
         with open(test_path, "r", encoding="utf-8") as f:
             test_entries = json.load(f)
 
-        # Texts
         X_train = [e["description"] for e in train_entries]
         X_dev = [e["description"] for e in dev_entries]
         X_test = [e["description"] for e in test_entries]
 
-        # Concepts
         C_train = self.build_concepts(train_entries)
         C_dev = self.build_concepts(dev_entries)
         C_test = self.build_concepts(test_entries)
 
         build_labels = self._return_cebab_logic()
 
-        # Labels
         y_train = build_labels(C_train)
         y_dev = build_labels(C_dev)
         y_test = build_labels(C_test)
@@ -200,14 +193,12 @@ class CeBaBLoader:
             self.device
         )
 
-        # logic
         logic = HardLogic(
             self._return_cebab_logic(),
             n_concepts=self.n_concepts,
             concept_dim=self.concept_dim,
         )
 
-        # Wrap in Dataset
         train_ds = CeBaBDataset(
             X_train, C_train, y_train, tokenizer_name=self.tokenizer_name
         )
@@ -243,5 +234,4 @@ def configure_subparsers(subparsers):
 
     sub = cebab_parser.add_subparsers(dest="model")
     bert.configure_subparsers(sub)
-    lama.configure_subparsers(sub)
     mpnet.configure_subparsers(sub)

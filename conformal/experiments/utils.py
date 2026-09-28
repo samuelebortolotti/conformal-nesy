@@ -64,10 +64,6 @@ def collect_predictions(
     permutation=None,
     is_dpl=False,
 ):
-    """
-    Compute loss and F1 score for the dataset (train or validation).
-    Returns raw logits/probabilities after None.
-    """
     model.eval()
     all_preds = []
     all_labels = []

@@ -25,20 +25,12 @@ class ConformalEPredictor(ConformalPredictor):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-
-        # Chosen alpha and beta parameters for e-value computation
         self.alpha = alpha
         self.beta = beta
-
-        # For storing sums of conformity scores for concepts and labels during calibration
         self.concept_score_sums = None
         self.label_score_sums = None
-
-        # Maximum size of concept and label sets to consider for prediction (for computational efficiency)
         self.max_size_concepts = max_size_concepts
         self.max_size_labels = max_size_labels
-
-        # Number of elements use to calibrate e-values (denominator of the average)
         self.n_concept_cal = None
         self.n_label_cal = None
 
@@ -82,7 +74,6 @@ class ConformalEPredictor(ConformalPredictor):
                     else conc_pred.unsqueeze(1)
                 )
 
-            # For each concept, compute - log(probability of true label)
             if self.multiconcepts:
                 batch_scores = torch.stack(
                     [
@@ -191,8 +182,6 @@ class ConformalEPredictor(ConformalPredictor):
 
         combos = np.arange(n_classes)  # (5,)
 
-        # self._plot_evalues(evalues, prefix="label", threshold=1/self.beta)
-
         return evalues, combos
 
     def compute_concept_evalues(self, scores):
@@ -219,12 +208,6 @@ class ConformalEPredictor(ConformalPredictor):
         # Note: joint_evalues[0, i, j] how likely it is that concept i has value j?
         _, n_concepts, n_classes = joint_evalues.shape
         combos = np.array(list(product(range(n_classes), repeat=n_concepts)))  # (16, 4)
-
-        # self._plot_evalues(
-        #     joint_evalues.reshape(joint_evalues.shape[0], -1),  # (B, n_concepts * n_classes)
-        #     prefix="concept",
-        #     threshold=1/self.beta
-        # )
 
         result = np.mean(
             joint_evalues[:, np.arange(n_concepts), combos],  # (B, 16, n_concepts)

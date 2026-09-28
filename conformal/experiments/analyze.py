@@ -6,7 +6,6 @@ from conformal.general_utils import log
 from conformal.datasets import (
     boia,
     chx,
-    derma,
     mnistadd,
     mnisthalf,
     mnistsump,
@@ -19,8 +18,6 @@ from conformal.datasets import (
 
 
 def configure_global_arguments(parser):
-    """Configure global arguments that are shared across models and datasets."""
-
     parser.add_argument(
         "--batch-size", type=int, default=64, help="Batch size for training."
     )
@@ -74,7 +71,6 @@ def test_parser(parser):
     mnisthalf.configure_subparsers(subparsers)
     mnistsump.configure_subparsers(subparsers)
     mnistaddn.configure_subparsers(subparsers)
-    derma.configure_subparsers(subparsers)
     chx.configure_subparsers(subparsers)
     boia.configure_subparsers(subparsers)
     rival.configure_subparsers(subparsers)
@@ -84,7 +80,6 @@ def test_parser(parser):
 
 
 def configure_subparsers(subparsers):
-    """Configure the subparsers."""
     parser = subparsers.add_parser(
         "analyze",
         help="Analyze the results coming from test",
@@ -94,7 +89,6 @@ def configure_subparsers(subparsers):
 
 
 def collect_result_files(root_dir, seed_regex):
-    """Get the csv files"""
     log(f"Scanning folder {root_dir} for test result files...", "INFO")
     pattern = re.compile(seed_regex + ".train_results_conformal.csv$")
     files = list(Path(root_dir).rglob("*.train_results_conformal.csv"))
@@ -178,14 +172,12 @@ def build_seed_regex(args):
 
 
 def extract_seed(f, folder_name, seed_position):
-    """Extract the seed from the file"""
     f = f.replace(folder_name + "_", "")
     f = f.split("_")
     return f, f[seed_position]
 
 
 def get_seed_position(args):
-    """Get the seed position from the args"""
     args_dict = vars(args)
     ignore_keys = ["func", "model_path", "analyze_seed"]
     keys_ordered = [k for k in args_dict.keys() if k not in ignore_keys]
@@ -193,7 +185,6 @@ def get_seed_position(args):
 
 
 def flatten_results(seed, results_dict):
-    """Get seed, settings, metrics and values for aggregation"""
     rows = []
     for setting, df_metrics in results_dict.items():
         for _, row in df_metrics.iterrows():
@@ -376,7 +367,6 @@ def main(experiment_name, results_output_h, stats_output_h, args, device):
         all_rows, args.nesy
     )
 
-    # Change the name with the number of seeds analyzed
     splitted_path, _ = extract_seed(
         stats_output_h.name.split("/")[-1], str(args.output_dir_path), seed_position
     )

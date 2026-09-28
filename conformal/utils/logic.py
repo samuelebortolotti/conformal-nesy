@@ -15,12 +15,10 @@ class BaseLogic(abc.ABC):
 
     @abc.abstractmethod
     def forward(self, x):
-        """Apply logic to concepts"""
         raise NotImplementedError
 
     @abc.abstractmethod
     def abductive_concept_sets(self, y):
-        """Get concept sets that would lead to label y"""
         raise NotImplementedError
 
 
@@ -263,7 +261,6 @@ class HardLogic(BaseLogic):
 
         for world in worlds:
             world_array = np.expand_dims(np.array(world), axis=0)
-            # wrong logic case
             if self.multi_set_logic is not None:
                 derived = self.multi_set_logic(world_array)
                 label = np.unique(np.concatenate(derived))
@@ -352,7 +349,6 @@ class FactorizedBoiaLogic(HardLogic):
         self._r_cache  = None  # right           -> list of 6-dim binary arrays
 
     def forward(self, x):
-        """Return binary (N, 4) labels, binarizing the soft BOIA logic output."""
         probs = self.logic(x)
         return (np.array(probs) > 0).astype(int)
 

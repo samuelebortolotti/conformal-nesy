@@ -42,8 +42,6 @@ class MPNetSentence(BaseLM):
 
 
 def configure_subparsers(subparsers):
-    """Configure subparsers."""
-    # Subparser for Bert
     mpnet_parser = subparsers.add_parser(
         "mpnet",
         help="Train an all-mpnet-base-v2 sentence model",

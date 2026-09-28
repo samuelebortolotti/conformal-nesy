@@ -19,25 +19,9 @@ def save_line_plot(
     grid=True,
     transparent=False,
 ):
-    """
-    Save a clean, well-formatted line plot with multiple series.
-
-    Args:
-        data (array-like): Either a 1D array or a 2D array of shape (steps, n_lines)
-        output_path (str): Path to save the figure
-        labels (list of str, optional): Labels for each line
-        xlabel, ylabel, title (str): Axis labels and plot title
-        figsize (tuple): Figure size in inches
-        legend (bool): Whether to show the legend
-        colors (list of str, optional): List of colors for lines
-        style (str): Line style (e.g. '-', '--', ':')
-        grid (bool): Whether to display gridlines
-        transparent (bool): Save figure with transparent background
-    """
     plt.figure(figsize=figsize)
     plt.style.use("default")
 
-    # Convert to numpy array if list
     if isinstance(data, list):
         data = (
             np.stack(data, axis=1)
@@ -49,7 +33,6 @@ def save_line_plot(
     n_lines = data.shape[1] if data.ndim > 1 else 1
     steps = np.arange(data.shape[0])
 
-    # Plot each line
     for i in range(n_lines):
         y = data[:, i] if n_lines > 1 else data
         label = labels[i] if labels is not None and i < len(labels) else f"Line {i+1}"
@@ -73,17 +56,6 @@ def save_line_plot(
 def plot_confusion_matrix(
     y_true, y_pred, class_names, title, output_path=None, max_cols=4, multilabel=False
 ):
-    """
-    Plot multiple confusion matrices (one per label) in a grid.
-
-    Args:
-        y_true (ndarray): shape (n_samples, n_labels)
-        y_pred (ndarray): shape (n_samples, n_labels)
-        class_names (list of str): list of label names (length n_labels)
-        title (str): figure title
-        output_path (str, optional): path to save the PDF
-        max_cols (int): maximum number of confusion matrices per row
-    """
     if y_true.ndim == 1:
         n_labels = 1
         y_true = y_true.reshape(-1, 1)
@@ -100,7 +72,6 @@ def plot_confusion_matrix(
         axes = np.array([axes]).flatten() if n_labels == 1 else axes.flatten()
 
         for i in range(n_labels):
-            # Binary comparison for each attribute
             cm = confusion_matrix(
                 y_true[:, i], y_pred[:, i], labels=[0, 1], normalize="true"
             )
@@ -118,14 +89,12 @@ def plot_confusion_matrix(
             axes[i].set_xlabel("Predicted")
             axes[i].set_ylabel("True")
 
-        # Clean up empty subplots
         for j in range(n_labels, len(axes)):
             axes[j].axis("off")
     else:
         fig, ax = plt.subplots(figsize=(12, 10))
         cm = confusion_matrix(y_true, y_pred, normalize="true")
 
-        # Limit labels for readability if there are too many (like 50)
         tick_labels = class_names if len(class_names) < 20 else False
 
         sns.heatmap(
@@ -182,15 +151,6 @@ def plot_knowledge(concept_preds, labels, output_path, title):
 def entropy_plot_over_time(
     entropy_values, concept_names, output_path, title="Concept Entropy"
 ):
-    """
-    Plots the average entropy for each concept as a bar plot and saves the figure.
-
-    Parameters:
-    - entropy_values: np.ndarray of shape (N, V), entropy values per concept
-    - concept_names: list of length V, names of the concepts
-    - output_path: str, path to save the figure (PDF)
-    - title: str, title of the plot
-    """
     entropy_values = np.asarray(entropy_values)
     assert entropy_values.ndim == 2, "Input should be 2D: (N, V)"
     N, V = entropy_values.shape
@@ -215,15 +175,6 @@ def entropy_plot_over_time(
 
 
 def plot_conformal_comparison(results_storage, file_name, target_coverage=0.9):
-    """
-    Scatter plot comparing Label Coverage vs Average Set Size for different methods.
-
-    Args:
-        results_storage (dict): Dictionary containing metrics for each method.
-        file_name (Path): Path to save the image.
-        target_coverage (float): The desired coverage level (1 - alpha).
-    """
-
     markers = ["o", "s", "^", "D", "p", "*", "X"]
     colors = [
         "#1f77b4",
@@ -288,15 +239,6 @@ def plot_conformal_comparison(results_storage, file_name, target_coverage=0.9):
 
 
 def plot_consistency_comparison(results_storage, file_name, target_coverage=0.9):
-    """
-    Scatter plot comparing Concept and Label Consistency
-
-    Args:
-        results_storage (dict): Dictionary containing metrics for each method.
-        file_name (Path): Path to save the image.
-        target_coverage (float): The desired coverage level (1 - alpha).
-    """
-
     markers = ["o", "s", "^", "D", "p", "*", "X"]
     colors = [
         "#1f77b4",
@@ -353,15 +295,6 @@ def plot_consistency_comparison(results_storage, file_name, target_coverage=0.9)
 def plot_model_metrics(
     baseline_results, file_name, concept_names=None, multiconcepts=False
 ):
-    """
-    Plots scalar performance metrics (F1, Loss, ECE) and per-concept entropy.
-
-    Args:
-        baseline_results (dict): The dictionary stored under results_storage['No Conformal']
-        file_name (Path): File name to save plots.
-        concept_names (list): Optional list of names for the concepts.
-    """
-
     performance_metrics = {
         "Y F1": baseline_results.get("test_f1", 0),
         "Y Acc": baseline_results.get("test_acc", 0),
@@ -409,7 +342,6 @@ def plot_model_metrics(
     if h_per_val.size > 0:
         plt.figure(figsize=(12, 6))
 
-        # If multiconcepts is True, we handle the [N_concepts, N_classes] structure
         if multiconcepts:
             # Squeeze if it's (1, 21, 2) -> (21, 2)
             if h_per_val.ndim == 3:
@@ -419,8 +351,6 @@ def plot_model_metrics(
             indices = np.arange(n_concepts)
             width = 0.35  # Width of individual bars
 
-            # Plot bars for each class (e.g., False and True)
-            # Assuming class 0 is False/Absent and class 1 is True/Present
             plt.bar(
                 indices - width / 2,
                 h_per_val[:, 0],
@@ -440,12 +370,10 @@ def plot_model_metrics(
 
             plt.legend()
         else:
-            # Standard 1D entropy per concept logic
             n_concepts = len(h_per_val)
             indices = np.arange(n_concepts)
             plt.bar(indices, h_per_val, color="purple", alpha=0.6, edgecolor="black")
 
-        # Labels and Formatting
         if concept_names and len(concept_names) == n_concepts:
             labels = concept_names
         else:

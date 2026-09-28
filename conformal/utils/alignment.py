@@ -10,7 +10,6 @@ def align_concepts(probs, labels, multiclass=False):
     """
 
     if probs.ndim == 2:
-        # Shape (N, C) — just apply alignment directly
         aligned_probs, permutation = align_distribution_with_labels(
             probs, labels, multiclass
         )
@@ -18,7 +17,6 @@ def align_concepts(probs, labels, multiclass=False):
     elif probs.ndim == 3:
 
         if not multiclass:
-            # Shape (N, M, C) — flatten first two dims
             N, M, C = probs.shape
             flat_probs = probs.reshape(-1, C)
             flat_labels = labels.reshape(-1)
@@ -27,7 +25,6 @@ def align_concepts(probs, labels, multiclass=False):
                 flat_probs, flat_labels, multiclass
             )
 
-            # Reshape back to (N, M, C)
             aligned_probs = aligned_flat.reshape(N, M, C)
         else:
             aligned_probs, permutation = align_distribution_with_labels(
@@ -94,14 +91,10 @@ def align_distribution_with_labels(probs, labels, multiclass=False):
 
 
 def inverse_permutation(perm):
-    """Return inverse permutation as np.ndarray."""
     return perm.T
 
 
 def apply_knowledge_permutation(probs, perm):
-    """
-    Revert previously aligned probabilities using inverse permutation.
-    """
     probs = probs @ inverse_permutation(perm)
     return probs
 

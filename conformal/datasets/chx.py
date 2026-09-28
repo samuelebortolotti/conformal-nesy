@@ -15,7 +15,6 @@ from conformal.models import resnet18, lenet, linear, clip_encoder
 
 
 def configure_global_arguments(parser):
-    """Global arguments for CHX"""
     parser.add_argument(
         "--chx-multi-class",
         action="store_true",
@@ -25,8 +24,6 @@ def configure_global_arguments(parser):
 
 
 class CHXDataset(Dataset):
-    """Dataset class with lazy loading for Chest X-rays."""
-
     def __init__(self, image_paths, concepts, targets, transform=None):
         self.image_paths = image_paths
         self.concepts = concepts
@@ -68,7 +65,6 @@ class CHXLoader:
         self.concept_dim = 4
 
     def _download_and_extract_needed(self, needed_filenames):
-        """Downloads NIH tarballs only to extract specific annotated images."""
         img_dir = os.path.join(self.data_dir, "images_nih")
         os.makedirs(img_dir, exist_ok=True)
 
@@ -115,7 +111,6 @@ class CHXLoader:
             os.remove(tar_path)
 
     def load(self):
-        # 1. Access local CSVs
         readers_csv = os.path.join(
             self.data_dir, "four_findings_expert_labels_individual_readers.csv"
         )
@@ -126,36 +121,23 @@ class CHXLoader:
             self.data_dir, "four_findings_expert_labels_validation_labels.csv"
         )
 
-        # Load all into one pool
         df_readers = pd.read_csv(readers_csv)
         df_test = pd.read_csv(test_labels_csv)
         df_val = pd.read_csv(val_labels_csv)
         expert_df = pd.concat([df_readers, df_test, df_val], ignore_index=True)
 
-        # 2. Trigger selective download/extraction
-        # needed_images = set(expert_df["Image ID"].unique())
-        # self._download_and_extract_needed(needed_images)
-
-        # 3. Process Labels
         concept_cols = ["Fracture", "Pneumothorax", "Airspace opacity", "Nodule/mass"]
-
-        # if "Nodule or mass" in expert_df.columns:
-        #     expert_df.rename(columns={"Nodule or mass": "Nodule/mass"}, inplace=True)
 
         for col in concept_cols:
             expert_df[col] = np.where(expert_df[col] == "YES", 1, 0)
 
-        # Aggregate (Majority vote for multiple readers)
         df_agg = expert_df.groupby("Image ID")[concept_cols].mean().reset_index()
         for col in concept_cols:
             df_agg[col] = (df_agg[col] >= 0.5).astype(int)
 
-        # Number of activated concepts
         concept_count = df_agg[concept_cols].sum(axis=1)
 
-        # depending on the class
         if self.chx_multi_class:
-            # TODO: maybe with the help of a clinitian we could rearrange something better
             df_agg["target"] = np.select(
                 [
                     concept_count == 0,  # 0 = Healthy
@@ -188,7 +170,6 @@ class CHXLoader:
         # Final check: only include what we successfully extracted
         df_agg = df_agg[df_agg["path"].apply(os.path.exists)].reset_index(drop=True)
 
-        # 4. Split and Transform
         x_train, x_test, c_train, c_test, y_train, y_test = train_test_split(
             df_agg["path"].values,
             df_agg[concept_cols].values,
@@ -200,13 +181,11 @@ class CHXLoader:
             x_train, c_train, y_train, test_size=self.val_split, random_state=42
         )
 
-        # Label weights
         y_counts = np.bincount(y_train, minlength=n_classes)
         self.label_weights = torch.tensor(
             len(y_train) / (n_classes * y_counts), dtype=torch.float
         )
 
-        # Concept weights
         for i in range(c_train.shape[1]):
             c_counts = np.bincount(c_train[:, i])
             if len(c_counts) < 2:
@@ -261,8 +240,6 @@ class CHXLoader:
 
 
 def configure_subparsers(subparsers):
-    """Configure subparsers."""
-    # Subparser for CHX
     chx_parser = subparsers.add_parser(
         "chx",
         help="Use CHX as dataset",
